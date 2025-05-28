@@ -53,11 +53,26 @@ func NewP2PService(appService *AppService) (*P2PService, error) {
 		return nil, fmt.Errorf("failed to create connection manager: %w", err)
 	}
 	
-	// Create libp2p host with various transports and NAT traversal
+	// Find available ports for P2P communication
+	tcpPort, err := FindAvailablePort(9000)
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("failed to find available TCP port: %w", err)
+	}
+	
+	quicPort, err := FindAvailablePort(tcpPort + 1)
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("failed to find available QUIC port: %w", err)
+	}
+	
+	log.Printf("🔌 Using P2P ports - TCP: %d, QUIC: %d", tcpPort, quicPort)
+	
+	// Create libp2p host with available ports and NAT traversal
 	h, err := libp2p.New(
 		libp2p.ListenAddrStrings(
-			"/ip4/0.0.0.0/tcp/0",        // TCP
-			"/ip4/0.0.0.0/udp/0/quic",   // QUIC
+			fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", tcpPort),        // TCP on available port
+			fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic", quicPort),  // QUIC on available port
 		),
 		libp2p.ConnectionManager(connmgr),
 		libp2p.EnableHolePunching(),      // Enable hole punching

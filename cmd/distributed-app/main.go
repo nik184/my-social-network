@@ -19,8 +19,11 @@ func main() {
 		}
 	}()
 	
-	// Initialize WebView UI
-	webUI := ui.NewWebViewUI(appService, 6996)
+	// Initialize WebView UI with automatic port discovery
+	webUI, err := ui.NewWebViewUI(appService, 6996)
+	if err != nil {
+		log.Fatalf("Failed to create WebView UI: %v", err)
+	}
 	
 	// Start the web server
 	webUI.StartServer()

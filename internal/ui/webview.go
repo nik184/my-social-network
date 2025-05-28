@@ -22,13 +22,26 @@ type WebViewUI struct {
 	port       int
 }
 
-// NewWebViewUI creates a new WebView UI manager
-func NewWebViewUI(appService *services.AppService, port int) *WebViewUI {
+// NewWebViewUI creates a new WebView UI manager with automatic port discovery
+func NewWebViewUI(appService *services.AppService, preferredPort int) (*WebViewUI, error) {
+	// Find an available port starting from the preferred port
+	availablePort, err := services.FindAvailablePort(preferredPort)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find available port: %w", err)
+	}
+	
+	log.Printf("🌐 Using port %d for HTTP server (preferred: %d)", availablePort, preferredPort)
+	
 	return &WebViewUI{
 		appService: appService,
 		handler:    handlers.NewHandler(appService),
-		port:       port,
-	}
+		port:       availablePort,
+	}, nil
+}
+
+// GetPort returns the port being used by the HTTP server
+func (w *WebViewUI) GetPort() int {
+	return w.port
 }
 
 // StartServer starts the HTTP server for the API and static files

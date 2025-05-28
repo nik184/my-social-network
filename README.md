@@ -10,7 +10,8 @@ A truly distributed Go application using libp2p that manages a shared directory 
 4. **NAT Traversal**: Automatic hole punching and relay connections for NAT'd networks
 5. **Secure Communication**: Encrypted libp2p streams for peer communication
 6. **Global Connectivity**: Works across the internet without fixed IP addresses
-7. **WebView UI**: Clean web-based interface for all interactions
+7. **Dynamic Port Allocation**: Automatically finds available ports to avoid conflicts
+8. **WebView UI**: Clean web-based interface for all interactions
 
 ## Project Structure
 
@@ -115,3 +116,5 @@ The application follows standard Go project layout:
 - **Secure Communication**: Noise protocol for encryption
 - **Connection Management**: Automatic connection limits and cleanup
 - **Bootstrap Nodes**: Connects to IPFS bootstrap nodes for initial connectivity
+- **Dynamic Port Management**: Automatically finds available ports for both HTTP server and P2P communication
+- **Multiple Instance Support**: Can run multiple instances on the same machine without port conflicts
