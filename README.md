@@ -9,6 +9,32 @@ A simple distributed Go application that manages a shared directory (`space184`)
 3. **Network Discovery**: Discovers other nodes on the network via IP address
 4. **WebView UI**: Clean web-based interface for all interactions
 
+## Project Structure
+
+```
+my-social-network/
+├── cmd/
+│   └── distributed-app/
+│       └── main.go              # Application entry point
+├── internal/
+│   ├── models/
+│   │   └── models.go            # Data structures
+│   ├── services/
+│   │   ├── app.go               # Application service coordinator
+│   │   ├── directory.go         # Directory management
+│   │   └── network.go           # Network operations
+│   ├── handlers/
+│   │   └── handlers.go          # HTTP request handlers
+│   └── ui/
+│       └── webview.go           # WebView interface management
+├── web/
+│   └── static/
+│       └── index.html           # Web UI
+├── go.mod                       # Go module file
+├── go.sum                       # Go dependencies
+└── README.md                    # This file
+```
+
 ## Requirements
 
 - Go 1.21 or later
@@ -19,12 +45,17 @@ A simple distributed Go application that manages a shared directory (`space184`)
 
 1. **Build the application**:
    ```bash
-   go build -o distributed-app .
+   go build -o distributed-app cmd/distributed-app/main.go
    ```
 
 2. **Run the application**:
    ```bash
    ./distributed-app
+   ```
+
+   Or run directly with:
+   ```bash
+   go run cmd/distributed-app/main.go
    ```
 
 3. **Use the WebView interface** to:
@@ -51,6 +82,18 @@ To discover another node:
 4. Click "Discover Node" to retrieve their folder information
 
 ## Architecture
+
+The application follows standard Go project layout:
+
+- **cmd/**: Application entrypoints
+- **internal/**: Private application code
+  - **models/**: Data structures and types
+  - **services/**: Business logic layer
+  - **handlers/**: HTTP request handling
+  - **ui/**: User interface management
+- **web/**: Static web assets
+
+### Components:
 
 - **WebView UI**: Native desktop interface using webview_go
 - **HTTP Server**: REST API for node communication on port 8080  
