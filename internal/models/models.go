@@ -1,6 +1,11 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
+)
 
 // FolderInfo represents information about a scanned directory
 type FolderInfo struct {
@@ -11,15 +16,14 @@ type FolderInfo struct {
 
 // NetworkNode represents a node in the distributed network
 type NetworkNode struct {
-	ID       string    `json:"id"`
-	IP       string    `json:"ip"`
-	Port     int       `json:"port"`
-	LastSeen time.Time `json:"lastSeen"`
+	ID        peer.ID             `json:"id"`
+	Addresses []multiaddr.Multiaddr `json:"addresses"`
+	LastSeen  time.Time           `json:"lastSeen"`
 }
 
 // DiscoveryRequest represents a request to discover a node
 type DiscoveryRequest struct {
-	IP string `json:"ip"`
+	PeerID string `json:"peerId"`
 }
 
 // NodeInfoResponse represents the response containing node and folder information
@@ -33,3 +37,17 @@ type StatusResponse struct {
 	Status  string `json:"status"`
 	Message string `json:"message,omitempty"`
 }
+
+// P2PMessage represents a message sent over libp2p streams
+type P2PMessage struct {
+	Type    string      `json:"type"`
+	Payload interface{} `json:"payload"`
+}
+
+// Constants for message types
+const (
+	MessageTypeGetInfo      = "getInfo"
+	MessageTypeGetInfoResp  = "getInfoResp"
+	MessageTypeDiscovery    = "discovery"
+	MessageTypeDiscoveryResp = "discoveryResp"
+)

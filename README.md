@@ -1,13 +1,16 @@
 # Distributed Social Network
 
-A simple distributed Go application that manages a shared directory (`space184`) and allows network discovery between nodes.
+A truly distributed Go application using libp2p that manages a shared directory (`space184`) and enables peer-to-peer discovery and communication across the internet.
 
 ## Features
 
 1. **Directory Management**: Creates and manages a `space184` folder in your home directory
 2. **Folder Scanning**: Scans directory contents and stores information in memory  
-3. **Network Discovery**: Discovers other nodes on the network via IP address
-4. **WebView UI**: Clean web-based interface for all interactions
+3. **P2P Network Discovery**: Discovers peers using DHT (Distributed Hash Table) and peer IDs
+4. **NAT Traversal**: Automatic hole punching and relay connections for NAT'd networks
+5. **Secure Communication**: Encrypted libp2p streams for peer communication
+6. **Global Connectivity**: Works across the internet without fixed IP addresses
+7. **WebView UI**: Clean web-based interface for all interactions
 
 ## Project Structure
 
@@ -22,7 +25,7 @@ my-social-network/
 │   ├── services/
 │   │   ├── app.go               # Application service coordinator
 │   │   ├── directory.go         # Directory management
-│   │   └── network.go           # Network operations
+│   │   └── p2p.go               # libp2p P2P networking
 │   ├── handlers/
 │   │   └── handlers.go          # HTTP request handlers
 │   └── ui/
@@ -66,20 +69,22 @@ my-social-network/
 
 ## API Endpoints
 
-The application exposes a REST API on port 8080:
+The application exposes a REST API on port 6996:
 
 - `GET /api/info` - Get current node and folder information
 - `POST /api/create` - Create the space184 directory
 - `POST /api/scan` - Scan the directory and update file list
-- `POST /api/discover` - Discover another node (requires IP in JSON body)
+- `POST /api/discover` - Discover a peer (requires peer ID in JSON body)
+- `GET /api/peers` - Get list of connected peers
 
-## Network Discovery
+## P2P Network Discovery
 
-To discover another node:
+To discover another peer:
 1. Ensure both applications are running
-2. Use the "Network Discovery" section in the UI
-3. Enter the IP address of the target node
-4. Click "Discover Node" to retrieve their folder information
+2. Use the "P2P Network Discovery" section in the UI
+3. Copy your Peer ID from the "Current Node Info" section and share it
+4. Enter another peer's Peer ID to discover and connect to them
+5. The DHT will automatically help discover peers across the internet
 
 ## Architecture
 
@@ -95,7 +100,18 @@ The application follows standard Go project layout:
 
 ### Components:
 
+- **libp2p Networking**: Full P2P stack with DHT, NAT traversal, hole punching
 - **WebView UI**: Native desktop interface using webview_go
-- **HTTP Server**: REST API for node communication on port 8080  
+- **HTTP Server**: Local REST API for UI communication on port 6996
+- **P2P Streams**: Secure encrypted communication between peers
 - **File System**: Direct interaction with OS file system for directory management
 - **In-Memory Storage**: Folder information cached in application memory
+
+### P2P Features:
+
+- **DHT-based Discovery**: Uses Kademlia DHT for global peer discovery
+- **NAT Traversal**: Automatic hole punching and relay connections
+- **Multiple Transports**: TCP, QUIC, WebRTC support
+- **Secure Communication**: Noise protocol for encryption
+- **Connection Management**: Automatic connection limits and cleanup
+- **Bootstrap Nodes**: Connects to IPFS bootstrap nodes for initial connectivity

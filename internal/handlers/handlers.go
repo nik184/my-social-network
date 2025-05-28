@@ -64,7 +64,7 @@ func (h *Handler) HandleDiscover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	nodeInfo, err := h.appService.NetworkService.DiscoverNode(req.IP)
+	nodeInfo, err := h.appService.P2PService.DiscoverPeer(req.PeerID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -74,10 +74,28 @@ func (h *Handler) HandleDiscover(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(nodeInfo)
 }
 
+// HandlePeers handles GET /api/peers requests
+func (h *Handler) HandlePeers(w http.ResponseWriter, r *http.Request) {
+	peers := h.appService.P2PService.GetConnectedPeers()
+	
+	// Convert peer IDs to strings for JSON
+	peerStrings := make([]string, len(peers))
+	for i, peer := range peers {
+		peerStrings[i] = peer.String()
+	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"peers": peerStrings,
+		"count": len(peerStrings),
+	})
+}
+
 // RegisterRoutes registers all HTTP routes
 func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/api/info", h.HandleGetInfo)
 	http.HandleFunc("/api/scan", h.HandleScan)
 	http.HandleFunc("/api/create", h.HandleCreate)
 	http.HandleFunc("/api/discover", h.HandleDiscover)
+	http.HandleFunc("/api/peers", h.HandlePeers)
 }

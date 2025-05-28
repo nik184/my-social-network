@@ -20,7 +20,8 @@
     <div class="container">
         <div class="header">
             <h1>🌐 Distributed Social Network</h1>
-            <p>Manage and share your space184 directory across the network</p>
+            <p>Manage and share your space184 directory using libp2p peer-to-peer networking</p>
+            <p style="font-size: 0.9em; color: #666;">✨ Features: DHT discovery, NAT traversal, hole punching, secure peer connections</p>
         </div>
         
         <div class="section">
@@ -32,9 +33,10 @@
         </div>
         
         <div class="section">
-            <h3>🔍 Network Discovery</h3>
-            <input type="text" id="ipInput" class="input" placeholder="Enter IP address" value="127.0.0.1">
-            <button class="button" onclick="discoverNode()">Discover Node</button>
+            <h3>🔍 P2P Network Discovery</h3>
+            <input type="text" id="peerIdInput" class="input" placeholder="Enter Peer ID" style="width: 400px;">
+            <button class="button" onclick="discoverPeer()">Discover Peer</button>
+            <button class="button" onclick="getConnectedPeers()">Show Connected Peers</button>
             <div id="discoveryStatus"></div>
             <div id="discoveryResult" class="result"></div>
         </div>
@@ -78,10 +80,10 @@
             }
         }
 
-        async function discoverNode() {
-            const ip = document.getElementById('ipInput').value;
-            if (!ip) {
-                showStatus('discoveryStatus', 'Please enter an IP address', true);
+        async function discoverPeer() {
+            const peerId = document.getElementById('peerIdInput').value;
+            if (!peerId) {
+                showStatus('discoveryStatus', 'Please enter a Peer ID', true);
                 return;
             }
 
@@ -89,21 +91,30 @@
                 const response = await fetch('/api/discover', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ip: ip })
+                    body: JSON.stringify({ peerId: peerId })
                 });
                 
                 if (!response.ok) {
-                    console.log(response);
-                    
                     throw new Error('Network response was not ok');
                 }
                 
                 const data = await response.json();
-                showStatus('discoveryStatus', 'Node discovered successfully!');
+                showStatus('discoveryStatus', 'Peer discovered successfully!');
                 showResult('discoveryResult', data);
             } catch (error) {
-                showStatus('discoveryStatus', 'Error discovering node: ' + error.message, true);
+                showStatus('discoveryStatus', 'Error discovering peer: ' + error.message, true);
                 document.getElementById('discoveryResult').textContent = '';
+            }
+        }
+
+        async function getConnectedPeers() {
+            try {
+                const response = await fetch('/api/peers');
+                const data = await response.json();
+                showStatus('discoveryStatus', `Connected to ${data.count} peers`);
+                showResult('discoveryResult', data);
+            } catch (error) {
+                showStatus('discoveryStatus', 'Error getting peers: ' + error.message, true);
             }
         }
 

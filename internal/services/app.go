@@ -1,22 +1,32 @@
 package services
 
 import (
+	"log"
+
 	"my-social-network/internal/models"
 )
 
 // AppService coordinates all application services
 type AppService struct {
 	DirectoryService *DirectoryService
-	NetworkService   *NetworkService
+	P2PService       *P2PService
 	folderInfo       *models.FolderInfo
 }
 
 // NewAppService creates a new application service
 func NewAppService() *AppService {
-	return &AppService{
+	appService := &AppService{
 		DirectoryService: NewDirectoryService(),
-		NetworkService:   NewNetworkService(),
 	}
+	
+	// Initialize P2P service
+	p2pService, err := NewP2PService(appService)
+	if err != nil {
+		log.Fatalf("Failed to create P2P service: %v", err)
+	}
+	appService.P2PService = p2pService
+	
+	return appService
 }
 
 // GetFolderInfo returns the current folder information
@@ -33,6 +43,14 @@ func (a *AppService) SetFolderInfo(info *models.FolderInfo) {
 func (a *AppService) GetNodeInfo() *models.NodeInfoResponse {
 	return &models.NodeInfoResponse{
 		FolderInfo: a.folderInfo,
-		Node:       a.NetworkService.GetNode(),
+		Node:       a.P2PService.GetNode(),
 	}
+}
+
+// Close shuts down all services
+func (a *AppService) Close() error {
+	if a.P2PService != nil {
+		return a.P2PService.Close()
+	}
+	return nil
 }
