@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	webview "github.com/webview/webview_go"
@@ -34,8 +36,24 @@ func (w *WebViewUI) StartServer() {
 	// Register API routes
 	w.handler.RegisterRoutes()
 	
+	// Find the project root directory
+	wd, _ := os.Getwd()
+	for {
+		if _, err := os.Stat(filepath.Join(wd, "go.mod")); err == nil {
+			break
+		}
+		parent := filepath.Dir(wd)
+		if parent == wd {
+			log.Fatal("Could not find project root")
+		}
+		wd = parent
+	}
+	
+	staticDir := filepath.Join(wd, "web", "static")
+	log.Printf("Serving static files from: %s", staticDir)
+	
 	// Serve static files
-	http.Handle("/", http.FileServer(http.Dir("web/static/")))
+	http.Handle("/", http.FileServer(http.Dir(staticDir)))
 	
 	go func() {
 		log.Printf("Starting web server on port %d", w.port)
