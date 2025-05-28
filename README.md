@@ -33,7 +33,8 @@ my-social-network/
 │   ├── handlers/
 │   │   └── handlers.go          # HTTP request handlers
 │   └── ui/
-│       └── webview.go           # WebView interface management
+│       ├── webview_unix.go      # Unix/Linux/macOS UI implementation
+│       └── webview_windows.go   # Windows UI implementation
 ├── web/
 │   └── static/
 │       └── index.html           # Web UI
@@ -44,32 +45,52 @@ my-social-network/
 
 ## Requirements
 
-- Go 1.21 or later
-- CGO enabled (for WebView support)
-- On Linux: `sudo apt-get install webkit2gtk-4.0-dev` or similar WebKit development libraries
+- Go 1.23.8 or later
+- No additional dependencies required! 
+- Works on Windows, Linux, and macOS
+- No CGO or WebKit dependencies needed
 
 ## Usage
 
+### Quick Start (Cross-Platform)
+
 1. **Build the application**:
+   
+   **Windows:**
+   ```batch
+   build.bat
+   ```
+   
+   **Linux/macOS:**
+   ```bash
+   ./build.sh
+   ```
+   
+   **Manual build:**
    ```bash
    go build -o distributed-app cmd/distributed-app/main.go
    ```
 
 2. **Run the application**:
+   
+   **Windows:**
+   ```batch
+   distributed-app.exe
+   ```
+   
+   **Linux/macOS:**
    ```bash
    ./distributed-app
    ```
 
-   Or run directly with:
-   ```bash
-   go run cmd/distributed-app/main.go
-   ```
-
-3. **Use the WebView interface** to:
-   - Create the `space184` directory in your home folder
-   - Scan the directory to store file information
-   - Discover other nodes by entering their IP addresses
-   - View current node information
+3. **Access the Web Interface**:
+   - The application automatically opens in your default browser
+   - If it doesn't open automatically, navigate to `http://localhost:6996`
+   - Use the web interface to:
+     - Create the `space184` directory in your home folder
+     - Scan the directory to store file information
+     - Discover peers using their Peer IDs
+     - View current node information and connected peers
 
 ## API Endpoints
 
@@ -106,7 +127,7 @@ The application follows standard Go project layout:
 ### Components:
 
 - **libp2p Networking**: Full P2P stack with DHT, NAT traversal, hole punching
-- **WebView UI**: Native desktop interface using webview_go
+- **Cross-Platform UI**: Browser-based interface that works on all platforms
 - **HTTP Server**: Local REST API for UI communication on port 6996
 - **P2P Streams**: Secure encrypted communication between peers
 - **File System**: Direct interaction with OS file system for directory management
