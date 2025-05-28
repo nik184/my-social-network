@@ -20,7 +20,7 @@ func NewNetworkService() *NetworkService {
 		node: &models.NetworkNode{
 			ID:   generateNodeID(),
 			IP:   "127.0.0.1",
-			Port: 8080,
+			Port: 6996,
 		},
 	}
 }
@@ -33,18 +33,18 @@ func (n *NetworkService) GetNode() *models.NetworkNode {
 // DiscoverNode attempts to discover another node by IP address
 func (n *NetworkService) DiscoverNode(ip string) (*models.NodeInfoResponse, error) {
 	client := &http.Client{Timeout: 5 * time.Second}
-	
-	resp, err := client.Get(fmt.Sprintf("http://%s:8080/api/info", ip))
+
+	resp, err := client.Get(fmt.Sprintf("http://%s:6996/api/info", ip))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to node: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	var result models.NodeInfoResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
-	
+
 	return &result, nil
 }
 

@@ -18,7 +18,7 @@ type DirectoryService struct {
 func NewDirectoryService() *DirectoryService {
 	homeDir, _ := os.UserHomeDir()
 	dirPath := filepath.Join(homeDir, "space184")
-	
+
 	return &DirectoryService{
 		directoryPath: dirPath,
 	}

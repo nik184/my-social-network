@@ -8,13 +8,13 @@ import (
 func main() {
 	// Initialize application services
 	appService := services.NewAppService()
-	
+
 	// Initialize WebView UI
-	webUI := ui.NewWebViewUI(appService, 8080)
-	
+	webUI := ui.NewWebViewUI(appService, 6996)
+
 	// Start the web server
 	webUI.StartServer()
-	
+
 	// Start the WebView interface
 	webUI.ShowWebView()
 }
