@@ -21,14 +21,16 @@
         <div class="header">
             <h1>🌐 Distributed Social Network</h1>
             <p>Manage and share your space184 directory using libp2p peer-to-peer networking</p>
-            <p style="font-size: 0.9em; color: #666;">✨ Features: DHT discovery, NAT traversal, hole punching, secure peer connections</p>
+            <p style="font-size: 0.9em; color: #666;">✨ Features: DHT discovery, NAT traversal, hole punching, auto file monitoring</p>
         </div>
         
         <div class="section">
             <h3>📁 Directory Management</h3>
             <button class="button" onclick="createDirectory()">Create space184 Directory</button>
-            <button class="button" onclick="scanDirectory()">Scan Directory</button>
+            <button class="button" onclick="scanDirectory()">Manual Scan</button>
+            <button class="button" onclick="getMonitorStatus()">Monitor Status</button>
             <div id="directoryStatus"></div>
+            <div id="monitorStatus" class="status" style="margin: 10px 0;"></div>
             <div id="directoryInfo" class="result"></div>
         </div>
         
@@ -73,10 +75,26 @@
             try {
                 const response = await fetch('/api/scan', { method: 'POST' });
                 const data = await response.json();
-                showStatus('directoryStatus', 'Directory scanned successfully!');
+                showStatus('directoryStatus', 'Manual scan completed successfully!');
                 getNodeInfo(); // Refresh the info
             } catch (error) {
                 showStatus('directoryStatus', 'Error scanning directory: ' + error.message, true);
+            }
+        }
+
+        async function getMonitorStatus() {
+            try {
+                const response = await fetch('/api/monitor');
+                const data = await response.json();
+                
+                if (data.monitoring) {
+                    const lastScan = data.lastScan ? new Date(data.lastScan).toLocaleTimeString() : 'Never';
+                    showStatus('monitorStatus', `📡 Auto-monitoring active | Last scan: ${lastScan}`, false);
+                } else {
+                    showStatus('monitorStatus', '❌ Auto-monitoring inactive', true);
+                }
+            } catch (error) {
+                showStatus('monitorStatus', 'Error getting monitor status: ' + error.message, true);
             }
         }
 
@@ -128,9 +146,21 @@
             }
         }
 
-        // Load initial node info
-        window.onload = function() {
+        // Auto-refresh node info and monitor status
+        function startAutoRefresh() {
             getNodeInfo();
+            getMonitorStatus();
+            
+            // Auto-refresh every 5 seconds
+            setInterval(() => {
+                getNodeInfo();
+                getMonitorStatus();
+            }, 5000);
+        }
+
+        // Load initial data
+        window.onload = function() {
+            startAutoRefresh();
         };
     </script>
 </body>

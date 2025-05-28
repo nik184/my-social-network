@@ -10,6 +10,7 @@ import (
 type AppService struct {
 	DirectoryService *DirectoryService
 	P2PService       *P2PService
+	MonitorService   *MonitorService
 	folderInfo       *models.FolderInfo
 }
 
@@ -25,6 +26,13 @@ func NewAppService() *AppService {
 		log.Fatalf("Failed to create P2P service: %v", err)
 	}
 	appService.P2PService = p2pService
+	
+	// Initialize monitoring service
+	monitorService, err := NewMonitorService(appService.DirectoryService, appService)
+	if err != nil {
+		log.Fatalf("Failed to create monitor service: %v", err)
+	}
+	appService.MonitorService = monitorService
 	
 	return appService
 }
@@ -47,8 +55,19 @@ func (a *AppService) GetNodeInfo() *models.NodeInfoResponse {
 	}
 }
 
+// StartMonitoring starts the file system monitoring
+func (a *AppService) StartMonitoring() error {
+	if a.MonitorService != nil {
+		return a.MonitorService.Start()
+	}
+	return nil
+}
+
 // Close shuts down all services
 func (a *AppService) Close() error {
+	if a.MonitorService != nil {
+		a.MonitorService.Stop()
+	}
 	if a.P2PService != nil {
 		return a.P2PService.Close()
 	}

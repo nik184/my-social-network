@@ -28,13 +28,22 @@ func (h *Handler) HandleGetInfo(w http.ResponseWriter, r *http.Request) {
 
 // HandleScan handles POST /api/scan requests
 func (h *Handler) HandleScan(w http.ResponseWriter, r *http.Request) {
-	folderInfo, err := h.appService.DirectoryService.ScanDirectory()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	// Use the monitor service for manual scan if available
+	if h.appService.MonitorService != nil {
+		err := h.appService.MonitorService.TriggerManualScan()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	} else {
+		// Fallback to direct scan
+		folderInfo, err := h.appService.DirectoryService.ScanDirectory()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		h.appService.SetFolderInfo(folderInfo)
 	}
-	
-	h.appService.SetFolderInfo(folderInfo)
 	
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(models.StatusResponse{Status: "success"})
@@ -91,6 +100,20 @@ func (h *Handler) HandlePeers(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// HandleMonitorStatus handles GET /api/monitor requests
+func (h *Handler) HandleMonitorStatus(w http.ResponseWriter, r *http.Request) {
+	status := map[string]interface{}{
+		"monitoring": h.appService.MonitorService != nil,
+	}
+	
+	if h.appService.MonitorService != nil {
+		status["lastScan"] = h.appService.MonitorService.GetLastScanTime()
+	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(status)
+}
+
 // RegisterRoutes registers all HTTP routes
 func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/api/info", h.HandleGetInfo)
@@ -98,4 +121,5 @@ func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/api/create", h.HandleCreate)
 	http.HandleFunc("/api/discover", h.HandleDiscover)
 	http.HandleFunc("/api/peers", h.HandlePeers)
+	http.HandleFunc("/api/monitor", h.HandleMonitorStatus)
 }

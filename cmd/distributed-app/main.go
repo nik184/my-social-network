@@ -28,6 +28,11 @@ func main() {
 	// Start the web server
 	webUI.StartServer()
 	
+	// Start file system monitoring
+	if err := appService.StartMonitoring(); err != nil {
+		log.Printf("Warning: Failed to start file monitoring: %v", err)
+	}
+	
 	// Handle graceful shutdown
 	go func() {
 		sigChan := make(chan os.Signal, 1)

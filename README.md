@@ -11,7 +11,8 @@ A truly distributed Go application using libp2p that manages a shared directory 
 5. **Secure Communication**: Encrypted libp2p streams for peer communication
 6. **Global Connectivity**: Works across the internet without fixed IP addresses
 7. **Dynamic Port Allocation**: Automatically finds available ports to avoid conflicts
-8. **WebView UI**: Clean web-based interface for all interactions
+8. **Real-time File Monitoring**: Automatically detects changes in the space184 directory
+9. **WebView UI**: Clean web-based interface for all interactions
 
 ## Project Structure
 
@@ -26,7 +27,9 @@ my-social-network/
 │   ├── services/
 │   │   ├── app.go               # Application service coordinator
 │   │   ├── directory.go         # Directory management
-│   │   └── p2p.go               # libp2p P2P networking
+│   │   ├── monitor.go           # File system monitoring
+│   │   ├── p2p.go               # libp2p P2P networking
+│   │   └── ports.go             # Port allocation utilities
 │   ├── handlers/
 │   │   └── handlers.go          # HTTP request handlers
 │   └── ui/
@@ -74,9 +77,10 @@ The application exposes a REST API on port 6996:
 
 - `GET /api/info` - Get current node and folder information
 - `POST /api/create` - Create the space184 directory
-- `POST /api/scan` - Scan the directory and update file list
+- `POST /api/scan` - Manually trigger directory scan
 - `POST /api/discover` - Discover a peer (requires peer ID in JSON body)
 - `GET /api/peers` - Get list of connected peers
+- `GET /api/monitor` - Get file monitoring status and last scan time
 
 ## P2P Network Discovery
 
@@ -118,3 +122,6 @@ The application follows standard Go project layout:
 - **Bootstrap Nodes**: Connects to IPFS bootstrap nodes for initial connectivity
 - **Dynamic Port Management**: Automatically finds available ports for both HTTP server and P2P communication
 - **Multiple Instance Support**: Can run multiple instances on the same machine without port conflicts
+- **Real-time File Monitoring**: Uses fsnotify for instant detection of file system changes
+- **Automatic Scanning**: Performs initial scan on startup and monitors for changes continuously
+- **Debounced Updates**: Prevents excessive scanning during rapid file operations
