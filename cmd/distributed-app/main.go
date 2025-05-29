@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -22,25 +23,55 @@ func showConnectionString(appService *services.AppService) {
 	fmt.Println("📋 CONNECTION STRING FOR SHARING")
 	fmt.Println(strings.Repeat("=", 60))
 	
+	// Show P2P addresses (extracted from local addresses)
+	fmt.Printf("🔗 P2P Listening Addresses:\n")
+	var p2pPort int
+	var localIP string
+	
+	for _, addr := range connectionInfo.LocalAddresses {
+		fmt.Printf("   %s\n", addr)
+		// Extract the first non-localhost IP and port for manual connection
+		if strings.Contains(addr, "/ip4/") && !strings.Contains(addr, "127.0.0.1") && localIP == "" {
+			parts := strings.Split(addr, "/")
+			if len(parts) >= 5 {
+				localIP = parts[2]      // IP address
+				if port, err := strconv.Atoi(parts[4]); err == nil {
+					p2pPort = port       // TCP port
+				}
+			}
+		}
+	}
+	
+	fmt.Println(strings.Repeat("-", 60))
+	
 	if connectionInfo.PublicAddress != "" && connectionInfo.Port != 0 {
 		connectionString := fmt.Sprintf("%s:%d:%s", 
 			connectionInfo.PublicAddress, 
 			connectionInfo.Port, 
 			connectionInfo.PeerID)
-		fmt.Printf("🌐 Connection String: %s\n", connectionString)
+		fmt.Printf("🌐 Auto-detected Connection String: %s\n", connectionString)
 		fmt.Printf("📋 Share this with others to connect to your node\n")
 		fmt.Printf("🔗 Public Address: %s:%d\n", connectionInfo.PublicAddress, connectionInfo.Port)
 	} else {
-		fmt.Printf("⚠️  This node is behind NAT - cannot accept direct connections\n")
-		fmt.Printf("🏠 Local addresses available for local network connections:\n")
-		for _, addr := range connectionInfo.LocalAddresses {
-			fmt.Printf("   %s\n", addr)
+		fmt.Printf("⚠️  Auto-detection failed - Node appears behind NAT\n")
+		if localIP != "" && p2pPort != 0 {
+			fmt.Printf("🔧 Manual Connection String (if server has public IP):\n")
+			fmt.Printf("   YOUR_PUBLIC_IP:%d:%s\n", p2pPort, connectionInfo.PeerID)
+			fmt.Printf("   Example: 93.183.82.171:%d:%s\n", p2pPort, connectionInfo.PeerID)
+			fmt.Printf("   ⚠️  Replace YOUR_PUBLIC_IP with your actual public IP address\n")
 		}
 	}
 	
 	fmt.Printf("🆔 Peer ID: %s\n", connectionInfo.PeerID)
+	fmt.Printf("🔌 P2P Port: %d (NOT the web port!)\n", p2pPort)
 	fmt.Printf("📊 NAT Status: %s\n", 
 		map[bool]string{true: "Public (can accept connections)", false: "Behind NAT (needs relay)"}[connectionInfo.IsPublicNode])
+	
+	fmt.Printf("\n💡 IMPORTANT:\n")
+	fmt.Printf("   - Use P2P port (%d) for peer connections, NOT web port\n", p2pPort)
+	fmt.Printf("   - Make sure port %d is open in your firewall\n", p2pPort)
+	fmt.Printf("   - Web interface is on a different port (for browser access only)\n")
+	
 	fmt.Println(strings.Repeat("=", 60) + "\n")
 }
 

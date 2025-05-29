@@ -297,13 +297,32 @@
                     publicAddress = `${data.publicAddress}:${data.port}`;
                 }
                 
+                // Extract P2P port from local addresses
+                let p2pPort = 'Unknown';
+                let localIP = 'Unknown';
+                if (data.localAddresses && data.localAddresses.length > 0) {
+                    for (const addr of data.localAddresses) {
+                        if (addr.includes('/ip4/') && !addr.includes('127.0.0.1')) {
+                            const parts = addr.split('/');
+                            if (parts.length >= 5) {
+                                localIP = parts[2];
+                                p2pPort = parts[4];
+                                break;
+                            }
+                        }
+                    }
+                }
+
                 const connectionInfo = {
                     'Peer ID': data.peerId || 'Unknown',
-                    'Public Address': publicAddress || 'Not available (behind NAT)',
-                    'Connection String': connectionString || 'Not available (node behind NAT)',
-                    'Share This': connectionString ? 'Copy the connection string above and share with others' : 'This node is behind NAT - cannot accept direct connections',
+                    'P2P Port': p2pPort + ' (Use this port for connections!)',
+                    'Local IP': localIP,
+                    'Public Address': publicAddress || 'Not auto-detected',
+                    'Connection String': connectionString || `Manual format: YOUR_PUBLIC_IP:${p2pPort}:${data.peerId}`,
+                    'Share This': connectionString ? 'Copy the connection string above and share with others' : `Replace YOUR_PUBLIC_IP with actual public IP in: YOUR_PUBLIC_IP:${p2pPort}:${data.peerId}`,
                     'Local Addresses': data.localAddresses || [],
-                    'NAT Status': data.isPublicNode ? 'Public (can accept connections)' : 'Behind NAT (needs relay)'
+                    'NAT Status': data.isPublicNode ? 'Public (can accept connections)' : 'Behind NAT (needs relay)',
+                    'Important': 'Use P2P port for connections, NOT the web interface port!'
                 };
                 
                 showStatus('discoveryStatus', 

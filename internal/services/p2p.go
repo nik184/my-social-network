@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -777,6 +778,17 @@ func (p *P2PService) ConnectByIP(ip string, port int, peerIDStr string) (*models
 	defer cancel()
 	
 	if err := p.host.Connect(ctx, peerInfo); err != nil {
+		// Provide more helpful error messages
+		errStr := err.Error()
+		if strings.Contains(errStr, "failed to negotiate security protocol") {
+			return nil, fmt.Errorf("failed to connect to peer at %s:%d: Protocol mismatch - make sure you're using the P2P port (not web port). Original error: %w", ip, port, err)
+		}
+		if strings.Contains(errStr, "connection refused") {
+			return nil, fmt.Errorf("failed to connect to peer at %s:%d: Connection refused - check if the node is running and port %d is open in firewall. Original error: %w", ip, port, port, err)
+		}
+		if strings.Contains(errStr, "timeout") {
+			return nil, fmt.Errorf("failed to connect to peer at %s:%d: Connection timeout - check network connectivity and firewall settings. Original error: %w", ip, port, err)
+		}
 		return nil, fmt.Errorf("failed to connect to peer at %s:%d: %w", ip, port, err)
 	}
 	
