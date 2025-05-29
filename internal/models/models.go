@@ -26,10 +26,38 @@ type DiscoveryRequest struct {
 	PeerID string `json:"peerId"`
 }
 
+// IPConnectionRequest represents a request to connect to a node by IP address
+type IPConnectionRequest struct {
+	IP     string `json:"ip"`
+	Port   int    `json:"port"`
+	PeerID string `json:"peerId"`
+}
+
+// ConnectionInfo represents the connection information for sharing
+type ConnectionInfo struct {
+	PeerID         string   `json:"peerId"`
+	PublicAddress  string   `json:"publicAddress,omitempty"`
+	Port           int      `json:"port,omitempty"`
+	LocalAddresses []string `json:"localAddresses"`
+	IsPublicNode   bool     `json:"isPublicNode"`
+}
+
+// PeerInfo stores information about connected peers for JSON serialization
+type PeerInfoJSON struct {
+	ID             string    `json:"id"`
+	Addresses      []string  `json:"addresses"`
+	FirstSeen      time.Time `json:"first_seen"`
+	LastSeen       time.Time `json:"last_seen"`
+	IsValidated    bool      `json:"is_validated"`
+	ConnectionType string    `json:"connection_type"`
+}
+
 // NodeInfoResponse represents the response containing node and folder information
 type NodeInfoResponse struct {
-	FolderInfo *FolderInfo  `json:"folderInfo"`
-	Node       *NetworkNode `json:"node"`
+	FolderInfo        *FolderInfo                   `json:"folderInfo"`
+	Node              *NetworkNode                  `json:"node"`
+	IsPublicNode      bool                          `json:"isPublicNode"`
+	ConnectedPeerInfo map[string]*PeerInfoJSON      `json:"connectedPeerInfo,omitempty"`
 }
 
 // StatusResponse represents a generic status response

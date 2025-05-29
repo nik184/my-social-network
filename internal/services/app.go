@@ -49,10 +49,33 @@ func (a *AppService) SetFolderInfo(info *models.FolderInfo) {
 
 // GetNodeInfo returns combined node and folder information
 func (a *AppService) GetNodeInfo() *models.NodeInfoResponse {
-	return &models.NodeInfoResponse{
+	response := &models.NodeInfoResponse{
 		FolderInfo: a.folderInfo,
 		Node:       a.P2PService.GetNode(),
 	}
+	
+	// Add NAT status and peer information if available
+	if a.P2PService != nil {
+		response.IsPublicNode = a.P2PService.IsPublicNode()
+		
+		// Convert PeerInfo to PeerInfoJSON for serialization
+		peerInfo := a.P2PService.GetConnectedPeerInfo()
+		if len(peerInfo) > 0 {
+			response.ConnectedPeerInfo = make(map[string]*models.PeerInfoJSON)
+			for peerID, info := range peerInfo {
+				response.ConnectedPeerInfo[peerID.String()] = &models.PeerInfoJSON{
+					ID:             info.ID.String(),
+					Addresses:      info.Addresses,
+					FirstSeen:      info.FirstSeen,
+					LastSeen:       info.LastSeen,
+					IsValidated:    info.IsValidated,
+					ConnectionType: info.ConnectionType,
+				}
+			}
+		}
+	}
+	
+	return response
 }
 
 // StartMonitoring starts the file system monitoring

@@ -36,9 +36,25 @@
         
         <div class="section">
             <h3>🔍 P2P Network Discovery</h3>
-            <input type="text" id="peerIdInput" class="input" placeholder="Enter Peer ID" style="width: 400px;">
-            <button class="button" onclick="discoverPeer()">Discover Peer</button>
+            <div style="margin-bottom: 15px;">
+                <h4>🔗 Connect by Peer ID (Local Network)</h4>
+                <input type="text" id="peerIdInput" class="input" placeholder="Enter Peer ID" style="width: 400px;">
+                <button class="button" onclick="discoverPeer()">Discover Peer</button>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <h4>🌐 Connect by IP Address (Internet)</h4>
+                <input type="text" id="ipInput" class="input" placeholder="IP Address (e.g., 203.0.113.1)" style="width: 150px;">
+                <input type="text" id="portInput" class="input" placeholder="Port (e.g., 9001)" style="width: 100px;">
+                <input type="text" id="targetPeerIdInput" class="input" placeholder="Target Peer ID" style="width: 300px;">
+                <button class="button" onclick="connectByIP()">Connect by IP</button>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <h4>📋 Connection String</h4>
+                <input type="text" id="connectionStringInput" class="input" placeholder="Paste connection string (IP:PORT:PEER_ID)" style="width: 500px;">
+                <button class="button" onclick="connectByString()">Connect</button>
+            </div>
             <button class="button" onclick="getConnectedPeers()">Show Connected Peers</button>
+            <button class="button" onclick="getConnectionInfo()">Get My Connection Info</button>
             <div id="discoveryStatus"></div>
             <div id="discoveryResult" class="result"></div>
         </div>
@@ -46,7 +62,15 @@
         <div class="section">
             <h3>ℹ️ Current Node Info</h3>
             <button class="button" onclick="getNodeInfo()">Refresh Info</button>
+            <div id="natStatus" class="status" style="margin: 10px 0;"></div>
             <div id="nodeInfo" class="result"></div>
+        </div>
+        
+        <div class="section">
+            <h3>👥 Connected Peer Details</h3>
+            <button class="button" onclick="getDetailedPeerInfo()">Show Detailed Peer Info</button>
+            <div id="peerInfoStatus" class="status" style="margin: 10px 0;"></div>
+            <div id="detailedPeerInfo" class="result"></div>
         </div>
     </div>
 
@@ -157,9 +181,182 @@
             try {
                 const response = await fetch('/api/info');
                 const data = await response.json();
-                showResult('nodeInfo', data);
+                
+                // Display NAT status
+                if (data.isPublicNode !== undefined) {
+                    const natStatusMsg = data.isPublicNode 
+                        ? '🌐 PUBLIC NODE - Can assist with NAT traversal' 
+                        : '🏠 NAT\'d NODE - Seeks assistance for connections';
+                    showStatus('natStatus', natStatusMsg, !data.isPublicNode);
+                }
+                
+                // Create a clean display object
+                const displayData = {
+                    'Node ID': data.node?.id || 'Unknown',
+                    'Addresses': data.node?.addresses || [],
+                    'Last Seen': data.node?.lastSeen ? new Date(data.node.lastSeen).toLocaleString() : 'Unknown',
+                    'NAT Status': data.isPublicNode ? 'Public (Can help others)' : 'Behind NAT (Needs assistance)',
+                    'Directory Info': data.folderInfo || 'No directory scanned yet',
+                    'Connected Peers': data.connectedPeerInfo ? Object.keys(data.connectedPeerInfo).length : 0
+                };
+                
+                showResult('nodeInfo', displayData);
             } catch (error) {
                 showStatus('nodeInfo', 'Error getting node info: ' + error.message, true);
+            }
+        }
+
+        async function connectByIP() {
+            const ip = document.getElementById('ipInput').value;
+            const port = document.getElementById('portInput').value;
+            const peerId = document.getElementById('targetPeerIdInput').value;
+            
+            if (!ip || !port || !peerId) {
+                showStatus('discoveryStatus', 'Please enter IP address, port, and peer ID', true);
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/connect-ip', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        ip: ip,
+                        port: parseInt(port),
+                        peerId: peerId 
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                
+                const data = await response.json();
+                showStatus('discoveryStatus', 'Successfully connected via IP address!');
+                showResult('discoveryResult', data);
+            } catch (error) {
+                showStatus('discoveryStatus', 'Error connecting by IP: ' + error.message, true);
+                document.getElementById('discoveryResult').textContent = '';
+            }
+        }
+
+        async function connectByString() {
+            const connectionString = document.getElementById('connectionStringInput').value;
+            
+            if (!connectionString) {
+                showStatus('discoveryStatus', 'Please enter a connection string', true);
+                return;
+            }
+
+            // Parse connection string (format: IP:PORT:PEER_ID)
+            const parts = connectionString.split(':');
+            if (parts.length < 3) {
+                showStatus('discoveryStatus', 'Invalid connection string format. Use IP:PORT:PEER_ID', true);
+                return;
+            }
+
+            const ip = parts[0];
+            const port = parts[1];
+            const peerId = parts.slice(2).join(':'); // In case peer ID contains colons
+
+            try {
+                const response = await fetch('/api/connect-ip', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        ip: ip,
+                        port: parseInt(port),
+                        peerId: peerId 
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                
+                const data = await response.json();
+                showStatus('discoveryStatus', 'Successfully connected using connection string!');
+                showResult('discoveryResult', data);
+            } catch (error) {
+                showStatus('discoveryStatus', 'Error connecting by string: ' + error.message, true);
+                document.getElementById('discoveryResult').textContent = '';
+            }
+        }
+
+        async function getConnectionInfo() {
+            try {
+                const response = await fetch('/api/connection-info');
+                const data = await response.json();
+                
+                // Create a shareable connection string
+                let connectionString = '';
+                let publicAddress = '';
+                
+                if (data.publicAddress && data.port && data.peerId) {
+                    connectionString = `${data.publicAddress}:${data.port}:${data.peerId}`;
+                    publicAddress = `${data.publicAddress}:${data.port}`;
+                }
+                
+                const connectionInfo = {
+                    'Peer ID': data.peerId || 'Unknown',
+                    'Public Address': publicAddress || 'Not available (behind NAT)',
+                    'Connection String': connectionString || 'Not available (node behind NAT)',
+                    'Share This': connectionString ? 'Copy the connection string above and share with others' : 'This node is behind NAT - cannot accept direct connections',
+                    'Local Addresses': data.localAddresses || [],
+                    'NAT Status': data.isPublicNode ? 'Public (can accept connections)' : 'Behind NAT (needs relay)'
+                };
+                
+                showStatus('discoveryStatus', 
+                    data.isPublicNode 
+                        ? '✅ Connection info ready for sharing' 
+                        : '⚠️ Node behind NAT - direct connections not possible', 
+                    !data.isPublicNode);
+                showResult('discoveryResult', connectionInfo);
+                
+                // Auto-select connection string for easy copying
+                if (connectionString && document.getElementById('connectionStringInput')) {
+                    document.getElementById('connectionStringInput').value = connectionString;
+                }
+                
+            } catch (error) {
+                showStatus('discoveryStatus', 'Error getting connection info: ' + error.message, true);
+            }
+        }
+
+        async function getDetailedPeerInfo() {
+            try {
+                const response = await fetch('/api/info');
+                const data = await response.json();
+                
+                if (data.connectedPeerInfo && Object.keys(data.connectedPeerInfo).length > 0) {
+                    const peerCount = Object.keys(data.connectedPeerInfo).length;
+                    const publicNode = data.isPublicNode;
+                    
+                    showStatus('peerInfoStatus', 
+                        `📊 ${peerCount} detailed peer record${peerCount === 1 ? '' : 's'} ${publicNode ? '(stored for relay assistance)' : ''}`, 
+                        false);
+                    
+                    // Format peer information for better display
+                    const formattedPeerInfo = {};
+                    for (const [peerId, info] of Object.entries(data.connectedPeerInfo)) {
+                        const shortId = peerId.substring(0, 12) + '...';
+                        formattedPeerInfo[shortId] = {
+                            'Full ID': info.id,
+                            'Connection Type': info.connection_type || 'unknown',
+                            'Addresses': info.addresses || [],
+                            'First Seen': new Date(info.first_seen).toLocaleString(),
+                            'Last Seen': new Date(info.last_seen).toLocaleString(),
+                            'Validated': info.is_validated ? 'Yes' : 'No'
+                        };
+                    }
+                    
+                    showResult('detailedPeerInfo', formattedPeerInfo);
+                } else {
+                    showStatus('peerInfoStatus', '📭 No detailed peer information available', true);
+                    document.getElementById('detailedPeerInfo').textContent = '';
+                }
+            } catch (error) {
+                showStatus('peerInfoStatus', 'Error getting detailed peer info: ' + error.message, true);
             }
         }
 
@@ -167,11 +364,13 @@
         function startAutoRefresh() {
             getNodeInfo();
             getMonitorStatus();
+            getDetailedPeerInfo();
             
             // Auto-refresh every 5 seconds
             setInterval(() => {
                 getNodeInfo();
                 getMonitorStatus();
+                getDetailedPeerInfo();
             }, 5000);
         }
 

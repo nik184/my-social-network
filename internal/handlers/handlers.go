@@ -119,6 +119,36 @@ func (h *Handler) HandleMonitorStatus(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(status)
 }
 
+// HandleConnectByIP handles POST /api/connect-ip requests
+func (h *Handler) HandleConnectByIP(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	
+	var req models.IPConnectionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	
+	nodeInfo, err := h.appService.P2PService.ConnectByIP(req.IP, req.Port, req.PeerID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(nodeInfo)
+}
+
+// HandleConnectionInfo handles GET /api/connection-info requests
+func (h *Handler) HandleConnectionInfo(w http.ResponseWriter, r *http.Request) {
+	connectionInfo := h.appService.P2PService.GetConnectionInfo()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(connectionInfo)
+}
+
 // RegisterRoutes registers all HTTP routes
 func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/api/info", h.HandleGetInfo)
@@ -127,4 +157,6 @@ func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/api/discover", h.HandleDiscover)
 	http.HandleFunc("/api/peers", h.HandlePeers)
 	http.HandleFunc("/api/monitor", h.HandleMonitorStatus)
+	http.HandleFunc("/api/connect-ip", h.HandleConnectByIP)
+	http.HandleFunc("/api/connection-info", h.HandleConnectionInfo)
 }
