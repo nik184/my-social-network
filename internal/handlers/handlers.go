@@ -149,6 +149,63 @@ func (h *Handler) HandleConnectionInfo(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(connectionInfo)
 }
 
+// HandleConnectionHistory handles GET /api/connection-history requests
+func (h *Handler) HandleConnectionHistory(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	
+	history, err := h.appService.GetConnectionHistory()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(history)
+}
+
+// HandleSecondDegreePeers handles GET /api/second-degree-peers requests
+func (h *Handler) HandleSecondDegreePeers(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	
+	secondDegreePeers, err := h.appService.GetSecondDegreeConnections()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(secondDegreePeers)
+}
+
+// HandleConnectSecondDegree handles POST /api/connect-second-degree requests
+func (h *Handler) HandleConnectSecondDegree(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	
+	var req models.SecondDegreeConnectionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	
+	nodeInfo, err := h.appService.ConnectToSecondDegreePeer(req.TargetPeerID, req.ViaPeerID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(nodeInfo)
+}
+
 // RegisterRoutes registers all HTTP routes
 func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/api/info", h.HandleGetInfo)
@@ -159,4 +216,7 @@ func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/api/monitor", h.HandleMonitorStatus)
 	http.HandleFunc("/api/connect-ip", h.HandleConnectByIP)
 	http.HandleFunc("/api/connection-info", h.HandleConnectionInfo)
+	http.HandleFunc("/api/connection-history", h.HandleConnectionHistory)
+	http.HandleFunc("/api/second-degree-peers", h.HandleSecondDegreePeers)
+	http.HandleFunc("/api/connect-second-degree", h.HandleConnectSecondDegree)
 }

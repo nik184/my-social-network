@@ -449,6 +449,22 @@ func (p *P2PService) handleStream(stream network.Stream) {
 			Payload: p.appService.GetNodeInfo(),
 		}
 		
+	case models.MessageTypeGetPeerList:
+		// Return list of connected peers
+		peerList := p.getConnectedPeersList()
+		response = models.P2PMessage{
+			Type:    models.MessageTypeGetPeerListResp,
+			Payload: peerList,
+		}
+		
+	case models.MessageTypeHolePunchAssist:
+		// Handle hole punching assistance request
+		assistResponse := p.handleHolePunchAssistRequest(msg.Payload)
+		response = models.P2PMessage{
+			Type:    models.MessageTypeHolePunchResp,
+			Payload: assistResponse,
+		}
+		
 	default:
 		log.Printf("Unknown message type: %s", msg.Type)
 		return
@@ -1019,6 +1035,331 @@ func parsePort(portStr string) (int, error) {
 		return 0, fmt.Errorf("port out of range")
 	}
 	return port, nil
+}
+
+// getConnectedPeersList returns a list of connected validated peers
+func (p *P2PService) getConnectedPeersList() models.PeerListResponse {
+	connectedPeers := p.GetConnectedPeers()
+	var peerList []models.PeerListItem
+	
+	for _, peerID := range connectedPeers {
+		peerName := "unknown"
+		
+		// Get peer name from stored peer info
+		p.peerInfoMutex.RLock()
+		if peerInfo, exists := p.connectedPeers[peerID]; exists && peerInfo.Name != "" {
+			peerName = peerInfo.Name
+		}
+		p.peerInfoMutex.RUnlock()
+		
+		peerList = append(peerList, models.PeerListItem{
+			PeerID:   peerID.String(),
+			PeerName: peerName,
+		})
+	}
+	
+	return models.PeerListResponse{
+		Peers: peerList,
+		Count: len(peerList),
+	}
+}
+
+// requestPeerListFromPeer requests the peer list from a connected peer
+func (p *P2PService) requestPeerListFromPeer(peerID peer.ID) (*models.PeerListResponse, error) {
+	ctx, cancel := context.WithTimeout(p.ctx, 10*time.Second)
+	defer cancel()
+	
+	// Open stream to peer
+	stream, err := p.host.NewStream(ctx, peerID, protocol.ID(AppProtocol))
+	if err != nil {
+		return nil, fmt.Errorf("failed to open stream: %w", err)
+	}
+	defer stream.Close()
+	
+	// Send peer list request
+	msg := models.P2PMessage{
+		Type:    models.MessageTypeGetPeerList,
+		Payload: nil,
+	}
+	
+	encoder := json.NewEncoder(stream)
+	if err := encoder.Encode(msg); err != nil {
+		return nil, fmt.Errorf("failed to send peer list request: %w", err)
+	}
+	
+	// Read response
+	var response models.P2PMessage
+	decoder := json.NewDecoder(stream)
+	if err := decoder.Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+	
+	if response.Type != models.MessageTypeGetPeerListResp {
+		return nil, fmt.Errorf("unexpected response type: %s", response.Type)
+	}
+	
+	// Parse response payload
+	responseData, err := json.Marshal(response.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal response payload: %w", err)
+	}
+	
+	var peerListResponse models.PeerListResponse
+	if err := json.Unmarshal(responseData, &peerListResponse); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal peer list: %w", err)
+	}
+	
+	return &peerListResponse, nil
+}
+
+// handleHolePunchAssistRequest handles hole punching assistance requests
+func (p *P2PService) handleHolePunchAssistRequest(payload interface{}) map[string]interface{} {
+	// Parse the request payload
+	payloadData, err := json.Marshal(payload)
+	if err != nil {
+		return map[string]interface{}{
+			"success": false,
+			"error":   "failed to parse request",
+		}
+	}
+	
+	var request map[string]string
+	if err := json.Unmarshal(payloadData, &request); err != nil {
+		return map[string]interface{}{
+			"success": false,
+			"error":   "invalid request format",
+		}
+	}
+	
+	targetPeerStr, exists := request["target_peer_id"]
+	if !exists {
+		return map[string]interface{}{
+			"success": false,
+			"error":   "missing target_peer_id",
+		}
+	}
+	
+	targetPeerID, err := peer.Decode(targetPeerStr)
+	if err != nil {
+		return map[string]interface{}{
+			"success": false,
+			"error":   "invalid target peer ID",
+		}
+	}
+	
+	// Check if we're connected to the target peer
+	p.peerInfoMutex.RLock()
+	targetInfo, exists := p.connectedPeers[targetPeerID]
+	p.peerInfoMutex.RUnlock()
+	
+	if !exists {
+		return map[string]interface{}{
+			"success": false,
+			"error":   "target peer not connected to this node",
+		}
+	}
+	
+	// Return target peer's connection information
+	return map[string]interface{}{
+		"success":     true,
+		"target_peer": targetPeerStr,
+		"addresses":   targetInfo.Addresses,
+		"name":        targetInfo.Name,
+	}
+}
+
+// GetSecondDegreeConnections discovers peers connected to our direct connections
+func (p *P2PService) GetSecondDegreeConnections() (*models.SecondDegreeConnectionsResponse, error) {
+	connectedPeers := p.GetConnectedPeers()
+	secondDegreePeers := make(map[string]models.SecondDegreePeer) // Use map to avoid duplicates
+	
+	// For each connected peer, request their peer list
+	for _, peerID := range connectedPeers {
+		viaPeerName := "unknown"
+		
+		// Get the via peer's name
+		p.peerInfoMutex.RLock()
+		if peerInfo, exists := p.connectedPeers[peerID]; exists && peerInfo.Name != "" {
+			viaPeerName = peerInfo.Name
+		}
+		p.peerInfoMutex.RUnlock()
+		
+		// Request peer list from this peer
+		peerList, err := p.requestPeerListFromPeer(peerID)
+		if err != nil {
+			log.Printf("Failed to get peer list from %s: %v", peerID, err)
+			continue
+		}
+		
+		// Process the peer list
+		for _, remotePeer := range peerList.Peers {
+			// Skip if it's ourselves
+			if remotePeer.PeerID == p.host.ID().String() {
+				continue
+			}
+			
+			// Skip if we're already directly connected to this peer
+			remotePeerID, err := peer.Decode(remotePeer.PeerID)
+			if err != nil {
+				continue
+			}
+			
+			isDirectlyConnected := false
+			for _, directPeer := range connectedPeers {
+				if directPeer == remotePeerID {
+					isDirectlyConnected = true
+					break
+				}
+			}
+			
+			if isDirectlyConnected {
+				continue
+			}
+			
+			// Add to second-degree peers (using peer ID as key to avoid duplicates)
+			secondDegreePeers[remotePeer.PeerID] = models.SecondDegreePeer{
+				PeerID:      remotePeer.PeerID,
+				PeerName:    remotePeer.PeerName,
+				ViaPeerID:   peerID.String(),
+				ViaPeerName: viaPeerName,
+			}
+		}
+	}
+	
+	// Convert map to slice
+	var peerList []models.SecondDegreePeer
+	for _, peer := range secondDegreePeers {
+		peerList = append(peerList, peer)
+	}
+	
+	return &models.SecondDegreeConnectionsResponse{
+		Peers: peerList,
+		Count: len(peerList),
+	}, nil
+}
+
+// ConnectToSecondDegreePeer attempts to connect to a second-degree peer using hole punching
+func (p *P2PService) ConnectToSecondDegreePeer(targetPeerID, viaPeerID string) (*models.NodeInfoResponse, error) {
+	// Parse peer IDs
+	targetPeer, err := peer.Decode(targetPeerID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid target peer ID: %w", err)
+	}
+	
+	viaPeer, err := peer.Decode(viaPeerID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid via peer ID: %w", err)
+	}
+	
+	log.Printf("🔧 Attempting hole punch connection to %s via %s", targetPeer, viaPeer)
+	
+	// First, request hole punch assistance from the via peer
+	ctx, cancel := context.WithTimeout(p.ctx, 30*time.Second)
+	defer cancel()
+	
+	stream, err := p.host.NewStream(ctx, viaPeer, protocol.ID(AppProtocol))
+	if err != nil {
+		return nil, fmt.Errorf("failed to open stream to via peer: %w", err)
+	}
+	defer stream.Close()
+	
+	// Send hole punch assistance request
+	assistRequest := models.P2PMessage{
+		Type: models.MessageTypeHolePunchAssist,
+		Payload: map[string]string{
+			"target_peer_id": targetPeerID,
+		},
+	}
+	
+	encoder := json.NewEncoder(stream)
+	if err := encoder.Encode(assistRequest); err != nil {
+		return nil, fmt.Errorf("failed to send hole punch request: %w", err)
+	}
+	
+	// Read response
+	var response models.P2PMessage
+	decoder := json.NewDecoder(stream)
+	if err := decoder.Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode hole punch response: %w", err)
+	}
+	
+	// Parse the response
+	responseData, err := json.Marshal(response.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal response payload: %w", err)
+	}
+	
+	var assistResponse map[string]interface{}
+	if err := json.Unmarshal(responseData, &assistResponse); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal assist response: %w", err)
+	}
+	
+	success, exists := assistResponse["success"].(bool)
+	if !exists || !success {
+		errorMsg := "hole punch assistance failed"
+		if errStr, exists := assistResponse["error"].(string); exists {
+			errorMsg = errStr
+		}
+		return nil, fmt.Errorf("hole punch assistance failed: %s", errorMsg)
+	}
+	
+	// Extract target peer addresses
+	addresses, exists := assistResponse["addresses"].([]interface{})
+	if !exists || len(addresses) == 0 {
+		return nil, fmt.Errorf("no addresses provided for target peer")
+	}
+	
+	// Try to connect using the provided addresses
+	var lastErr error
+	for _, addrInterface := range addresses {
+		addrStr, ok := addrInterface.(string)
+		if !ok {
+			continue
+		}
+		
+		// Parse multiaddr
+		addr, err := multiaddr.NewMultiaddr(addrStr)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		
+		// Create peer info
+		peerInfo := peer.AddrInfo{
+			ID:    targetPeer,
+			Addrs: []multiaddr.Multiaddr{addr},
+		}
+		
+		// Attempt connection
+		connectCtx, connectCancel := context.WithTimeout(ctx, 15*time.Second)
+		err = p.host.Connect(connectCtx, peerInfo)
+		connectCancel()
+		
+		if err == nil {
+			log.Printf("✅ Successfully connected to %s via hole punching", targetPeer)
+			
+			// Store peer information
+			p.storePeerInfo(targetPeer, "outbound")
+			
+			// Validate the peer
+			if !p.validatePeer(targetPeer) {
+				log.Printf("❌ Peer %s is not running our application, disconnecting", targetPeer)
+				p.host.Network().ClosePeer(targetPeer)
+				return nil, fmt.Errorf("peer %s is not running our application", targetPeer)
+			}
+			
+			// Get node info from the newly connected peer
+			return p.DiscoverPeer(targetPeerID)
+		}
+		
+		lastErr = err
+	}
+	
+	if lastErr != nil {
+		return nil, fmt.Errorf("failed to connect to target peer: %w", lastErr)
+	}
+	
+	return nil, fmt.Errorf("no valid addresses to connect to")
 }
 
 // Close shuts down the P2P service

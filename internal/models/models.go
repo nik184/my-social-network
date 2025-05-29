@@ -73,10 +73,64 @@ type P2PMessage struct {
 	Payload interface{} `json:"payload"`
 }
 
+// SecondDegreePeer represents a peer that is connected to one of our direct connections
+type SecondDegreePeer struct {
+	PeerID           string `json:"peer_id"`
+	PeerName         string `json:"peer_name"`
+	ViaPeerID        string `json:"via_peer_id"`
+	ViaPeerName      string `json:"via_peer_name"`
+	ConnectionPath   string `json:"connection_path,omitempty"`
+}
+
+// SecondDegreeConnectionsResponse represents the response for second-degree peer discovery
+type SecondDegreeConnectionsResponse struct {
+	Peers []SecondDegreePeer `json:"peers"`
+	Count int                `json:"count"`
+}
+
+// SecondDegreeConnectionRequest represents a request to connect to a second-degree peer
+type SecondDegreeConnectionRequest struct {
+	TargetPeerID string `json:"targetPeerId"`
+	ViaPeerID    string `json:"viaPeerId"`
+}
+
+// PeerListItem represents a peer in a peer list response
+type PeerListItem struct {
+	PeerID   string `json:"peer_id"`
+	PeerName string `json:"peer_name"`
+}
+
+// PeerListResponse represents a response containing a list of connected peers
+type PeerListResponse struct {
+	Peers []PeerListItem `json:"peers"`
+	Count int            `json:"count"`
+}
+
+// ConnectionHistoryItem represents a connection history item with current status
+type ConnectionHistoryItem struct {
+	PeerID             string    `json:"peer_id"`
+	PeerName           string    `json:"peer_name"`
+	Address            string    `json:"address"`
+	LastConnected      time.Time `json:"last_connected"`
+	ConnectionType     string    `json:"connection_type"`
+	IsValidated        bool      `json:"is_validated"`
+	CurrentlyConnected bool      `json:"currently_connected"`
+}
+
+// ConnectionHistoryResponse represents the response for connection history
+type ConnectionHistoryResponse struct {
+	Connections []ConnectionHistoryItem `json:"connections"`
+	Count       int                     `json:"count"`
+}
+
 // Constants for message types
 const (
-	MessageTypeGetInfo      = "getInfo"
-	MessageTypeGetInfoResp  = "getInfoResp"
-	MessageTypeDiscovery    = "discovery"
-	MessageTypeDiscoveryResp = "discoveryResp"
+	MessageTypeGetInfo          = "getInfo"
+	MessageTypeGetInfoResp      = "getInfoResp"
+	MessageTypeDiscovery        = "discovery"
+	MessageTypeDiscoveryResp    = "discoveryResp"
+	MessageTypeGetPeerList      = "getPeerList"
+	MessageTypeGetPeerListResp  = "getPeerListResp"
+	MessageTypeHolePunchAssist  = "holePunchAssist"
+	MessageTypeHolePunchResp    = "holePunchResp"
 )

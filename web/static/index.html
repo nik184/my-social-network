@@ -72,6 +72,21 @@
             <div id="peerInfoStatus" class="status" style="margin: 10px 0;"></div>
             <div id="detailedPeerInfo" class="result"></div>
         </div>
+        
+        <div class="section">
+            <h3>📜 Connection History</h3>
+            <button class="button" onclick="getConnectionHistory()">Refresh History</button>
+            <div id="connectionHistoryStatus" class="status" style="margin: 10px 0;"></div>
+            <div id="connectionHistory" style="margin: 10px 0;"></div>
+        </div>
+        
+        <div class="section">
+            <h3>🔗 Second-Degree Connections</h3>
+            <p style="font-size: 0.9em; color: #666;">Peers connected to your direct connections (friends of friends)</p>
+            <button class="button" onclick="getSecondDegreeConnections()">Discover Peers</button>
+            <div id="secondDegreeStatus" class="status" style="margin: 10px 0;"></div>
+            <div id="secondDegreeConnections" style="margin: 10px 0;"></div>
+        </div>
     </div>
 
     <script>
@@ -385,17 +400,212 @@
             }
         }
 
+        async function getConnectionHistory() {
+            try {
+                const response = await fetch('/api/connection-history');
+                const data = await response.json();
+                
+                if (data.connections && data.connections.length > 0) {
+                    showStatus('connectionHistoryStatus', `📚 Found ${data.connections.length} connection record${data.connections.length === 1 ? '' : 's'}`, false);
+                    
+                    // Create HTML for connection history with connect buttons
+                    let historyHtml = '<div style="display: grid; gap: 10px;">';
+                    
+                    data.connections.forEach(conn => {
+                        const shortId = conn.peer_id.substring(0, 12) + '...';
+                        const displayName = conn.peer_name && conn.peer_name !== '' && conn.peer_name !== 'unknown' 
+                            ? conn.peer_name 
+                            : 'Unknown';
+                        const isCurrentlyConnected = conn.currently_connected || false;
+                        const lastSeen = new Date(conn.last_connected).toLocaleString();
+                        
+                        historyHtml += `
+                            <div style="border: 1px solid #ddd; border-radius: 5px; padding: 10px; background: ${isCurrentlyConnected ? '#d4edda' : '#f8f9fa'};">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <strong>${displayName}</strong> (${shortId})
+                                        <br>
+                                        <small style="color: #666;">
+                                            Last connected: ${lastSeen}
+                                            ${isCurrentlyConnected ? ' • <span style="color: #155724;">Currently connected</span>' : ''}
+                                        </small>
+                                    </div>
+                                    <div>
+                                        ${!isCurrentlyConnected ? 
+                                            `<button class="button" onclick="reconnectToPeer('${conn.peer_id}', '${conn.address}', '${displayName}')">Reconnect</button>` : 
+                                            '<span style="color: #155724; font-weight: bold;">Connected ✓</span>'
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    historyHtml += '</div>';
+                    document.getElementById('connectionHistory').innerHTML = historyHtml;
+                } else {
+                    showStatus('connectionHistoryStatus', '📭 No connection history found', true);
+                    document.getElementById('connectionHistory').innerHTML = '';
+                }
+            } catch (error) {
+                showStatus('connectionHistoryStatus', 'Error getting connection history: ' + error.message, true);
+                document.getElementById('connectionHistory').innerHTML = '';
+            }
+        }
+
+        async function reconnectToPeer(peerId, address, displayName) {
+            try {
+                // Extract IP and port from address if it's in multiaddr format
+                let ip = '';
+                let port = '';
+                
+                if (address.includes('/ip4/')) {
+                    const parts = address.split('/');
+                    if (parts.length >= 5) {
+                        ip = parts[2];
+                        port = parts[4];
+                    }
+                } else {
+                    // Try to parse as IP:PORT format
+                    const parts = address.split(':');
+                    if (parts.length >= 2) {
+                        ip = parts[0];
+                        port = parts[1];
+                    }
+                }
+                
+                if (!ip || !port) {
+                    throw new Error('Could not extract IP and port from address: ' + address);
+                }
+                
+                showStatus('connectionHistoryStatus', `🔄 Reconnecting to ${displayName}...`, false);
+                
+                const response = await fetch('/api/connect-ip', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        ip: ip,
+                        port: parseInt(port),
+                        peerId: peerId 
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                
+                const data = await response.json();
+                showStatus('connectionHistoryStatus', `✅ Successfully reconnected to ${displayName}!`, false);
+                
+                // Refresh the connection history to update status
+                setTimeout(() => {
+                    getConnectionHistory();
+                    getDetailedPeerInfo();
+                }, 1000);
+                
+            } catch (error) {
+                showStatus('connectionHistoryStatus', `❌ Failed to reconnect to ${displayName}: ${error.message}`, true);
+            }
+        }
+
+        async function getSecondDegreeConnections() {
+            try {
+                showStatus('secondDegreeStatus', '🔍 Discovering second-degree connections...', false);
+                
+                const response = await fetch('/api/second-degree-peers');
+                const data = await response.json();
+                
+                if (data.peers && data.peers.length > 0) {
+                    showStatus('secondDegreeStatus', `🔗 Found ${data.peers.length} second-degree peer${data.peers.length === 1 ? '' : 's'}`, false);
+                    
+                    // Create HTML for second-degree peers with connect buttons
+                    let peersHtml = '<div style="display: grid; gap: 10px;">';
+                    
+                    data.peers.forEach(peer => {
+                        const shortId = peer.peer_id.substring(0, 12) + '...';
+                        const displayName = peer.peer_name && peer.peer_name !== '' && peer.peer_name !== 'unknown' 
+                            ? peer.peer_name 
+                            : 'Unknown';
+                        const connectionPath = peer.connection_path ? ` (via ${peer.connection_path})` : '';
+                        
+                        peersHtml += `
+                            <div style="border: 1px solid #ddd; border-radius: 5px; padding: 10px; background: #f8f9fa;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <strong>${displayName}</strong> (${shortId})
+                                        <br>
+                                        <small style="color: #666;">
+                                            Connected via: ${peer.via_peer_name || 'Unknown'}${connectionPath}
+                                            <br>
+                                            Distance: 2 hops away
+                                        </small>
+                                    </div>
+                                    <div>
+                                        <button class="button" onclick="connectToSecondDegreePeer('${peer.peer_id}', '${peer.via_peer_id}', '${displayName}')">Connect</button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    peersHtml += '</div>';
+                    document.getElementById('secondDegreeConnections').innerHTML = peersHtml;
+                } else {
+                    showStatus('secondDegreeStatus', '📭 No second-degree connections found', true);
+                    document.getElementById('secondDegreeConnections').innerHTML = '';
+                }
+            } catch (error) {
+                showStatus('secondDegreeStatus', 'Error discovering second-degree connections: ' + error.message, true);
+                document.getElementById('secondDegreeConnections').innerHTML = '';
+            }
+        }
+
+        async function connectToSecondDegreePeer(targetPeerId, viaPeerId, displayName) {
+            try {
+                showStatus('secondDegreeStatus', `🔄 Connecting to ${displayName} via hole punching...`, false);
+                
+                const response = await fetch('/api/connect-second-degree', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        targetPeerId: targetPeerId,
+                        viaPeerId: viaPeerId
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                
+                const data = await response.json();
+                showStatus('secondDegreeStatus', `✅ Successfully connected to ${displayName}!`, false);
+                
+                // Refresh the lists to update connection status
+                setTimeout(() => {
+                    getSecondDegreeConnections();
+                    getDetailedPeerInfo();
+                }, 1000);
+                
+            } catch (error) {
+                showStatus('secondDegreeStatus', `❌ Failed to connect to ${displayName}: ${error.message}`, true);
+            }
+        }
+
         // Auto-refresh node info and monitor status
         function startAutoRefresh() {
             getNodeInfo();
             getMonitorStatus();
             getDetailedPeerInfo();
+            getConnectionHistory();
+            getSecondDegreeConnections();
             
             // Auto-refresh every 5 seconds
             setInterval(() => {
                 getNodeInfo();
                 getMonitorStatus();
                 getDetailedPeerInfo();
+                getConnectionHistory();
+                getSecondDegreeConnections();
             }, 5000);
         }
 
