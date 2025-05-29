@@ -51,6 +51,7 @@ type PeerInfo struct {
 	LastSeen     time.Time         `json:"last_seen"`
 	IsValidated  bool              `json:"is_validated"`
 	ConnectionType string           `json:"connection_type"` // "inbound" or "outbound"
+	Name         string            `json:"name"`            // peer's display name
 }
 
 // P2PService handles libp2p networking
@@ -60,6 +61,7 @@ type P2PService struct {
 	ctx            context.Context
 	cancel         context.CancelFunc
 	appService     *AppService
+	dbService      *DatabaseService
 	validatedPeers map[peer.ID]bool
 	peersMutex     sync.RWMutex
 	
@@ -71,8 +73,15 @@ type P2PService struct {
 }
 
 // NewP2PService creates a new P2P service
-func NewP2PService(appService *AppService) (*P2PService, error) {
+func NewP2PService(appService *AppService, dbService *DatabaseService) (*P2PService, error) {
 	ctx, cancel := context.WithCancel(context.Background())
+	
+	// Get persistent private key from database
+	privateKey, err := dbService.GetNodePrivateKey()
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("failed to get node private key: %w", err)
+	}
 	
 	// Connection manager to handle connection limits
 	connmgr, err := connmgr.NewConnManager(
@@ -100,8 +109,9 @@ func NewP2PService(appService *AppService) (*P2PService, error) {
 	
 	log.Printf("🔌 Using P2P ports - TCP: %d, QUIC: %d", tcpPort, quicPort)
 	
-	// Create libp2p host with available ports and NAT traversal
+	// Create libp2p host with persistent identity and available ports
 	h, err := libp2p.New(
+		libp2p.Identity(privateKey),      // Use persistent private key
 		libp2p.ListenAddrStrings(
 			fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", tcpPort),        // TCP on available port
 			fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic", quicPort),  // QUIC on available port
@@ -130,6 +140,7 @@ func NewP2PService(appService *AppService) (*P2PService, error) {
 		ctx:            ctx,
 		cancel:         cancel,
 		appService:     appService,
+		dbService:      dbService,
 		validatedPeers: make(map[peer.ID]bool),
 		connectedPeers: make(map[peer.ID]*PeerInfo),
 	}
@@ -208,11 +219,20 @@ func (p *P2PService) handleIdentifyStream(stream network.Stream) {
 	peerID := stream.Conn().RemotePeer()
 	log.Printf("🔍 Received identification request from peer: %s", peerID)
 	
-	// Send our application identifier
+	// Get our node name from database
+	nodeName := "unknown"
+	if p.dbService != nil {
+		if name, err := p.dbService.GetSetting("name"); err == nil {
+			nodeName = name
+		}
+	}
+	
+	// Send our application identifier including name
 	response := map[string]string{
 		"app":     AppIdentifier,
 		"version": "1.0.0",
 		"nodeId":  p.host.ID().String(),
+		"name":    nodeName,
 	}
 	
 	encoder := json.NewEncoder(stream)
@@ -221,7 +241,7 @@ func (p *P2PService) handleIdentifyStream(stream network.Stream) {
 		return
 	}
 	
-	log.Printf("✅ Sent identification response to peer: %s", peerID)
+	log.Printf("✅ Sent identification response to peer: %s (name: %s)", peerID, nodeName)
 }
 
 // validatePeer checks if a peer is running our application
@@ -269,21 +289,43 @@ func (p *P2PService) validatePeer(peerID peer.ID) bool {
 		return false
 	}
 	
-	log.Printf("✅ Peer %s validated as our application", peerID)
-	p.markPeerValidation(peerID, true)
+	// Extract peer name if available
+	peerName := "unknown"
+	if name, exists := response["name"]; exists {
+		peerName = name
+	}
+	
+	log.Printf("✅ Peer %s validated as our application (name: %s)", peerID, peerName)
+	p.markPeerValidationWithName(peerID, true, peerName)
 	return true
 }
 
 // markPeerValidation marks a peer as validated or not
 func (p *P2PService) markPeerValidation(peerID peer.ID, isValid bool) {
+	p.markPeerValidationWithName(peerID, isValid, "")
+}
+
+// markPeerValidationWithName marks a peer as validated with name information
+func (p *P2PService) markPeerValidationWithName(peerID peer.ID, isValid bool, peerName string) {
 	p.peersMutex.Lock()
 	p.validatedPeers[peerID] = isValid
 	p.peersMutex.Unlock()
 	
-	// Update peer info validation status
+	// Update peer info validation status and name
 	p.peerInfoMutex.Lock()
 	if peerInfo, exists := p.connectedPeers[peerID]; exists {
 		peerInfo.IsValidated = isValid
+		if peerName != "" {
+			peerInfo.Name = peerName
+		}
+		
+		// Update validation status and name in database
+		if p.dbService != nil && len(peerInfo.Addresses) > 0 {
+			address := peerInfo.Addresses[0] // Use first address
+			if err := p.dbService.RecordConnectionWithName(peerID.String(), address, peerInfo.ConnectionType, isValid, peerName); err != nil {
+				log.Printf("Warning: Failed to update validation status in database: %v", err)
+			}
+		}
 	}
 	p.peerInfoMutex.Unlock()
 }
@@ -690,11 +732,17 @@ func (p *P2PService) storePeerInfo(peerID peer.ID, connectionType string) {
 	now := time.Now()
 	peerInfo, exists := p.connectedPeers[peerID]
 	
+	// Get peer address
+	var address string
+	if conn := p.host.Network().ConnsToPeer(peerID); len(conn) > 0 {
+		address = conn[0].RemoteMultiaddr().String()
+	}
+	
 	if !exists {
 		// Create new peer info
 		addrs := make([]string, 0)
-		if conn := p.host.Network().ConnsToPeer(peerID); len(conn) > 0 {
-			addrs = append(addrs, conn[0].RemoteMultiaddr().String())
+		if address != "" {
+			addrs = append(addrs, address)
 		}
 		
 		peerInfo = &PeerInfo{
@@ -714,6 +762,13 @@ func (p *P2PService) storePeerInfo(peerID peer.ID, connectionType string) {
 		peerInfo.LastSeen = now
 		if connectionType != "" && peerInfo.ConnectionType == "" {
 			peerInfo.ConnectionType = connectionType
+		}
+	}
+	
+	// Record connection in database
+	if p.dbService != nil && address != "" {
+		if err := p.dbService.RecordConnection(peerID.String(), address, connectionType, false); err != nil {
+			log.Printf("Warning: Failed to record connection in database: %v", err)
 		}
 	}
 }

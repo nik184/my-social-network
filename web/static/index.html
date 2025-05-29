@@ -359,7 +359,13 @@
                     const formattedPeerInfo = {};
                     for (const [peerId, info] of Object.entries(data.connectedPeerInfo)) {
                         const shortId = peerId.substring(0, 12) + '...';
-                        formattedPeerInfo[shortId] = {
+                        const displayName = info.name && info.name !== '' && info.name !== 'unknown' 
+                            ? info.name 
+                            : 'Unknown';
+                        const peerLabel = `${displayName} (${shortId})`;
+                        
+                        formattedPeerInfo[peerLabel] = {
+                            'Name': displayName,
                             'Full ID': info.id,
                             'Connection Type': info.connection_type || 'unknown',
                             'Addresses': info.addresses || [],

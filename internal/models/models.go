@@ -50,6 +50,7 @@ type PeerInfoJSON struct {
 	LastSeen       time.Time `json:"last_seen"`
 	IsValidated    bool      `json:"is_validated"`
 	ConnectionType string    `json:"connection_type"`
+	Name           string    `json:"name"`
 }
 
 // NodeInfoResponse represents the response containing node and folder information

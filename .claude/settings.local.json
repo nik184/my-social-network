@@ -9,7 +9,9 @@
       "Bash(rm:*)",
       "Bash(timeout:*)",
       "Bash(chmod:*)",
-      "Bash(go run:*)"
+      "Bash(go run:*)",
+      "Bash(ls:*)",
+      "Bash(sqlite3:*)"
     ],
     "deny": []
   }

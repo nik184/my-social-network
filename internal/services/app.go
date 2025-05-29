@@ -2,6 +2,7 @@ package services
 
 import (
 	"log"
+	"path/filepath"
 
 	"my-social-network/internal/models"
 )
@@ -9,6 +10,7 @@ import (
 // AppService coordinates all application services
 type AppService struct {
 	DirectoryService *DirectoryService
+	DatabaseService  *DatabaseService
 	P2PService       *P2PService
 	MonitorService   *MonitorService
 	folderInfo       *models.FolderInfo
@@ -20,8 +22,19 @@ func NewAppService() *AppService {
 		DirectoryService: NewDirectoryService(),
 	}
 	
-	// Initialize P2P service
-	p2pService, err := NewP2PService(appService)
+	// Create database path in space184 directory
+	space184Path := appService.DirectoryService.GetDirectoryPath()
+	dbPath := filepath.Join(space184Path, "node.db")
+	
+	// Initialize database service with space184 path
+	dbService, err := NewDatabaseService(dbPath)
+	if err != nil {
+		log.Fatalf("Failed to create database service: %v", err)
+	}
+	appService.DatabaseService = dbService
+	
+	// Initialize P2P service with database
+	p2pService, err := NewP2PService(appService, dbService)
 	if err != nil {
 		log.Fatalf("Failed to create P2P service: %v", err)
 	}
@@ -70,6 +83,7 @@ func (a *AppService) GetNodeInfo() *models.NodeInfoResponse {
 					LastSeen:       info.LastSeen,
 					IsValidated:    info.IsValidated,
 					ConnectionType: info.ConnectionType,
+					Name:           info.Name,
 				}
 			}
 		}
@@ -92,7 +106,12 @@ func (a *AppService) Close() error {
 		a.MonitorService.Stop()
 	}
 	if a.P2PService != nil {
-		return a.P2PService.Close()
+		if err := a.P2PService.Close(); err != nil {
+			log.Printf("Error closing P2P service: %v", err)
+		}
+	}
+	if a.DatabaseService != nil {
+		return a.DatabaseService.Close()
 	}
 	return nil
 }
