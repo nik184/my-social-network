@@ -129,8 +129,25 @@
             try {
                 const response = await fetch('/api/peers');
                 const data = await response.json();
-                showStatus('discoveryStatus', `Connected to ${data.count} peers`);
-                showResult('discoveryResult', data);
+                
+                const validatedCount = data.validatedCount || data.count || 0;
+                const totalCount = data.totalConnectedCount || 0;
+                
+                if (totalCount > validatedCount) {
+                    showStatus('discoveryStatus', `✅ ${validatedCount} app peers | 🔗 ${totalCount} total connections`, false);
+                } else {
+                    showStatus('discoveryStatus', `✅ Connected to ${validatedCount} app peers`, false);
+                }
+                
+                // Show detailed information
+                const peerInfo = {
+                    'Application Peers (Validated)': data.validatedPeers || data.peers || [],
+                    'Validated Count': validatedCount,
+                    'Total Connections': totalCount,
+                    'Filtering': totalCount > validatedCount ? 'Active - Non-app peers filtered out' : 'No non-app peers detected'
+                };
+                
+                showResult('discoveryResult', peerInfo);
             } catch (error) {
                 showStatus('discoveryStatus', 'Error getting peers: ' + error.message, true);
             }

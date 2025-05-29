@@ -85,18 +85,23 @@ func (h *Handler) HandleDiscover(w http.ResponseWriter, r *http.Request) {
 
 // HandlePeers handles GET /api/peers requests
 func (h *Handler) HandlePeers(w http.ResponseWriter, r *http.Request) {
-	peers := h.appService.P2PService.GetConnectedPeers()
+	validatedPeers := h.appService.P2PService.GetConnectedPeers()
+	allPeers := h.appService.P2PService.GetAllConnectedPeers()
 	
 	// Convert peer IDs to strings for JSON
-	peerStrings := make([]string, len(peers))
-	for i, peer := range peers {
-		peerStrings[i] = peer.String()
+	validatedPeerStrings := make([]string, len(validatedPeers))
+	for i, peer := range validatedPeers {
+		validatedPeerStrings[i] = peer.String()
 	}
 	
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"peers": peerStrings,
-		"count": len(peerStrings),
+		"validatedPeers":      validatedPeerStrings,
+		"validatedCount":      len(validatedPeerStrings),
+		"totalConnectedCount": len(allPeers),
+		"applicationPeers":    validatedPeerStrings, // For backward compatibility
+		"peers":               validatedPeerStrings, // For backward compatibility
+		"count":               len(validatedPeerStrings), // For backward compatibility
 	})
 }
 

@@ -16,7 +16,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
-	"github.com/multiformats/go-multiaddr"
 
 	"my-social-network/internal/models"
 )
@@ -26,16 +25,24 @@ const (
 	AppProtocol = "/my-social-network/1.0.0"
 	
 	// Service tag for mDNS discovery
-	ServiceTag = "my-social-network"
+	ServiceTag = "my-social-network-p2p"
+	
+	// Application identifier for peer validation
+	AppIdentifier = "MySocialNetwork-DistributedApp"
+	
+	// Protocol for peer identification
+	IdentifyProtocol = "/my-social-network/identify/1.0.0"
 )
 
 // P2PService handles libp2p networking
 type P2PService struct {
-	host      host.Host
-	dht       *dht.IpfsDHT
-	ctx       context.Context
-	cancel    context.CancelFunc
-	appService *AppService
+	host           host.Host
+	dht            *dht.IpfsDHT
+	ctx            context.Context
+	cancel         context.CancelFunc
+	appService     *AppService
+	validatedPeers map[peer.ID]bool
+	peersMutex     sync.RWMutex
 }
 
 // NewP2PService creates a new P2P service
@@ -94,14 +101,16 @@ func NewP2PService(appService *AppService) (*P2PService, error) {
 	log.Printf("🔧 Features enabled: Hole Punching, NAT Service, DHT Discovery")
 	
 	service := &P2PService{
-		host:       h,
-		ctx:        ctx,
-		cancel:     cancel,
-		appService: appService,
+		host:           h,
+		ctx:            ctx,
+		cancel:         cancel,
+		appService:     appService,
+		validatedPeers: make(map[peer.ID]bool),
 	}
 	
 	// Set stream handler for our protocol
 	h.SetStreamHandler(protocol.ID(AppProtocol), service.handleStream)
+	h.SetStreamHandler(protocol.ID(IdentifyProtocol), service.handleIdentifyStream)
 	
 	// Initialize DHT for global peer discovery
 	if err := service.setupDHT(); err != nil {
@@ -132,11 +141,14 @@ func (p *P2PService) setupDHT() error {
 		return fmt.Errorf("failed to bootstrap DHT: %w", err)
 	}
 	
-	// Connect to bootstrap nodes
-	go p.connectToBootstrapNodes()
+	// Skip IPFS bootstrap nodes to avoid connecting to non-app peers
+	log.Printf("🔍 DHT initialized - using local peer discovery only")
 	
 	// Setup relay discovery after DHT is ready
 	go p.setupRelayDiscovery()
+	
+	// Start periodic peer cleanup
+	go p.startPeerCleanup()
 	
 	return nil
 }
@@ -158,43 +170,84 @@ func (p *P2PService) setupRelayDiscovery() {
 	}
 }
 
-// connectToBootstrapNodes connects to well-known bootstrap nodes
-func (p *P2PService) connectToBootstrapNodes() {
-	// IPFS bootstrap nodes for initial connectivity
-	bootstrapNodes := []string{
-		"/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN",
-		"/dnsaddr/bootstrap.libp2p.io/p2p/QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19uLTa",
+// handleIdentifyStream handles peer identification requests
+func (p *P2PService) handleIdentifyStream(stream network.Stream) {
+	defer stream.Close()
+	
+	peerID := stream.Conn().RemotePeer()
+	log.Printf("🔍 Received identification request from peer: %s", peerID)
+	
+	// Send our application identifier
+	response := map[string]string{
+		"app":     AppIdentifier,
+		"version": "1.0.0",
+		"nodeId":  p.host.ID().String(),
 	}
 	
-	var wg sync.WaitGroup
-	for _, nodeAddr := range bootstrapNodes {
-		wg.Add(1)
-		go func(addr string) {
-			defer wg.Done()
-			
-			maddr, err := multiaddr.NewMultiaddr(addr)
-			if err != nil {
-				log.Printf("Invalid bootstrap address %s: %v", addr, err)
-				return
-			}
-			
-			peerInfo, err := peer.AddrInfoFromP2pAddr(maddr)
-			if err != nil {
-				log.Printf("Failed to get peer info from %s: %v", addr, err)
-				return
-			}
-			
-			ctx, cancel := context.WithTimeout(p.ctx, 10*time.Second)
-			defer cancel()
-			
-			if err := p.host.Connect(ctx, *peerInfo); err != nil {
-				log.Printf("Failed to connect to bootstrap node %s: %v", addr, err)
-			} else {
-				log.Printf("Connected to bootstrap node: %s", peerInfo.ID)
-			}
-		}(nodeAddr)
+	encoder := json.NewEncoder(stream)
+	if err := encoder.Encode(response); err != nil {
+		log.Printf("Failed to send identification response: %v", err)
+		return
 	}
-	wg.Wait()
+	
+	log.Printf("✅ Sent identification response to peer: %s", peerID)
+}
+
+// validatePeer checks if a peer is running our application
+func (p *P2PService) validatePeer(peerID peer.ID) bool {
+	// Check if already validated
+	p.peersMutex.RLock()
+	if validated, exists := p.validatedPeers[peerID]; exists {
+		p.peersMutex.RUnlock()
+		return validated
+	}
+	p.peersMutex.RUnlock()
+	
+	// Don't validate ourselves
+	if peerID == p.host.ID() {
+		return false
+	}
+	
+	log.Printf("🔍 Validating peer: %s", peerID)
+	
+	// Try to open identification stream
+	ctx, cancel := context.WithTimeout(p.ctx, 5*time.Second)
+	defer cancel()
+	
+	stream, err := p.host.NewStream(ctx, peerID, protocol.ID(IdentifyProtocol))
+	if err != nil {
+		log.Printf("❌ Failed to open identification stream to %s: %v", peerID, err)
+		p.markPeerValidation(peerID, false)
+		return false
+	}
+	defer stream.Close()
+	
+	// Read identification response
+	var response map[string]string
+	decoder := json.NewDecoder(stream)
+	if err := decoder.Decode(&response); err != nil {
+		log.Printf("❌ Failed to decode identification from %s: %v", peerID, err)
+		p.markPeerValidation(peerID, false)
+		return false
+	}
+	
+	// Check if it's our application
+	if app, exists := response["app"]; !exists || app != AppIdentifier {
+		log.Printf("❌ Peer %s is not running our application (app: %s)", peerID, app)
+		p.markPeerValidation(peerID, false)
+		return false
+	}
+	
+	log.Printf("✅ Peer %s validated as our application", peerID)
+	p.markPeerValidation(peerID, true)
+	return true
+}
+
+// markPeerValidation marks a peer as validated or not
+func (p *P2PService) markPeerValidation(peerID peer.ID, isValid bool) {
+	p.peersMutex.Lock()
+	defer p.peersMutex.Unlock()
+	p.validatedPeers[peerID] = isValid
 }
 
 // setupMDNS initializes mDNS for local network discovery
@@ -210,17 +263,31 @@ type discoveryNotifee struct {
 }
 
 func (n *discoveryNotifee) HandlePeerFound(peerInfo peer.AddrInfo) {
-	log.Printf("Discovered peer via mDNS: %s", peerInfo.ID)
+	log.Printf("🔍 Discovered peer via mDNS: %s", peerInfo.ID)
 	
 	// Connect to discovered peer
 	ctx, cancel := context.WithTimeout(n.p2pService.ctx, 5*time.Second)
 	defer cancel()
 	
 	if err := n.p2pService.host.Connect(ctx, peerInfo); err != nil {
-		log.Printf("Failed to connect to discovered peer %s: %v", peerInfo.ID, err)
-	} else {
-		log.Printf("Connected to peer: %s", peerInfo.ID)
+		log.Printf("❌ Failed to connect to discovered peer %s: %v", peerInfo.ID, err)
+		return
 	}
+	
+	log.Printf("🔗 Connected to peer: %s", peerInfo.ID)
+	
+	// Validate that this peer is running our application
+	go func() {
+		// Give the connection a moment to stabilize
+		time.Sleep(1 * time.Second)
+		
+		if n.p2pService.validatePeer(peerInfo.ID) {
+			log.Printf("✅ mDNS peer %s validated as our application", peerInfo.ID)
+		} else {
+			log.Printf("❌ mDNS peer %s is not our application, disconnecting", peerInfo.ID)
+			n.p2pService.host.Network().ClosePeer(peerInfo.ID)
+		}
+	}()
 }
 
 // handleStream handles incoming streams
@@ -300,6 +367,11 @@ func (p *P2PService) DiscoverPeer(peerID string) (*models.NodeInfoResponse, erro
 		}
 	}
 	
+	// Validate that this peer is running our application
+	if !p.validatePeer(pid) {
+		return nil, fmt.Errorf("peer %s is not running our application", pid)
+	}
+	
 	// Open stream to peer
 	stream, err := p.host.NewStream(ctx, pid, protocol.ID(AppProtocol))
 	if err != nil {
@@ -339,9 +411,67 @@ func (p *P2PService) DiscoverPeer(peerID string) (*models.NodeInfoResponse, erro
 	return &nodeInfo, nil
 }
 
-// GetConnectedPeers returns list of connected peers
+// GetConnectedPeers returns list of validated connected peers
 func (p *P2PService) GetConnectedPeers() []peer.ID {
+	allPeers := p.host.Network().Peers()
+	var validatedPeersList []peer.ID
+	
+	p.peersMutex.RLock()
+	defer p.peersMutex.RUnlock()
+	
+	for _, peerID := range allPeers {
+		// Check if peer is validated as our application
+		if validated, exists := p.validatedPeers[peerID]; exists && validated {
+			validatedPeersList = append(validatedPeersList, peerID)
+		} else if !exists {
+			// Trigger validation for unknown peers
+			go p.validatePeer(peerID)
+		}
+	}
+	
+	log.Printf("📊 Connected peers: %d total, %d validated as our app", len(allPeers), len(validatedPeersList))
+	return validatedPeersList
+}
+
+// GetAllConnectedPeers returns list of all connected peers (validated and unvalidated)
+func (p *P2PService) GetAllConnectedPeers() []peer.ID {
 	return p.host.Network().Peers()
+}
+
+// startPeerCleanup runs periodic cleanup of invalid peers
+func (p *P2PService) startPeerCleanup() {
+	ticker := time.NewTicker(30 * time.Second) // Check every 30 seconds
+	defer ticker.Stop()
+	
+	for {
+		select {
+		case <-p.ctx.Done():
+			return
+		case <-ticker.C:
+			p.cleanupInvalidPeers()
+		}
+	}
+}
+
+// cleanupInvalidPeers disconnects from peers that failed validation
+func (p *P2PService) cleanupInvalidPeers() {
+	allPeers := p.host.Network().Peers()
+	var disconnectedCount int
+	
+	p.peersMutex.RLock()
+	for _, peerID := range allPeers {
+		if validated, exists := p.validatedPeers[peerID]; exists && !validated {
+			// Disconnect from invalid peer
+			p.host.Network().ClosePeer(peerID)
+			disconnectedCount++
+			log.Printf("🧹 Disconnected from invalid peer: %s", peerID)
+		}
+	}
+	p.peersMutex.RUnlock()
+	
+	if disconnectedCount > 0 {
+		log.Printf("🧹 Cleanup complete: disconnected from %d invalid peers", disconnectedCount)
+	}
 }
 
 // Close shuts down the P2P service

@@ -12,7 +12,8 @@ A truly distributed Go application using libp2p that manages a shared directory 
 6. **Global Connectivity**: Works across the internet without fixed IP addresses
 7. **Dynamic Port Allocation**: Automatically finds available ports to avoid conflicts
 8. **Real-time File Monitoring**: Automatically detects changes in the space184 directory
-9. **WebView UI**: Clean web-based interface for all interactions
+9. **Application-Specific Discovery**: Only connects to other instances of this application
+10. **WebView UI**: Clean web-based interface for all interactions
 
 ## Project Structure
 
@@ -107,10 +108,12 @@ The application exposes a REST API on port 6996:
 
 To discover another peer:
 1. Ensure both applications are running
-2. Use the "P2P Network Discovery" section in the UI
-3. Copy your Peer ID from the "Current Node Info" section and share it
-4. Enter another peer's Peer ID to discover and connect to them
-5. The DHT will automatically help discover peers across the internet
+2. **Automatic Local Discovery**: Peers on the same network are discovered automatically via mDNS
+3. **Manual Discovery**: Use the "P2P Network Discovery" section in the UI
+4. Copy your Peer ID from the "Current Node Info" section and share it
+5. Enter another peer's Peer ID to discover and connect to them
+6. **Application Filtering**: Only peers running this specific application will be connected
+7. The DHT helps discover peers across the internet
 
 ## Architecture
 
@@ -140,9 +143,12 @@ The application follows standard Go project layout:
 - **Multiple Transports**: TCP, QUIC, WebRTC support
 - **Secure Communication**: Noise protocol for encryption
 - **Connection Management**: Automatic connection limits and cleanup
-- **Bootstrap Nodes**: Connects to IPFS bootstrap nodes for initial connectivity
+- **No External Bootstrap**: Uses local discovery only to avoid connecting to external networks
 - **Dynamic Port Management**: Automatically finds available ports for both HTTP server and P2P communication
 - **Multiple Instance Support**: Can run multiple instances on the same machine without port conflicts
 - **Real-time File Monitoring**: Uses fsnotify for instant detection of file system changes
 - **Automatic Scanning**: Performs initial scan on startup and monitors for changes continuously
 - **Debounced Updates**: Prevents excessive scanning during rapid file operations
+- **Application-Specific Networking**: Custom peer identification and validation system
+- **Peer Filtering**: Automatically disconnects from non-application peers (IPFS, etc.)
+- **Local Network Discovery**: mDNS-based discovery for same-network peers
