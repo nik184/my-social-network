@@ -2,11 +2,14 @@ package services
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -53,6 +56,14 @@ type PeerInfo struct {
 	IsValidated    bool      `json:"is_validated"`
 	ConnectionType string    `json:"connection_type"` // "inbound" or "outbound"
 	Name           string    `json:"name"`            // peer's display name
+	HasAvatar      bool      `json:"has_avatar"`      // whether peer has avatar images
+}
+
+// AvatarData represents avatar image data for peer identification
+type AvatarData struct {
+	Filename string `json:"filename"`
+	Data     string `json:"data"` // base64 encoded image data
+	Size     int    `json:"size"`
 }
 
 // P2PService handles libp2p networking
@@ -193,6 +204,9 @@ func (p *P2PService) setupDHT() error {
 	// Start periodic peer cleanup
 	go p.startPeerCleanup()
 
+	// Start periodic peer data retry check
+	go p.startPeerDataRetry()
+
 	return nil
 }
 
@@ -213,6 +227,73 @@ func (p *P2PService) setupRelayDiscovery() {
 	}
 }
 
+// prepareAvatarData reads the primary avatar image and encodes it for transmission
+func (p *P2PService) prepareAvatarData() *AvatarData {
+	if p.appService == nil || p.appService.DirectoryService == nil {
+		return nil
+	}
+
+	// Get avatar images
+	avatarImages, err := p.appService.DirectoryService.GetAvatarImages()
+	if err != nil || len(avatarImages) == 0 {
+		return nil
+	}
+
+	// Use the first image as the primary avatar
+	primaryAvatar := avatarImages[0]
+	avatarDir := p.appService.DirectoryService.GetAvatarDirectory()
+	avatarPath := filepath.Join(avatarDir, primaryAvatar)
+
+	// Read the image file
+	imageData, err := os.ReadFile(avatarPath)
+	if err != nil {
+		log.Printf("Failed to read avatar image %s: %v", primaryAvatar, err)
+		return nil
+	}
+
+	// Limit avatar size to 1MB for transmission
+	if len(imageData) > 1024*1024 {
+		log.Printf("Avatar image %s too large (%d bytes), skipping", primaryAvatar, len(imageData))
+		return nil
+	}
+
+	// Encode to base64
+	encodedData := base64.StdEncoding.EncodeToString(imageData)
+
+	return &AvatarData{
+		Filename: primaryAvatar,
+		Data:     encodedData,
+		Size:     len(imageData),
+	}
+}
+
+// saveReceivedAvatar saves avatar data received from a peer
+func (p *P2PService) saveReceivedAvatar(peerID peer.ID, avatarData *AvatarData) error {
+	if p.appService == nil || p.appService.DirectoryService == nil || avatarData == nil {
+		return fmt.Errorf("invalid service or avatar data")
+	}
+
+	// Decode base64 data
+	imageData, err := base64.StdEncoding.DecodeString(avatarData.Data)
+	if err != nil {
+		return fmt.Errorf("failed to decode avatar data: %w", err)
+	}
+
+	// Verify size matches
+	if len(imageData) != avatarData.Size {
+		return fmt.Errorf("avatar data size mismatch: expected %d, got %d", avatarData.Size, len(imageData))
+	}
+
+	// Save using DirectoryService
+	err = p.appService.DirectoryService.SavePeerAvatar(peerID.String(), avatarData.Filename, imageData)
+	if err != nil {
+		return fmt.Errorf("failed to save peer avatar: %w", err)
+	}
+
+	log.Printf("✅ Saved avatar %s for peer %s (%d bytes)", avatarData.Filename, peerID, len(imageData))
+	return nil
+}
+
 // handleIdentifyStream handles peer identification requests
 func (p *P2PService) handleIdentifyStream(stream network.Stream) {
 	defer stream.Close()
@@ -221,7 +302,7 @@ func (p *P2PService) handleIdentifyStream(stream network.Stream) {
 	log.Printf("🔍 Received identification request from peer: %s", peerID)
 
 	// Read the requesting peer's identification data (client sends first)
-	var peerRequest map[string]string
+	var peerRequest map[string]interface{}
 	decoder := json.NewDecoder(stream)
 	if err := decoder.Decode(&peerRequest); err != nil {
 		log.Printf("Failed to decode peer identification: %v", err)
@@ -236,12 +317,20 @@ func (p *P2PService) handleIdentifyStream(stream network.Stream) {
 		}
 	}
 
-	// Send our application identifier response including name
-	response := map[string]string{
+	// Prepare our avatar data for transmission
+	avatarData := p.prepareAvatarData()
+
+	// Send our application identifier response including name and avatar
+	response := map[string]interface{}{
 		"app":     AppIdentifier,
 		"version": "1.0.0",
 		"nodeId":  p.host.ID().String(),
 		"name":    nodeName,
+	}
+
+	// Include avatar data if available
+	if avatarData != nil {
+		response["avatar"] = avatarData
 	}
 
 	encoder := json.NewEncoder(stream)
@@ -254,7 +343,31 @@ func (p *P2PService) handleIdentifyStream(stream network.Stream) {
 	if app, exists := peerRequest["app"]; exists && app == AppIdentifier {
 		peerName := "unknown"
 		if name, exists := peerRequest["name"]; exists {
-			peerName = name
+			if nameStr, ok := name.(string); ok {
+				peerName = nameStr
+			}
+		}
+
+		// Process avatar data if present
+		if avatarInterface, exists := peerRequest["avatar"]; exists {
+			// Convert interface{} to AvatarData
+			if avatarMap, ok := avatarInterface.(map[string]interface{}); ok {
+				avatarData := &AvatarData{}
+				if filename, ok := avatarMap["filename"].(string); ok {
+					avatarData.Filename = filename
+				}
+				if data, ok := avatarMap["data"].(string); ok {
+					avatarData.Data = data
+				}
+				if size, ok := avatarMap["size"].(float64); ok {
+					avatarData.Size = int(size)
+				}
+
+				// Save the received avatar
+				if err := p.saveReceivedAvatar(peerID, avatarData); err != nil {
+					log.Printf("Failed to save avatar from peer %s: %v", peerID, err)
+				}
+			}
 		}
 
 		// Mark peer as validated and save connection with name
@@ -302,11 +415,19 @@ func (p *P2PService) validatePeer(peerID peer.ID) bool {
 		}
 	}
 
-	ourRequest := map[string]string{
+	// Prepare our avatar data for transmission
+	avatarData := p.prepareAvatarData()
+
+	ourRequest := map[string]interface{}{
 		"app":     AppIdentifier,
 		"version": "1.0.0",
 		"nodeId":  p.host.ID().String(),
 		"name":    ourNodeName,
+	}
+
+	// Include avatar data if available
+	if avatarData != nil {
+		ourRequest["avatar"] = avatarData
 	}
 
 	encoder := json.NewEncoder(stream)
@@ -317,7 +438,7 @@ func (p *P2PService) validatePeer(peerID peer.ID) bool {
 	}
 
 	// Read identification response from remote peer
-	var response map[string]string
+	var response map[string]interface{}
 	decoder := json.NewDecoder(stream)
 	if err := decoder.Decode(&response); err != nil {
 		log.Printf("❌ Failed to decode identification from %s: %v", peerID, err)
@@ -326,8 +447,16 @@ func (p *P2PService) validatePeer(peerID peer.ID) bool {
 	}
 
 	// Check if it's our application
-	if app, exists := response["app"]; !exists || app != AppIdentifier {
-		log.Printf("❌ Peer %s is not running our application (app: %s)", peerID, app)
+	app, exists := response["app"]
+	if !exists {
+		log.Printf("❌ Peer %s identification missing app field", peerID)
+		p.markPeerValidation(peerID, false)
+		return false
+	}
+	
+	appStr, ok := app.(string)
+	if !ok || appStr != AppIdentifier {
+		log.Printf("❌ Peer %s is not running our application (app: %v)", peerID, app)
 		p.markPeerValidation(peerID, false)
 		return false
 	}
@@ -335,7 +464,31 @@ func (p *P2PService) validatePeer(peerID peer.ID) bool {
 	// Extract peer name if available
 	peerName := "unknown"
 	if name, exists := response["name"]; exists {
-		peerName = name
+		if nameStr, ok := name.(string); ok {
+			peerName = nameStr
+		}
+	}
+
+	// Process avatar data if present
+	if avatarInterface, exists := response["avatar"]; exists {
+		// Convert interface{} to AvatarData
+		if avatarMap, ok := avatarInterface.(map[string]interface{}); ok {
+			receivedAvatarData := &AvatarData{}
+			if filename, ok := avatarMap["filename"].(string); ok {
+				receivedAvatarData.Filename = filename
+			}
+			if data, ok := avatarMap["data"].(string); ok {
+				receivedAvatarData.Data = data
+			}
+			if size, ok := avatarMap["size"].(float64); ok {
+				receivedAvatarData.Size = int(size)
+			}
+
+			// Save the received avatar
+			if err := p.saveReceivedAvatar(peerID, receivedAvatarData); err != nil {
+				log.Printf("Failed to save avatar from peer %s: %v", peerID, err)
+			}
+		}
 	}
 
 	log.Printf("✅ Peer %s validated as our application (name: %s)", peerID, peerName)
@@ -346,6 +499,20 @@ func (p *P2PService) validatePeer(peerID peer.ID) bool {
 // markPeerValidation marks a peer as validated or not
 func (p *P2PService) markPeerValidation(peerID peer.ID, isValid bool) {
 	p.markPeerValidationWithName(peerID, isValid, "")
+}
+
+// checkPeerHasAvatar checks if a peer has avatar images available
+func (p *P2PService) checkPeerHasAvatar(peerID peer.ID) bool {
+	if p.appService == nil || p.appService.DirectoryService == nil {
+		return false
+	}
+
+	avatarImages, err := p.appService.DirectoryService.GetPeerAvatarImages(peerID.String())
+	if err != nil {
+		return false
+	}
+
+	return len(avatarImages) > 0
 }
 
 // markPeerValidationWithName marks a peer as validated with name information
@@ -362,6 +529,14 @@ func (p *P2PService) markPeerValidationWithName(peerID peer.ID, isValid bool, pe
 			peerInfo.Name = peerName
 		}
 
+		// Check if peer has avatar
+		peerInfo.HasAvatar = p.checkPeerHasAvatar(peerID)
+
+		// If peer is validated but missing name or avatar, schedule retry
+		if isValid && (peerInfo.Name == "" || peerInfo.Name == "unknown" || !peerInfo.HasAvatar) {
+			go p.retryPeerDataExchange(peerID)
+		}
+
 		// Update validation status and name in database
 		if p.dbService != nil && len(peerInfo.Addresses) > 0 {
 			address := peerInfo.Addresses[0] // Use first address
@@ -371,6 +546,26 @@ func (p *P2PService) markPeerValidationWithName(peerID peer.ID, isValid bool, pe
 		}
 	}
 	p.peerInfoMutex.Unlock()
+}
+
+// retryPeerDataExchange attempts to re-exchange identification data with a peer
+func (p *P2PService) retryPeerDataExchange(peerID peer.ID) {
+	// Wait a bit before retrying to avoid immediate retry storms
+	time.Sleep(2 * time.Second)
+
+	// Check if peer is still connected
+	if p.host.Network().Connectedness(peerID) != network.Connected {
+		return
+	}
+
+	log.Printf("🔄 Retrying data exchange with peer %s (missing name or avatar)", peerID)
+
+	// Try to re-validate the peer to exchange identification data again
+	if p.validatePeer(peerID) {
+		log.Printf("✅ Successfully retried data exchange with peer %s", peerID)
+	} else {
+		log.Printf("❌ Failed to retry data exchange with peer %s", peerID)
+	}
 }
 
 // setupMDNS initializes mDNS for local network discovery
@@ -619,6 +814,49 @@ func (p *P2PService) cleanupInvalidPeers() {
 
 	if disconnectedCount > 0 {
 		log.Printf("🧹 Cleanup complete: disconnected from %d invalid peers", disconnectedCount)
+	}
+}
+
+// startPeerDataRetry runs periodic checks for missing peer data and retries
+func (p *P2PService) startPeerDataRetry() {
+	ticker := time.NewTicker(60 * time.Second) // Check every 60 seconds
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-p.ctx.Done():
+			return
+		case <-ticker.C:
+			p.checkAndRetryMissingPeerData()
+		}
+	}
+}
+
+// checkAndRetryMissingPeerData checks for peers with missing names or avatars and retries
+func (p *P2PService) checkAndRetryMissingPeerData() {
+	p.peerInfoMutex.RLock()
+	var peersToRetry []peer.ID
+	
+	for peerID, peerInfo := range p.connectedPeers {
+		// Skip if peer is not validated or not connected
+		if !peerInfo.IsValidated || p.host.Network().Connectedness(peerID) != network.Connected {
+			continue
+		}
+		
+		// Check if peer has missing name or avatar
+		if (peerInfo.Name == "" || peerInfo.Name == "unknown") || !peerInfo.HasAvatar {
+			peersToRetry = append(peersToRetry, peerID)
+		}
+	}
+	p.peerInfoMutex.RUnlock()
+	
+	if len(peersToRetry) > 0 {
+		log.Printf("🔄 Found %d peers with missing data, scheduling retries", len(peersToRetry))
+		
+		// Retry data exchange for each peer
+		for _, peerID := range peersToRetry {
+			go p.retryPeerDataExchange(peerID)
+		}
 	}
 }
 

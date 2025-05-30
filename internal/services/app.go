@@ -85,6 +85,7 @@ func (a *AppService) GetNodeInfo() *models.NodeInfoResponse {
 					IsValidated:    info.IsValidated,
 					ConnectionType: info.ConnectionType,
 					Name:           info.Name,
+					HasAvatar:      info.HasAvatar,
 				}
 			}
 		}

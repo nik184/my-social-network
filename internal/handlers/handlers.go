@@ -292,6 +292,120 @@ func (h *Handler) HandleAvatarImage(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, filePath)
 }
 
+// HandlePeerAvatar handles GET /api/peer-avatar/{peerID} and /api/peer-avatar/{peerID}/{filename} requests
+func (h *Handler) HandlePeerAvatar(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" && r.Method != "HEAD" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract path segments from URL
+	pathSegments := r.URL.Path[len("/api/peer-avatar/"):]
+	if pathSegments == "" {
+		http.Error(w, "Peer ID required", http.StatusBadRequest)
+		return
+	}
+
+	// Split path into components
+	pathParts := make([]string, 0)
+	currentPart := ""
+	for _, char := range pathSegments {
+		if char == '/' {
+			if currentPart != "" {
+				pathParts = append(pathParts, currentPart)
+				currentPart = ""
+			}
+		} else {
+			currentPart += string(char)
+		}
+	}
+	if currentPart != "" {
+		pathParts = append(pathParts, currentPart)
+	}
+
+	if len(pathParts) == 0 {
+		http.Error(w, "Peer ID required", http.StatusBadRequest)
+		return
+	}
+
+	peerID := pathParts[0]
+
+	// If only peer ID is provided, return avatar list
+	if len(pathParts) == 1 {
+		images, err := h.appService.DirectoryService.GetPeerAvatarImages(peerID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		response := map[string]interface{}{
+			"peer_id": peerID,
+			"images":  images,
+			"count":   len(images),
+		}
+
+		if len(images) > 0 {
+			response["primary"] = images[0] // First image is the primary avatar
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// If peer ID and filename are provided, serve the image
+	if len(pathParts) >= 2 {
+		filename := pathParts[1]
+
+		// Get peer avatar images list to verify the file exists
+		images, err := h.appService.DirectoryService.GetPeerAvatarImages(peerID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Check if the requested file exists in the peer's avatar list
+		found := false
+		for _, img := range images {
+			if img == filename {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			http.Error(w, "Peer avatar image not found", http.StatusNotFound)
+			return
+		}
+
+		// Serve the file
+		peerAvatarDir := h.appService.DirectoryService.GetPeerAvatarDirectory(peerID)
+		filePath := filepath.Join(peerAvatarDir, filename)
+		
+		// Set appropriate content type based on file extension
+		ext := filepath.Ext(filename)
+		switch ext {
+		case ".jpg", ".jpeg":
+			w.Header().Set("Content-Type", "image/jpeg")
+		case ".png":
+			w.Header().Set("Content-Type", "image/png")
+		case ".gif":
+			w.Header().Set("Content-Type", "image/gif")
+		case ".webp":
+			w.Header().Set("Content-Type", "image/webp")
+		case ".bmp":
+			w.Header().Set("Content-Type", "image/bmp")
+		default:
+			w.Header().Set("Content-Type", "application/octet-stream")
+		}
+
+		http.ServeFile(w, r, filePath)
+		return
+	}
+
+	http.Error(w, "Invalid request path", http.StatusBadRequest)
+}
+
 // RegisterRoutes registers all HTTP routes
 func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/api/info", h.HandleGetInfo)
@@ -307,4 +421,5 @@ func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/api/connect-second-degree", h.HandleConnectSecondDegree)
 	http.HandleFunc("/api/avatar", h.HandleAvatarList)
 	http.HandleFunc("/api/avatar/", h.HandleAvatarImage)
+	http.HandleFunc("/api/peer-avatar/", h.HandlePeerAvatar)
 }

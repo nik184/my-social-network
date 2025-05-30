@@ -235,6 +235,37 @@
             }
         }
 
+        // Load peer avatar images and return primary avatar info
+        async function getPeerAvatar(peerID) {
+            try {
+                const response = await fetch(`/api/peer-avatar/${peerID}`);
+                if (!response.ok) {
+                    return null;
+                }
+                const data = await response.json();
+                if (data.images && data.images.length > 0) {
+                    return {
+                        hasAvatar: true,
+                        primary: data.primary || data.images[0],
+                        count: data.count,
+                        url: `/api/peer-avatar/${peerID}/${data.primary || data.images[0]}`
+                    };
+                }
+                return null;
+            } catch (error) {
+                return null;
+            }
+        }
+
+        // Create avatar HTML element for peer
+        function createPeerAvatarElement(peerID, avatarInfo, size = '32px') {
+            if (avatarInfo && avatarInfo.hasAvatar) {
+                return `<img src="${avatarInfo.url}" alt="Avatar" style="width: ${size}; height: ${size}; border-radius: 50%; object-fit: cover; margin-right: 10px; border: 2px solid #ddd;" />`;
+            } else {
+                return `<div style="width: ${size}; height: ${size}; border-radius: 50%; background: #e9ecef; display: flex; align-items: center; justify-content: center; margin-right: 10px; border: 2px solid #ddd; font-size: 16px;">👤</div>`;
+            }
+        }
+
         // Close modal when clicking outside the image
         window.onclick = function(event) {
             const modal = document.getElementById('galleryModal');
@@ -568,24 +599,33 @@
                     // Create HTML for connection history with connect buttons
                     let historyHtml = '<div style="display: grid; gap: 10px;">';
                     
-                    data.connections.forEach(conn => {
+                    // Load avatars for all peers in parallel
+                    const avatarPromises = data.connections.map(conn => getPeerAvatar(conn.peer_id));
+                    const avatars = await Promise.all(avatarPromises);
+                    
+                    data.connections.forEach((conn, index) => {
                         const peerId = conn.peer_id;
                         const displayName = conn.peer_name && conn.peer_name !== '' && conn.peer_name !== 'unknown' 
                             ? conn.peer_name 
                             : 'Unknown';
                         const isCurrentlyConnected = conn.currently_connected || false;
                         const lastSeen = new Date(conn.last_connected).toLocaleString();
+                        const avatarInfo = avatars[index];
+                        const avatarHtml = createPeerAvatarElement(peerId, avatarInfo, '40px');
                         
                         historyHtml += `
                             <div style="border: 1px solid #ddd; border-radius: 5px; padding: 10px; background: ${isCurrentlyConnected ? '#d4edda' : '#f8f9fa'};">
                                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <div>
-                                        <strong>${displayName}</strong> (${peerId})
-                                        <br>
-                                        <small style="color: #666;">
-                                            Last connected: ${lastSeen}
-                                            ${isCurrentlyConnected ? ' • <span style="color: #155724;">Currently connected</span>' : ''}
-                                        </small>
+                                    <div style="display: flex; align-items: center;">
+                                        ${avatarHtml}
+                                        <div>
+                                            <strong>${displayName}</strong> (${peerId})
+                                            <br>
+                                            <small style="color: #666;">
+                                                Last connected: ${lastSeen}
+                                                ${isCurrentlyConnected ? ' • <span style="color: #155724;">Currently connected</span>' : ''}
+                                            </small>
+                                        </div>
                                     </div>
                                     <div>
                                         ${!isCurrentlyConnected ? 
@@ -678,24 +718,33 @@
                     // Create HTML for second-degree peers with connect buttons
                     let peersHtml = '<div style="display: grid; gap: 10px;">';
                     
-                    data.peers.forEach(peer => {
+                    // Load avatars for all peers in parallel
+                    const avatarPromises = data.peers.map(peer => getPeerAvatar(peer.peer_id));
+                    const avatars = await Promise.all(avatarPromises);
+                    
+                    data.peers.forEach((peer, index) => {
                         const shortId = peer.peer_id.substring(0, 12) + '...';
                         const displayName = peer.peer_name && peer.peer_name !== '' && peer.peer_name !== 'unknown' 
                             ? peer.peer_name 
                             : 'Unknown';
                         const connectionPath = peer.connection_path ? ` (via ${peer.connection_path})` : '';
+                        const avatarInfo = avatars[index];
+                        const avatarHtml = createPeerAvatarElement(peer.peer_id, avatarInfo, '40px');
                         
                         peersHtml += `
                             <div style="border: 1px solid #ddd; border-radius: 5px; padding: 10px; background: #f8f9fa;">
                                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <div>
-                                        <strong>${displayName}</strong> (${shortId})
-                                        <br>
-                                        <small style="color: #666;">
-                                            Connected via: ${peer.via_peer_name || 'Unknown'}${connectionPath}
+                                    <div style="display: flex; align-items: center;">
+                                        ${avatarHtml}
+                                        <div>
+                                            <strong>${displayName}</strong> (${shortId})
                                             <br>
-                                            Distance: 2 hops away
-                                        </small>
+                                            <small style="color: #666;">
+                                                Connected via: ${peer.via_peer_name || 'Unknown'}${connectionPath}
+                                                <br>
+                                                Distance: 2 hops away
+                                            </small>
+                                        </div>
                                     </div>
                                     <div>
                                         <button class="button" onclick="connectToSecondDegreePeer('${peer.peer_id}', '${peer.via_peer_id}', '${displayName}')">Connect</button>

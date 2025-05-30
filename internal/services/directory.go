@@ -18,6 +18,10 @@ type DirectoryServiceInterface interface {
 	GetAvatarDirectory() string
 	CreateAvatarDirectory() error
 	GetAvatarImages() ([]string, error)
+	GetPeerAvatarDirectory(peerID string) string
+	CreatePeerAvatarDirectory(peerID string) error
+	SavePeerAvatar(peerID string, filename string, data []byte) error
+	GetPeerAvatarImages(peerID string) ([]string, error)
 }
 
 // DirectoryService handles directory operations
@@ -95,6 +99,82 @@ func (d *DirectoryService) GetAvatarImages() ([]string, error) {
 	files, err := os.ReadDir(avatarDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read avatar directory: %w", err)
+	}
+
+	var imageFiles []string
+	validExtensions := map[string]bool{
+		".jpg":  true,
+		".jpeg": true,
+		".png":  true,
+		".gif":  true,
+		".bmp":  true,
+		".webp": true,
+	}
+
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		
+		ext := strings.ToLower(filepath.Ext(file.Name()))
+		if validExtensions[ext] {
+			imageFiles = append(imageFiles, file.Name())
+		}
+	}
+
+	return imageFiles, nil
+}
+
+// GetPeerAvatarDirectory returns the path to a specific peer's avatar directory
+func (d *DirectoryService) GetPeerAvatarDirectory(peerID string) string {
+	return filepath.Join(d.directoryPath, "downloaded", peerID, "images")
+}
+
+// CreatePeerAvatarDirectory creates the avatar directory for a specific peer
+func (d *DirectoryService) CreatePeerAvatarDirectory(peerID string) error {
+	peerAvatarDir := d.GetPeerAvatarDirectory(peerID)
+	err := os.MkdirAll(peerAvatarDir, 0755)
+	if err != nil {
+		return fmt.Errorf("failed to create peer avatar directory: %w", err)
+	}
+	return nil
+}
+
+// SavePeerAvatar saves an avatar image for a specific peer
+func (d *DirectoryService) SavePeerAvatar(peerID string, filename string, data []byte) error {
+	// Ensure the directory exists
+	if err := d.CreatePeerAvatarDirectory(peerID); err != nil {
+		return err
+	}
+
+	// Validate filename to prevent directory traversal
+	if strings.Contains(filename, "..") || strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
+		return fmt.Errorf("invalid filename: %s", filename)
+	}
+
+	peerAvatarDir := d.GetPeerAvatarDirectory(peerID)
+	filePath := filepath.Join(peerAvatarDir, filename)
+	
+	err := os.WriteFile(filePath, data, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to save peer avatar: %w", err)
+	}
+	
+	return nil
+}
+
+// GetPeerAvatarImages returns a list of image files in a peer's avatar directory
+func (d *DirectoryService) GetPeerAvatarImages(peerID string) ([]string, error) {
+	peerAvatarDir := d.GetPeerAvatarDirectory(peerID)
+	
+	// Check if directory exists
+	if _, err := os.Stat(peerAvatarDir); os.IsNotExist(err) {
+		return []string{}, nil // Return empty list if directory doesn't exist
+	}
+
+	files, err := os.ReadDir(peerAvatarDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read peer avatar directory: %w", err)
 	}
 
 	var imageFiles []string

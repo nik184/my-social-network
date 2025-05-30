@@ -51,6 +51,7 @@ type PeerInfoJSON struct {
 	IsValidated    bool      `json:"is_validated"`
 	ConnectionType string    `json:"connection_type"`
 	Name           string    `json:"name"`
+	HasAvatar      bool      `json:"has_avatar"`
 }
 
 // NodeInfoResponse represents the response containing node and folder information
