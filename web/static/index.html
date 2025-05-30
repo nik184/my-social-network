@@ -5,7 +5,7 @@
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
         .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .header { text-align: center; color: #333; margin-bottom: 30px; }
+        .header { text-align: center; color: #333; margin-bottom: 30px; position: relative; }
         .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
         .button { background-color: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
         .button:hover { background-color: #0056b3; }
@@ -14,11 +14,32 @@
         .status { padding: 10px; margin: 10px 0; border-radius: 3px; }
         .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
         .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        
+        /* Avatar styles */
+        .avatar-container { position: absolute; top: 10px; right: 10px; }
+        .avatar { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; cursor: pointer; border: 3px solid #007bff; transition: transform 0.2s; }
+        .avatar:hover { transform: scale(1.1); }
+        .avatar-placeholder { width: 60px; height: 60px; border-radius: 50%; background: #e9ecef; display: flex; align-items: center; justify-content: center; color: #6c757d; font-size: 24px; cursor: pointer; border: 3px solid #dee2e6; }
+        
+        /* Gallery modal styles */
+        .gallery-modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); }
+        .gallery-content { position: relative; margin: auto; padding: 0; width: 90%; max-width: 800px; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+        .gallery-image { max-width: 100%; max-height: 80vh; object-fit: contain; }
+        .gallery-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.8); border: none; font-size: 24px; padding: 10px 15px; cursor: pointer; border-radius: 5px; }
+        .gallery-nav:hover { background: rgba(255,255,255,1); }
+        .gallery-prev { left: 20px; }
+        .gallery-next { right: 20px; }
+        .gallery-close { position: absolute; top: 20px; right: 30px; color: white; font-size: 40px; font-weight: bold; cursor: pointer; }
+        .gallery-close:hover { color: #ccc; }
+        .gallery-counter { color: white; text-align: center; margin-top: 20px; font-size: 18px; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
+            <div class="avatar-container">
+                <div id="avatarDisplay" class="avatar-placeholder" onclick="openGallery()">👤</div>
+            </div>
             <h1>🌐 Distributed Social Network</h1>
             <p>Manage and share your space184 directory using libp2p peer-to-peer networking</p>
             <p style="font-size: 0.9em; color: #666;">✨ Features: DHT discovery, NAT traversal, hole punching, auto file monitoring</p>
@@ -89,6 +110,19 @@
         </div>
     </div>
 
+    <!-- Avatar Gallery Modal -->
+    <div id="galleryModal" class="gallery-modal">
+        <div class="gallery-content">
+            <span class="gallery-close" onclick="closeGallery()">&times;</span>
+            <button class="gallery-nav gallery-prev" onclick="previousImage()">&#10094;</button>
+            <img id="galleryImage" class="gallery-image" src="" alt="Avatar">
+            <button class="gallery-nav gallery-next" onclick="nextImage()">&#10095;</button>
+            <div class="gallery-counter">
+                <span id="currentImageIndex">1</span> / <span id="totalImages">1</span>
+            </div>
+        </div>
+    </div>
+
     <script>
         function showStatus(elementId, message, isError = false) {
             const element = document.getElementById(elementId);
@@ -99,6 +133,129 @@
         function showResult(elementId, data) {
             document.getElementById(elementId).textContent = JSON.stringify(data, null, 2);
         }
+
+        // Avatar-related variables
+        let avatarImages = [];
+        let currentImageIndex = 0;
+
+        // Load avatar images
+        async function loadAvatarImages() {
+            try {
+                const response = await fetch('/api/avatar');
+                const data = await response.json();
+                
+                avatarImages = data.images || [];
+                
+                if (avatarImages.length > 0) {
+                    // Display the primary avatar (first image)
+                    const avatarDisplay = document.getElementById('avatarDisplay');
+                    avatarDisplay.innerHTML = `<img src="/api/avatar/${avatarImages[0]}" alt="Avatar" class="avatar">`;
+                } else {
+                    // Keep the placeholder if no images
+                    const avatarDisplay = document.getElementById('avatarDisplay');
+                    avatarDisplay.innerHTML = '👤';
+                    avatarDisplay.className = 'avatar-placeholder';
+                }
+            } catch (error) {
+                console.log('No avatar images found or error loading:', error.message);
+            }
+        }
+
+        // Open gallery modal
+        function openGallery() {
+            if (avatarImages.length === 0) {
+                // If no images, try to create the avatar directory
+                createAvatarDirectory();
+                return;
+            }
+            
+            currentImageIndex = 0;
+            showGalleryImage();
+            document.getElementById('galleryModal').style.display = 'block';
+            updateGalleryCounter();
+        }
+
+        // Close gallery modal
+        function closeGallery() {
+            document.getElementById('galleryModal').style.display = 'none';
+        }
+
+        // Show current gallery image
+        function showGalleryImage() {
+            if (avatarImages.length > 0) {
+                const galleryImage = document.getElementById('galleryImage');
+                galleryImage.src = `/api/avatar/${avatarImages[currentImageIndex]}`;
+            }
+        }
+
+        // Navigate to previous image
+        function previousImage() {
+            if (avatarImages.length > 1) {
+                currentImageIndex = (currentImageIndex - 1 + avatarImages.length) % avatarImages.length;
+                showGalleryImage();
+                updateGalleryCounter();
+            }
+        }
+
+        // Navigate to next image
+        function nextImage() {
+            if (avatarImages.length > 1) {
+                currentImageIndex = (currentImageIndex + 1) % avatarImages.length;
+                showGalleryImage();
+                updateGalleryCounter();
+            }
+        }
+
+        // Update gallery counter
+        function updateGalleryCounter() {
+            document.getElementById('currentImageIndex').textContent = currentImageIndex + 1;
+            document.getElementById('totalImages').textContent = avatarImages.length;
+            
+            // Hide navigation arrows if only one image
+            const prevBtn = document.querySelector('.gallery-prev');
+            const nextBtn = document.querySelector('.gallery-next');
+            if (avatarImages.length <= 1) {
+                prevBtn.style.display = 'none';
+                nextBtn.style.display = 'none';
+            } else {
+                prevBtn.style.display = 'block';
+                nextBtn.style.display = 'block';
+            }
+        }
+
+        // Create avatar directory and show instructions
+        async function createAvatarDirectory() {
+            try {
+                // First ensure space184 directory exists
+                await fetch('/api/create', { method: 'POST' });
+                
+                alert('Avatar directory is ready!\n\nTo add your avatar:\n1. Navigate to your space184/images/avatar folder\n2. Place one or more image files (jpg, png, gif, etc.)\n3. Refresh this page\n\nThe first image will become your avatar, and you can browse all images by clicking on it.');
+            } catch (error) {
+                alert('Error creating avatar directory: ' + error.message);
+            }
+        }
+
+        // Close modal when clicking outside the image
+        window.onclick = function(event) {
+            const modal = document.getElementById('galleryModal');
+            if (event.target === modal) {
+                closeGallery();
+            }
+        }
+
+        // Keyboard navigation for gallery
+        document.addEventListener('keydown', function(event) {
+            const modal = document.getElementById('galleryModal');
+            if (modal.style.display === 'block') {
+                if (event.key === 'ArrowLeft') {
+                    previousImage();
+                } else if (event.key === 'ArrowRight') {
+                    nextImage();
+                } else if (event.key === 'Escape') {
+                    closeGallery();
+                }
+            }
+        });
 
         async function createDirectory() {
             try {
@@ -593,6 +750,7 @@
 
         // Auto-refresh node info and monitor status
         function startAutoRefresh() {
+            loadAvatarImages();
             getNodeInfo();
             getMonitorStatus();
             getDetailedPeerInfo();
@@ -601,6 +759,7 @@
             
             // Auto-refresh every 5 seconds
             setInterval(() => {
+                loadAvatarImages();
                 getNodeInfo();
                 getMonitorStatus();
                 getDetailedPeerInfo();

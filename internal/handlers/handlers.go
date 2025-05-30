@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"path/filepath"
 
 	"my-social-network/internal/models"
 	"my-social-network/internal/services"
@@ -206,6 +207,91 @@ func (h *Handler) HandleConnectSecondDegree(w http.ResponseWriter, r *http.Reque
 	json.NewEncoder(w).Encode(nodeInfo)
 }
 
+// HandleAvatarList handles GET /api/avatar requests
+func (h *Handler) HandleAvatarList(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	images, err := h.appService.DirectoryService.GetAvatarImages()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"images": images,
+		"count":  len(images),
+	}
+
+	if len(images) > 0 {
+		response["primary"] = images[0] // First image is the primary avatar
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// HandleAvatarImage handles GET /api/avatar/{filename} requests
+func (h *Handler) HandleAvatarImage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" && r.Method != "HEAD" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract filename from URL path
+	filename := r.URL.Path[len("/api/avatar/"):]
+	if filename == "" {
+		http.Error(w, "Filename required", http.StatusBadRequest)
+		return
+	}
+
+	// Get avatar images list to verify the file exists
+	images, err := h.appService.DirectoryService.GetAvatarImages()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Check if the requested file exists in our avatar list
+	found := false
+	for _, img := range images {
+		if img == filename {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		http.Error(w, "Avatar image not found", http.StatusNotFound)
+		return
+	}
+
+	// Serve the file
+	avatarDir := h.appService.DirectoryService.GetAvatarDirectory()
+	filePath := filepath.Join(avatarDir, filename)
+	
+	// Set appropriate content type based on file extension
+	ext := filepath.Ext(filename)
+	switch ext {
+	case ".jpg", ".jpeg":
+		w.Header().Set("Content-Type", "image/jpeg")
+	case ".png":
+		w.Header().Set("Content-Type", "image/png")
+	case ".gif":
+		w.Header().Set("Content-Type", "image/gif")
+	case ".webp":
+		w.Header().Set("Content-Type", "image/webp")
+	case ".bmp":
+		w.Header().Set("Content-Type", "image/bmp")
+	default:
+		w.Header().Set("Content-Type", "application/octet-stream")
+	}
+
+	http.ServeFile(w, r, filePath)
+}
+
 // RegisterRoutes registers all HTTP routes
 func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/api/info", h.HandleGetInfo)
@@ -219,4 +305,6 @@ func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/api/connection-history", h.HandleConnectionHistory)
 	http.HandleFunc("/api/second-degree-peers", h.HandleSecondDegreePeers)
 	http.HandleFunc("/api/connect-second-degree", h.HandleConnectSecondDegree)
+	http.HandleFunc("/api/avatar", h.HandleAvatarList)
+	http.HandleFunc("/api/avatar/", h.HandleAvatarImage)
 }

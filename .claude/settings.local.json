@@ -14,7 +14,9 @@
       "Bash(sqlite3:*)",
       "Bash(CGO_ENABLED=0 go build cmd/distributed-app/main.go)",
       "Bash(go test:*)",
-      "Bash(rg:*)"
+      "Bash(rg:*)",
+      "Bash(curl:*)",
+      "Bash(pkill:*)"
     ],
     "deny": []
   }
