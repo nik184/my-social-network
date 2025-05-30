@@ -220,6 +220,14 @@ func (p *P2PService) handleIdentifyStream(stream network.Stream) {
 	peerID := stream.Conn().RemotePeer()
 	log.Printf("🔍 Received identification request from peer: %s", peerID)
 
+	// Read the requesting peer's identification data (client sends first)
+	var peerRequest map[string]string
+	decoder := json.NewDecoder(stream)
+	if err := decoder.Decode(&peerRequest); err != nil {
+		log.Printf("Failed to decode peer identification: %v", err)
+		return
+	}
+
 	// Get our node name from database
 	nodeName := "unknown"
 	if p.dbService != nil {
@@ -228,7 +236,7 @@ func (p *P2PService) handleIdentifyStream(stream network.Stream) {
 		}
 	}
 
-	// Send our application identifier including name
+	// Send our application identifier response including name
 	response := map[string]string{
 		"app":     AppIdentifier,
 		"version": "1.0.0",
@@ -242,18 +250,10 @@ func (p *P2PService) handleIdentifyStream(stream network.Stream) {
 		return
 	}
 
-	// Read the requesting peer's identification data
-	var peerResponse map[string]string
-	decoder := json.NewDecoder(stream)
-	if err := decoder.Decode(&peerResponse); err != nil {
-		log.Printf("Failed to decode peer identification: %v", err)
-		return
-	}
-
 	// Extract peer name and validate it's our application
-	if app, exists := peerResponse["app"]; exists && app == AppIdentifier {
+	if app, exists := peerRequest["app"]; exists && app == AppIdentifier {
 		peerName := "unknown"
-		if name, exists := peerResponse["name"]; exists {
+		if name, exists := peerRequest["name"]; exists {
 			peerName = name
 		}
 
@@ -294,16 +294,7 @@ func (p *P2PService) validatePeer(peerID peer.ID) bool {
 	}
 	defer stream.Close()
 
-	// Read identification response from remote peer
-	var response map[string]string
-	decoder := json.NewDecoder(stream)
-	if err := decoder.Decode(&response); err != nil {
-		log.Printf("❌ Failed to decode identification from %s: %v", peerID, err)
-		p.markPeerValidation(peerID, false)
-		return false
-	}
-
-	// Send our identification data back to the remote peer
+	// As the stream initiator (client), send our identification data first
 	ourNodeName := "unknown"
 	if p.dbService != nil {
 		if name, err := p.dbService.GetSetting("name"); err == nil {
@@ -311,7 +302,7 @@ func (p *P2PService) validatePeer(peerID peer.ID) bool {
 		}
 	}
 
-	ourResponse := map[string]string{
+	ourRequest := map[string]string{
 		"app":     AppIdentifier,
 		"version": "1.0.0",
 		"nodeId":  p.host.ID().String(),
@@ -319,9 +310,19 @@ func (p *P2PService) validatePeer(peerID peer.ID) bool {
 	}
 
 	encoder := json.NewEncoder(stream)
-	if err := encoder.Encode(ourResponse); err != nil {
+	if err := encoder.Encode(ourRequest); err != nil {
 		log.Printf("❌ Failed to send our identification to %s: %v", peerID, err)
-		// Continue anyway, we still got their response
+		p.markPeerValidation(peerID, false)
+		return false
+	}
+
+	// Read identification response from remote peer
+	var response map[string]string
+	decoder := json.NewDecoder(stream)
+	if err := decoder.Decode(&response); err != nil {
+		log.Printf("❌ Failed to decode identification from %s: %v", peerID, err)
+		p.markPeerValidation(peerID, false)
+		return false
 	}
 
 	// Check if it's our application
@@ -577,7 +578,6 @@ func (p *P2PService) GetConnectedPeers() []peer.ID {
 		}
 	}
 
-	log.Printf("📊 Connected peers: %d total, %d validated as our app", len(allPeers), len(validatedPeersList))
 	return validatedPeersList
 }
 
@@ -1101,7 +1101,6 @@ func (p *P2PService) requestPeerListFromPeer(peerID peer.ID) (*models.PeerListRe
 	if err := decoder.Decode(&response); err != nil {
 		// Special handling for EOF - this might happen if peer has no connections
 		if err == io.EOF {
-			log.Printf("Received EOF from peer %s - peer might have no connections, returning empty list", peerID)
 			// Return empty peer list
 			return &models.PeerListResponse{
 				Peers: []models.PeerListItem{},

@@ -412,7 +412,7 @@
                     let historyHtml = '<div style="display: grid; gap: 10px;">';
                     
                     data.connections.forEach(conn => {
-                        const shortId = conn.peer_id.substring(0, 12) + '...';
+                        const peerId = conn.peer_id;
                         const displayName = conn.peer_name && conn.peer_name !== '' && conn.peer_name !== 'unknown' 
                             ? conn.peer_name 
                             : 'Unknown';
@@ -423,7 +423,7 @@
                             <div style="border: 1px solid #ddd; border-radius: 5px; padding: 10px; background: ${isCurrentlyConnected ? '#d4edda' : '#f8f9fa'};">
                                 <div style="display: flex; justify-content: space-between; align-items: center;">
                                     <div>
-                                        <strong>${displayName}</strong> (${shortId})
+                                        <strong>${displayName}</strong> (${peerId})
                                         <br>
                                         <small style="color: #666;">
                                             Last connected: ${lastSeen}

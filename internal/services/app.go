@@ -10,7 +10,7 @@ import (
 
 // AppService coordinates all application services
 type AppService struct {
-	DirectoryService *DirectoryService
+	DirectoryService DirectoryServiceInterface
 	DatabaseService  *DatabaseService
 	P2PService       *P2PService
 	MonitorService   *MonitorService

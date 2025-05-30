@@ -9,6 +9,13 @@ import (
 	"my-social-network/internal/models"
 )
 
+// DirectoryServiceInterface defines the interface for directory operations
+type DirectoryServiceInterface interface {
+	GetDirectoryPath() string
+	CreateDirectory() error
+	ScanDirectory() (*models.FolderInfo, error)
+}
+
 // DirectoryService handles directory operations
 type DirectoryService struct {
 	directoryPath string

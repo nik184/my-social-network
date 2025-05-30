@@ -13,7 +13,7 @@ import (
 // MonitorService handles file system monitoring for the space184 directory
 type MonitorService struct {
 	watcher           *fsnotify.Watcher
-	directoryService  *DirectoryService
+	directoryService  DirectoryServiceInterface
 	appService        *AppService
 	ctx               context.Context
 	cancel            context.CancelFunc
@@ -24,7 +24,7 @@ type MonitorService struct {
 }
 
 // NewMonitorService creates a new file system monitor
-func NewMonitorService(directoryService *DirectoryService, appService *AppService) (*MonitorService, error) {
+func NewMonitorService(directoryService DirectoryServiceInterface, appService *AppService) (*MonitorService, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
