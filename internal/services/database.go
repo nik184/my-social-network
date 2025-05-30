@@ -52,7 +52,7 @@ func NewDatabaseService(dbPath string) (*DatabaseService, error) {
 	}
 
 	service := &DatabaseService{db: db}
-	
+
 	if err := service.initTables(); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("failed to initialize tables: %w", err)
@@ -84,18 +84,17 @@ func (d *DatabaseService) initTables() error {
 		return fmt.Errorf("failed to create settings table: %w", err)
 	}
 
-	// Create connections table
+	// Create connections table with peer_id uniqueness
 	connectionsTable := `
 		CREATE TABLE IF NOT EXISTS connections (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			peer_id TEXT NOT NULL,
+			peer_id TEXT NOT NULL UNIQUE,
 			address TEXT NOT NULL,
 			first_connected DATETIME NOT NULL,
 			last_connected DATETIME NOT NULL,
 			connection_type TEXT NOT NULL,
 			is_validated BOOLEAN NOT NULL DEFAULT 0,
-			peer_name TEXT DEFAULT '',
-			UNIQUE(peer_id, address)
+			peer_name TEXT DEFAULT ''
 		);
 	`
 	if _, err := d.db.Exec(connectionsTable); err != nil {
@@ -269,14 +268,14 @@ func (d *DatabaseService) RecordConnection(peerID, address, connectionType strin
 // RecordConnectionWithName stores or updates a connection record with peer name
 func (d *DatabaseService) RecordConnectionWithName(peerID, address, connectionType string, isValidated bool, peerName string) error {
 	now := time.Now()
-	
-	// Try to update existing record
+
+	// Try to update existing record by peer_id (since peer_id is now unique)
 	result, err := d.db.Exec(`
 		UPDATE connections 
-		SET last_connected = ?, connection_type = ?, is_validated = ?, peer_name = CASE WHEN ? != '' THEN ? ELSE peer_name END
-		WHERE peer_id = ? AND address = ?
-	`, now, connectionType, isValidated, peerName, peerName, peerID, address)
-	
+		SET address = ?, last_connected = ?, connection_type = ?, is_validated = ?, peer_name = CASE WHEN ? != '' THEN ? ELSE peer_name END
+		WHERE peer_id = ?
+	`, address, now, connectionType, isValidated, peerName, peerName, peerID)
+
 	if err != nil {
 		return fmt.Errorf("failed to update connection: %w", err)
 	}
@@ -292,7 +291,7 @@ func (d *DatabaseService) RecordConnectionWithName(peerID, address, connectionTy
 			INSERT INTO connections (peer_id, address, first_connected, last_connected, connection_type, is_validated, peer_name)
 			VALUES (?, ?, ?, ?, ?, ?, ?)
 		`, peerID, address, now, now, connectionType, isValidated, peerName)
-		
+
 		if err != nil {
 			return fmt.Errorf("failed to insert connection: %w", err)
 		}
@@ -306,7 +305,7 @@ func (d *DatabaseService) RecordConnectionWithName(peerID, address, connectionTy
 		if nameDisplay == "" {
 			nameDisplay = "unknown"
 		}
-		log.Printf("📝 Connection updated: %s (%s) - %s", peerID[:12]+"...", connectionType, nameDisplay)
+		log.Printf("📝 Connection updated: %s (%s) - %s, new address: %s", peerID[:12]+"...", connectionType, nameDisplay, address)
 	}
 
 	return nil
@@ -344,7 +343,7 @@ func (d *DatabaseService) GetConnectionHistory() ([]ConnectionRecord, error) {
 // GetRecentConnections retrieves connections from the last N days
 func (d *DatabaseService) GetRecentConnections(days int) ([]ConnectionRecord, error) {
 	cutoff := time.Now().AddDate(0, 0, -days)
-	
+
 	rows, err := d.db.Query(`
 		SELECT id, peer_id, address, first_connected, last_connected, connection_type, is_validated, peer_name
 		FROM connections

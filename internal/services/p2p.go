@@ -1061,6 +1061,11 @@ func (p *P2PService) storePeerInfo(peerID peer.ID, connectionType string) {
 		if connectionType != "" && peerInfo.ConnectionType == "" {
 			peerInfo.ConnectionType = connectionType
 		}
+		
+		// Update address if we have a new one (handle case where peer reconnects from different address)
+		if address != "" {
+			peerInfo.Addresses = []string{address}
+		}
 	}
 
 	// Record connection in database
