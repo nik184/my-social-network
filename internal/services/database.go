@@ -11,6 +11,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	_ "modernc.org/sqlite"
+	
+	"my-social-network/internal/models"
 )
 
 // DatabaseService handles SQLite database operations
@@ -99,6 +101,21 @@ func (d *DatabaseService) initTables() error {
 	`
 	if _, err := d.db.Exec(connectionsTable); err != nil {
 		return fmt.Errorf("failed to create connections table: %w", err)
+	}
+
+	// Create friends table
+	friendsTable := `
+		CREATE TABLE IF NOT EXISTS friends (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			peer_id TEXT NOT NULL UNIQUE,
+			peer_name TEXT NOT NULL,
+			added_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			last_seen DATETIME,
+			is_online BOOLEAN NOT NULL DEFAULT 0
+		);
+	`
+	if _, err := d.db.Exec(friendsTable); err != nil {
+		return fmt.Errorf("failed to create friends table: %w", err)
 	}
 
 	log.Printf("📊 Database tables initialized successfully")
@@ -370,6 +387,98 @@ func (d *DatabaseService) GetRecentConnections(days int) ([]ConnectionRecord, er
 	}
 
 	return connections, nil
+}
+
+// AddFriend adds a peer to the friends list
+func (d *DatabaseService) AddFriend(peerID, peerName string) error {
+	_, err := d.db.Exec(`
+		INSERT OR REPLACE INTO friends (peer_id, peer_name, added_at)
+		VALUES (?, ?, CURRENT_TIMESTAMP)
+	`, peerID, peerName)
+	if err != nil {
+		return fmt.Errorf("failed to add friend: %w", err)
+	}
+	
+	log.Printf("👥 Added friend: %s (%s)", peerName, peerID)
+	return nil
+}
+
+// RemoveFriend removes a peer from the friends list
+func (d *DatabaseService) RemoveFriend(peerID string) error {
+	result, err := d.db.Exec("DELETE FROM friends WHERE peer_id = ?", peerID)
+	if err != nil {
+		return fmt.Errorf("failed to remove friend: %w", err)
+	}
+	
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	
+	if rowsAffected == 0 {
+		return fmt.Errorf("friend not found")
+	}
+	
+	log.Printf("👥 Removed friend: %s", peerID)
+	return nil
+}
+
+// GetFriends retrieves all friends
+func (d *DatabaseService) GetFriends() ([]models.Friend, error) {
+	rows, err := d.db.Query(`
+		SELECT id, peer_id, peer_name, added_at, last_seen, is_online
+		FROM friends
+		ORDER BY peer_name ASC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query friends: %w", err)
+	}
+	defer rows.Close()
+
+	var friends []models.Friend
+	for rows.Next() {
+		var friend models.Friend
+		var lastSeen sql.NullTime
+		
+		err := rows.Scan(
+			&friend.ID, &friend.PeerID, &friend.PeerName,
+			&friend.AddedAt, &lastSeen, &friend.IsOnline,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan friend: %w", err)
+		}
+		
+		if lastSeen.Valid {
+			friend.LastSeen = &lastSeen.Time
+		}
+		
+		friends = append(friends, friend)
+	}
+
+	return friends, nil
+}
+
+// IsFriend checks if a peer is in the friends list
+func (d *DatabaseService) IsFriend(peerID string) (bool, error) {
+	var count int
+	err := d.db.QueryRow("SELECT COUNT(*) FROM friends WHERE peer_id = ?", peerID).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("failed to check if peer is friend: %w", err)
+	}
+	return count > 0, nil
+}
+
+// UpdateFriendStatus updates a friend's online status and last seen time
+func (d *DatabaseService) UpdateFriendStatus(peerID string, isOnline bool) error {
+	_, err := d.db.Exec(`
+		UPDATE friends 
+		SET is_online = ?, last_seen = CURRENT_TIMESTAMP
+		WHERE peer_id = ?
+	`, isOnline, peerID)
+	if err != nil {
+		return fmt.Errorf("failed to update friend status: %w", err)
+	}
+	return nil
 }
 
 // Close closes the database connection

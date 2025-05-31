@@ -50,6 +50,7 @@
             <div class="nav-links">
                 <a href="profile.html" class="nav-link">Profile</a>
                 <a href="index.html" class="nav-link active">Network</a>
+                <a href="friends.html" class="nav-link">Friends</a>
             </div>
         </nav>
         
@@ -535,11 +536,12 @@
                                             </small>
                                         </div>
                                     </div>
-                                    <div>
+                                    <div style="display: flex; gap: 10px; align-items: center;">
                                         ${!isCurrentlyConnected ? 
                                             `<button class="button" onclick="reconnectToPeer('${conn.peer_id}', '${conn.address}', '${displayName}')">Reconnect</button>` : 
                                             '<span style="color: #155724; font-weight: bold;">Connected ✓</span>'
                                         }
+                                        <button class="button" onclick="addToFriends('${conn.peer_id}', '${displayName}')">Add to Friends</button>
                                     </div>
                                 </div>
                             </div>
@@ -610,6 +612,31 @@
                 
             } catch (error) {
                 showStatus('connectionHistoryStatus', `❌ Failed to reconnect to ${displayName}: ${error.message}`, true);
+            }
+        }
+
+        async function addToFriends(peerID, displayName) {
+            try {
+                showStatus('connectionHistoryStatus', `👥 Adding ${displayName} to friends...`, false);
+                
+                const response = await fetch('/api/friends', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        peer_id: peerID,
+                        peer_name: displayName 
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                
+                const data = await response.json();
+                showStatus('connectionHistoryStatus', `✅ ${displayName} added to friends!`, false);
+                
+            } catch (error) {
+                showStatus('connectionHistoryStatus', `❌ Failed to add ${displayName} to friends: ${error.message}`, true);
             }
         }
 

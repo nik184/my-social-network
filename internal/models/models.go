@@ -134,6 +134,49 @@ type ConnectionHistoryResponse struct {
 	Count       int                     `json:"count"`
 }
 
+// Friend represents a friend in the friends list
+type Friend struct {
+	ID       int       `json:"id"`
+	PeerID   string    `json:"peer_id"`
+	PeerName string    `json:"peer_name"`
+	AddedAt  time.Time `json:"added_at"`
+	LastSeen *time.Time `json:"last_seen"`
+	IsOnline bool      `json:"is_online"`
+}
+
+// FriendsResponse represents the response for friends list
+type FriendsResponse struct {
+	Friends []Friend `json:"friends"`
+	Count   int      `json:"count"`
+}
+
+// AddFriendRequest represents a request to add a friend
+type AddFriendRequest struct {
+	PeerID   string `json:"peer_id"`
+	PeerName string `json:"peer_name"`
+}
+
+// NotesRequest represents a P2P request for notes list
+type NotesRequest struct {
+	// Currently no additional fields needed
+}
+
+// NotesResponse represents a P2P response with notes list
+type NotesResponse struct {
+	Notes []Note `json:"notes"`
+	Count int    `json:"count"`
+}
+
+// NoteRequest represents a P2P request for a specific note
+type NoteRequest struct {
+	Filename string `json:"filename"`
+}
+
+// NoteResponse represents a P2P response with note content
+type NoteResponse struct {
+	Note *Note `json:"note"`
+}
+
 // Constants for message types
 const (
 	MessageTypeGetInfo          = "getInfo"
@@ -144,4 +187,8 @@ const (
 	MessageTypeGetPeerListResp  = "getPeerListResp"
 	MessageTypeHolePunchAssist  = "holePunchAssist"
 	MessageTypeHolePunchResp    = "holePunchResp"
+	MessageTypeGetNotes         = "getNotes"
+	MessageTypeGetNotesResp     = "getNotesResp"
+	MessageTypeGetNote          = "getNote"
+	MessageTypeGetNoteResp      = "getNoteResp"
 )

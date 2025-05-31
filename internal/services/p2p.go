@@ -664,6 +664,24 @@ func (p *P2PService) handleStream(stream network.Stream) {
 			Payload: assistResponse,
 		}
 
+	case models.MessageTypeGetNotes:
+		// Handle notes list request
+		log.Printf("📝 Processing notes request from %s", peerID)
+		notesResponse := p.handleGetNotesRequest()
+		response = models.P2PMessage{
+			Type:    models.MessageTypeGetNotesResp,
+			Payload: notesResponse,
+		}
+
+	case models.MessageTypeGetNote:
+		// Handle specific note request
+		log.Printf("📝 Processing note request from %s", peerID)
+		noteResponse := p.handleGetNoteRequest(msg.Payload)
+		response = models.P2PMessage{
+			Type:    models.MessageTypeGetNoteResp,
+			Payload: noteResponse,
+		}
+
 	default:
 		log.Printf("Unknown message type: %s", msg.Type)
 		return
@@ -1619,6 +1637,166 @@ func (p *P2PService) ConnectToSecondDegreePeer(targetPeerID, viaPeerID string) (
 	}
 
 	return nil, fmt.Errorf("no valid addresses to connect to")
+}
+
+// handleGetNotesRequest handles P2P request for notes list
+func (p *P2PService) handleGetNotesRequest() *models.NotesResponse {
+	if p.appService == nil || p.appService.DirectoryService == nil {
+		return &models.NotesResponse{
+			Notes: []models.Note{},
+			Count: 0,
+		}
+	}
+
+	notes, err := p.appService.DirectoryService.GetNotes()
+	if err != nil {
+		log.Printf("Failed to get notes for P2P request: %v", err)
+		return &models.NotesResponse{
+			Notes: []models.Note{},
+			Count: 0,
+		}
+	}
+
+	return &models.NotesResponse{
+		Notes: notes,
+		Count: len(notes),
+	}
+}
+
+// handleGetNoteRequest handles P2P request for specific note
+func (p *P2PService) handleGetNoteRequest(payload interface{}) *models.NoteResponse {
+	if p.appService == nil || p.appService.DirectoryService == nil {
+		return &models.NoteResponse{
+			Note: nil,
+		}
+	}
+
+	// Parse the request payload
+	requestData, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("Failed to marshal note request payload: %v", err)
+		return &models.NoteResponse{Note: nil}
+	}
+
+	var noteRequest models.NoteRequest
+	if err := json.Unmarshal(requestData, &noteRequest); err != nil {
+		log.Printf("Failed to parse note request: %v", err)
+		return &models.NoteResponse{Note: nil}
+	}
+
+	note, err := p.appService.DirectoryService.GetNote(noteRequest.Filename)
+	if err != nil {
+		log.Printf("Failed to get note %s for P2P request: %v", noteRequest.Filename, err)
+		return &models.NoteResponse{Note: nil}
+	}
+
+	return &models.NoteResponse{Note: note}
+}
+
+// RequestPeerNotes requests notes list from a peer
+func (p *P2PService) RequestPeerNotes(peerID string) (*models.NotesResponse, error) {
+	peer, err := peer.Decode(peerID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid peer ID: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(p.ctx, 10*time.Second)
+	defer cancel()
+
+	stream, err := p.host.NewStream(ctx, peer, protocol.ID(AppProtocol))
+	if err != nil {
+		return nil, fmt.Errorf("failed to open stream: %w", err)
+	}
+	defer stream.Close()
+
+	// Send notes request
+	msg := models.P2PMessage{
+		Type:    models.MessageTypeGetNotes,
+		Payload: models.NotesRequest{},
+	}
+
+	encoder := json.NewEncoder(stream)
+	if err := encoder.Encode(msg); err != nil {
+		return nil, fmt.Errorf("failed to send notes request: %w", err)
+	}
+
+	// Read response
+	decoder := json.NewDecoder(stream)
+	var response models.P2PMessage
+	if err := decoder.Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if response.Type != models.MessageTypeGetNotesResp {
+		return nil, fmt.Errorf("unexpected response type: %s", response.Type)
+	}
+
+	// Parse response payload
+	responseData, err := json.Marshal(response.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal response payload: %w", err)
+	}
+
+	var notesResponse models.NotesResponse
+	if err := json.Unmarshal(responseData, &notesResponse); err != nil {
+		return nil, fmt.Errorf("failed to parse notes response: %w", err)
+	}
+
+	return &notesResponse, nil
+}
+
+// RequestPeerNote requests a specific note from a peer
+func (p *P2PService) RequestPeerNote(peerID, filename string) (*models.NoteResponse, error) {
+	peer, err := peer.Decode(peerID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid peer ID: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(p.ctx, 10*time.Second)
+	defer cancel()
+
+	stream, err := p.host.NewStream(ctx, peer, protocol.ID(AppProtocol))
+	if err != nil {
+		return nil, fmt.Errorf("failed to open stream: %w", err)
+	}
+	defer stream.Close()
+
+	// Send note request
+	msg := models.P2PMessage{
+		Type: models.MessageTypeGetNote,
+		Payload: models.NoteRequest{
+			Filename: filename,
+		},
+	}
+
+	encoder := json.NewEncoder(stream)
+	if err := encoder.Encode(msg); err != nil {
+		return nil, fmt.Errorf("failed to send note request: %w", err)
+	}
+
+	// Read response
+	decoder := json.NewDecoder(stream)
+	var response models.P2PMessage
+	if err := decoder.Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if response.Type != models.MessageTypeGetNoteResp {
+		return nil, fmt.Errorf("unexpected response type: %s", response.Type)
+	}
+
+	// Parse response payload
+	responseData, err := json.Marshal(response.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal response payload: %w", err)
+	}
+
+	var noteResponse models.NoteResponse
+	if err := json.Unmarshal(responseData, &noteResponse); err != nil {
+		return nil, fmt.Errorf("failed to parse note response: %w", err)
+	}
+
+	return &noteResponse, nil
 }
 
 // Close shuts down the P2P service

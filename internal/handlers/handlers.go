@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"path/filepath"
+	"strings"
 
 	"my-social-network/internal/models"
 	"my-social-network/internal/services"
@@ -450,6 +452,131 @@ func (h *Handler) HandleNote(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(note)
 }
 
+// HandleFriends handles GET /api/friends requests
+func (h *Handler) HandleFriends(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		friends, err := h.appService.DatabaseService.GetFriends()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		response := models.FriendsResponse{
+			Friends: friends,
+			Count:   len(friends),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+
+	case http.MethodPost:
+		var req models.AddFriendRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		if req.PeerID == "" || req.PeerName == "" {
+			http.Error(w, "peer_id and peer_name are required", http.StatusBadRequest)
+			return
+		}
+
+		err := h.appService.DatabaseService.AddFriend(req.PeerID, req.PeerName)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(models.StatusResponse{Status: "success", Message: "Friend added successfully"})
+
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// HandleFriend handles DELETE /api/friends/{peerID} requests
+func (h *Handler) HandleFriend(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract peer ID from URL path
+	peerID := r.URL.Path[len("/api/friends/"):]
+	if peerID == "" {
+		http.Error(w, "Peer ID is required", http.StatusBadRequest)
+		return
+	}
+
+	err := h.appService.DatabaseService.RemoveFriend(peerID)
+	if err != nil {
+		if err.Error() == "friend not found" {
+			http.Error(w, err.Error(), http.StatusNotFound)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(models.StatusResponse{Status: "success", Message: "Friend removed successfully"})
+}
+
+// HandlePeerNotes handles GET /api/peer-notes/{peerID} and /api/peer-notes/{peerID}/{filename} requests
+func (h *Handler) HandlePeerNotes(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse URL path to extract peerID and optional filename
+	pathParts := strings.Split(r.URL.Path[len("/api/peer-notes/"):], "/")
+	if len(pathParts) < 1 || pathParts[0] == "" {
+		http.Error(w, "Peer ID is required", http.StatusBadRequest)
+		return
+	}
+
+	peerID := pathParts[0]
+
+	// If no filename provided, return notes list
+	if len(pathParts) == 1 {
+		// Request notes list from peer via P2P
+		notesResponse, err := h.appService.P2PService.RequestPeerNotes(peerID)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to get notes from peer: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(notesResponse)
+		return
+	}
+
+	// If filename provided, return specific note
+	filename := strings.Join(pathParts[1:], "/") // Join in case filename has slashes
+	if filename == "" {
+		http.Error(w, "Filename is required", http.StatusBadRequest)
+		return
+	}
+
+	// Request specific note from peer via P2P
+	noteResponse, err := h.appService.P2PService.RequestPeerNote(peerID, filename)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to get note from peer: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	if noteResponse.Note == nil {
+		http.Error(w, "Note not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(noteResponse.Note)
+}
+
 // RegisterRoutes registers all HTTP routes
 func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/api/info", h.HandleGetInfo)
@@ -468,4 +595,7 @@ func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/api/peer-avatar/", h.HandlePeerAvatar)
 	http.HandleFunc("/api/notes", h.HandleNotes)
 	http.HandleFunc("/api/notes/", h.HandleNote)
+	http.HandleFunc("/api/friends", h.HandleFriends)
+	http.HandleFunc("/api/friends/", h.HandleFriend)
+	http.HandleFunc("/api/peer-notes/", h.HandlePeerNotes)
 }
