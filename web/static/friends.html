@@ -35,57 +35,9 @@
         </div>
     </div>
 
-    <!-- Friend Profile Modal -->
-    <div id="friendProfileModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div id="friendProfileModalTitle" class="modal-title">Friend Profile</div>
-                <span class="close" onclick="closeFriendProfileModal()">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div id="friendProfileContent">
-                    <div class="profile-header">
-                        <div id="friendAvatar" class="profile-avatar">
-                            👤
-                        </div>
-                        <h1 id="friendName" class="profile-name">Loading...</h1>
-                        <p id="friendId" class="profile-id">Peer ID: ...</p>
-                    </div>
-                    
-                    <div class="section">
-                        <h3>📝 Notes</h3>
-                        <div id="friendNotesStatus" class="status" style="display: none;"></div>
-                        <div id="friendNotesContent">
-                            <div class="empty-state">
-                                <div class="empty-state-icon">📝</div>
-                                <div>Loading notes...</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Note Detail Modal -->
-    <div id="noteModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div id="noteModalTitle" class="modal-title">Note</div>
-                <span class="close" onclick="closeNoteModal()">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div id="noteModalMeta" class="note-full-meta"></div>
-                <div id="noteModalContent" class="note-content"></div>
-            </div>
-        </div>
-    </div>
 
     <script src="js/shared.js"></script>
     <script>
-        let currentFriend = null;
-        let friendNotes = [];
-
         // Load initial data when page loads
         document.addEventListener('DOMContentLoaded', function() {
             loadFriends();
@@ -131,7 +83,7 @@
                 const avatarHtml = sharedApp.createPeerAvatarElement(friend.peer_id, avatarInfo, '50px');
 
                 const friendCard = `
-                    <div style="border: 1px solid #ddd; border-radius: 5px; padding: 15px; background: #f8f9fa; cursor: pointer;" onclick="openFriendProfile('${friend.peer_id}', '${sharedApp.escapeHtml(friend.peer_name)}')">
+                    <div style="border: 1px solid #ddd; border-radius: 5px; padding: 15px; background: #f8f9fa; cursor: pointer;" onclick="viewFriendProfile('${friend.peer_id}')">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <div style="display: flex; align-items: center;">
                                 ${avatarHtml}
@@ -146,7 +98,7 @@
                                 </div>
                             </div>
                             <div style="display: flex; gap: 10px;">
-                                <button class="button" onclick="event.stopPropagation(); openFriendProfile('${friend.peer_id}', '${sharedApp.escapeHtml(friend.peer_name)}')">View Profile</button>
+                                <button class="button" onclick="event.stopPropagation(); viewFriendProfile('${friend.peer_id}')">View Profile</button>
                                 <button class="button" onclick="event.stopPropagation(); removeFriend('${friend.peer_id}', '${sharedApp.escapeHtml(friend.peer_name)}')" style="background-color: #dc3545;">Remove</button>
                             </div>
                         </div>
@@ -207,139 +159,11 @@
             }
         }
 
-        // Open friend profile modal
-        async function openFriendProfile(peerID, friendName) {
-            currentFriend = { peer_id: peerID, peer_name: friendName };
-            
-            document.getElementById('friendProfileModalTitle').textContent = `${friendName}'s Profile`;
-            document.getElementById('friendName').textContent = friendName;
-            document.getElementById('friendId').textContent = `Peer ID: ${peerID}`;
-
-            // Load friend's avatar
-            const avatarInfo = await sharedApp.getPeerAvatar(peerID);
-            const friendAvatar = document.getElementById('friendAvatar');
-            if (avatarInfo && avatarInfo.hasAvatar) {
-                friendAvatar.innerHTML = `<img src="${avatarInfo.url}" alt="Avatar" />`;
-            } else {
-                friendAvatar.innerHTML = '👤';
-            }
-
-            // Load friend's notes (this will be implemented with P2P protocol)
-            await loadFriendNotes(peerID);
-
-            document.getElementById('friendProfileModal').style.display = 'block';
+        // Navigate to friend profile page
+        function viewFriendProfile(peerID) {
+            window.location.href = `friend-profile.html?peer_id=${encodeURIComponent(peerID)}`;
         }
 
-        // Load friend's notes via P2P
-        async function loadFriendNotes(peerID) {
-            try {
-                sharedApp.showStatus('friendNotesStatus', 'Loading notes via P2P...', false);
-                
-                const data = await sharedApp.fetchAPI(`/api/peer-notes/${peerID}`);
-                
-                displayFriendNotes(data.notes || []);
-                sharedApp.hideStatus('friendNotesStatus');
-            } catch (error) {
-                console.error('Error loading friend notes:', error);
-                sharedApp.showStatus('friendNotesStatus', 'Error loading notes: ' + error.message, true);
-                displayFriendNotesEmptyState('Failed to load notes from friend');
-            }
-        }
-
-        // Display friend's notes
-        function displayFriendNotes(notes) {
-            const friendNotesContent = document.getElementById('friendNotesContent');
-            
-            if (notes.length === 0) {
-                displayFriendNotesEmptyState('No notes found');
-                return;
-            }
-
-            const notesGrid = document.createElement('div');
-            notesGrid.className = 'notes-grid';
-
-            notes.forEach(note => {
-                const noteCard = document.createElement('div');
-                noteCard.className = 'note-card';
-
-                const modifiedDate = new Date(note.modified_at).toLocaleDateString();
-                const sizeKB = Math.round(note.size / 1024 * 100) / 100;
-
-                noteCard.innerHTML = `
-                    <div class="note-title">${sharedApp.escapeHtml(note.title)}</div>
-                    <div class="note-meta">
-                        <span>📅 ${modifiedDate}</span>
-                        <span>📄 ${sizeKB} KB</span>
-                    </div>
-                    <div class="note-preview">${sharedApp.escapeHtml(note.preview)}</div>
-                    <div class="note-actions">
-                        <button class="read-more-btn" onclick="openFriendNote('${currentFriend.peer_id}', '${sharedApp.escapeHtml(note.filename)}')">
-                            Read more
-                        </button>
-                    </div>
-                `;
-
-                notesGrid.appendChild(noteCard);
-            });
-
-            friendNotesContent.innerHTML = '';
-            friendNotesContent.appendChild(notesGrid);
-        }
-
-        // Display empty state for friend notes
-        function displayFriendNotesEmptyState(message) {
-            const friendNotesContent = document.getElementById('friendNotesContent');
-            friendNotesContent.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-state-icon">📝</div>
-                    <div>${message}</div>
-                    <div class="create-note-hint">
-                        📡 Notes are requested directly from your friend via P2P connection
-                    </div>
-                </div>
-            `;
-        }
-
-        // Close friend profile modal
-        function closeFriendProfileModal() {
-            document.getElementById('friendProfileModal').style.display = 'none';
-            currentFriend = null;
-        }
-
-        // Note modal functions
-        function closeNoteModal() {
-            sharedApp.closeNoteModal();
-        }
-
-        // Open a specific friend note
-        async function openFriendNote(peerID, filename) {
-            try {
-                const note = await sharedApp.fetchAPI(`/api/peer-notes/${peerID}/${encodeURIComponent(filename)}`);
-                
-                document.getElementById('noteModalTitle').textContent = note.title;
-                document.getElementById('noteModalMeta').innerHTML = `
-                    <strong>From:</strong> ${sharedApp.escapeHtml(currentFriend.peer_name)}<br>
-                    <strong>Filename:</strong> ${sharedApp.escapeHtml(note.filename)}<br>
-                    <strong>Modified:</strong> ${new Date(note.modified_at).toLocaleString()}<br>
-                    <strong>Size:</strong> ${Math.round(note.size / 1024 * 100) / 100} KB
-                `;
-                document.getElementById('noteModalContent').textContent = note.content;
-                
-                document.getElementById('noteModal').style.display = 'block';
-            } catch (error) {
-                console.error('Error loading friend note:', error);
-                alert('Error loading note: ' + error.message);
-            }
-        }
-
-        // Open a specific note (fallback function)
-        async function openNote(filename) {
-            if (currentFriend) {
-                await openFriendNote(currentFriend.peer_id, filename);
-            } else {
-                alert('No friend selected');
-            }
-        }
     </script>
 </body>
 </html>

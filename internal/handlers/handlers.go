@@ -496,13 +496,8 @@ func (h *Handler) HandleFriends(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// HandleFriend handles DELETE /api/friends/{peerID} requests
+// HandleFriend handles GET and DELETE /api/friends/{peerID} requests
 func (h *Handler) HandleFriend(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodDelete {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
 	// Extract peer ID from URL path
 	peerID := r.URL.Path[len("/api/friends/"):]
 	if peerID == "" {
@@ -510,18 +505,44 @@ func (h *Handler) HandleFriend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.appService.DatabaseService.RemoveFriend(peerID)
-	if err != nil {
-		if err.Error() == "friend not found" {
-			http.Error(w, err.Error(), http.StatusNotFound)
-		} else {
+	switch r.Method {
+	case http.MethodGet:
+		// Get specific friend info
+		friends, err := h.appService.DatabaseService.GetFriends()
+		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
-		return
-	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(models.StatusResponse{Status: "success", Message: "Friend removed successfully"})
+		// Find the friend with matching peer ID
+		for _, friend := range friends {
+			if friend.PeerID == peerID {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(friend)
+				return
+			}
+		}
+
+		http.Error(w, "Friend not found", http.StatusNotFound)
+
+	case http.MethodDelete:
+		// Remove friend
+		err := h.appService.DatabaseService.RemoveFriend(peerID)
+		if err != nil {
+			if err.Error() == "friend not found" {
+				http.Error(w, err.Error(), http.StatusNotFound)
+			} else {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(models.StatusResponse{Status: "success", Message: "Friend removed successfully"})
+
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 // HandlePeerNotes handles GET /api/peer-notes/{peerID} and /api/peer-notes/{peerID}/{filename} requests
