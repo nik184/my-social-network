@@ -19,5 +19,6 @@
       "Bash(pkill:*)"
     ],
     "deny": []
-  }
+  },
+  "enableAllProjectMcpServers": false
 }
