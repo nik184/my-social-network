@@ -406,6 +406,50 @@ func (h *Handler) HandlePeerAvatar(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Invalid request path", http.StatusBadRequest)
 }
 
+// HandleNotes handles GET /api/notes requests
+func (h *Handler) HandleNotes(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	notes, err := h.appService.DirectoryService.GetNotes()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"notes": notes,
+		"count": len(notes),
+	})
+}
+
+// HandleNote handles GET /api/notes/{filename} requests
+func (h *Handler) HandleNote(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract filename from URL path
+	filename := r.URL.Path[len("/api/notes/"):]
+	if filename == "" {
+		http.Error(w, "Filename required", http.StatusBadRequest)
+		return
+	}
+
+	note, err := h.appService.DirectoryService.GetNote(filename)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(note)
+}
+
 // RegisterRoutes registers all HTTP routes
 func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/api/info", h.HandleGetInfo)
@@ -422,4 +466,6 @@ func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/api/avatar", h.HandleAvatarList)
 	http.HandleFunc("/api/avatar/", h.HandleAvatarImage)
 	http.HandleFunc("/api/peer-avatar/", h.HandlePeerAvatar)
+	http.HandleFunc("/api/notes", h.HandleNotes)
+	http.HandleFunc("/api/notes/", h.HandleNote)
 }

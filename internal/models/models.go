@@ -14,6 +14,16 @@ type FolderInfo struct {
 	LastScan time.Time `json:"lastScan"`
 }
 
+// Note represents a text note from the notes directory
+type Note struct {
+	Filename    string    `json:"filename"`
+	Title       string    `json:"title"`
+	Content     string    `json:"content"`
+	Preview     string    `json:"preview"`
+	ModifiedAt  time.Time `json:"modified_at"`
+	Size        int64     `json:"size"`
+}
+
 // NetworkNode represents a node in the distributed network
 type NetworkNode struct {
 	ID        peer.ID             `json:"id"`

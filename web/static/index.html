@@ -32,10 +32,27 @@
         .gallery-close { position: absolute; top: 20px; right: 30px; color: white; font-size: 40px; font-weight: bold; cursor: pointer; }
         .gallery-close:hover { color: #ccc; }
         .gallery-counter { color: white; text-align: center; margin-top: 20px; font-size: 18px; }
+        
+        /* Navigation styles */
+        .nav { background: linear-gradient(135deg, #007bff 0%, #6610f2 100%); color: white; padding: 15px 25px; margin: -20px -20px 20px -20px; border-radius: 10px 10px 0 0; display: flex; justify-content: space-between; align-items: center; }
+        .nav-brand { font-size: 20px; font-weight: bold; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-link { color: white; text-decoration: none; padding: 8px 16px; border-radius: 5px; transition: background-color 0.3s; }
+        .nav-link:hover { background-color: rgba(255, 255, 255, 0.2); }
+        .nav-link.active { background-color: rgba(255, 255, 255, 0.3); font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- Navigation -->
+        <nav class="nav">
+            <div class="nav-brand">🌐 My Social Network</div>
+            <div class="nav-links">
+                <a href="profile.html" class="nav-link">Profile</a>
+                <a href="index.html" class="nav-link active">Network</a>
+            </div>
+        </nav>
+        
         <div class="header">
             <div class="avatar-container">
                 <div id="avatarDisplay" class="avatar-placeholder" onclick="openGallery()">👤</div>
@@ -123,170 +140,61 @@
         </div>
     </div>
 
+    <script src="js/shared.js"></script>
     <script>
+        // Load avatar images and update display
+        async function loadAvatarImages() {
+            const data = await sharedApp.loadAvatarImages();
+            const avatarDisplay = document.getElementById('avatarDisplay');
+            sharedApp.updateHeaderAvatar(avatarDisplay);
+            return data;
+        }
+
+        // Gallery functions - use shared functions
+        function openGallery() {
+            sharedApp.openGallery();
+        }
+
+        function closeGallery() {
+            sharedApp.closeGallery();
+        }
+
+        function showGalleryImage() {
+            sharedApp.showGalleryImage();
+        }
+
+        function previousImage() {
+            sharedApp.previousImage();
+        }
+
+        function nextImage() {
+            sharedApp.nextImage();
+        }
+
+        function updateGalleryCounter() {
+            sharedApp.updateGalleryCounter();
+        }
+
+        function createAvatarDirectory() {
+            sharedApp.createAvatarDirectory();
+        }
+
+        function getPeerAvatar(peerID) {
+            return sharedApp.getPeerAvatar(peerID);
+        }
+
+        function createPeerAvatarElement(peerID, avatarInfo, size = '32px') {
+            return sharedApp.createPeerAvatarElement(peerID, avatarInfo, size);
+        }
+
+        // Utility functions - use shared functions
         function showStatus(elementId, message, isError = false) {
-            const element = document.getElementById(elementId);
-            element.innerHTML = message;
-            element.className = 'status ' + (isError ? 'error' : 'success');
+            sharedApp.showStatus(elementId, message, isError);
         }
 
         function showResult(elementId, data) {
-            document.getElementById(elementId).textContent = JSON.stringify(data, null, 2);
+            sharedApp.showResult(elementId, data);
         }
-
-        // Avatar-related variables
-        let avatarImages = [];
-        let currentImageIndex = 0;
-
-        // Load avatar images
-        async function loadAvatarImages() {
-            try {
-                const response = await fetch('/api/avatar');
-                const data = await response.json();
-                
-                avatarImages = data.images || [];
-                
-                if (avatarImages.length > 0) {
-                    // Display the primary avatar (first image)
-                    const avatarDisplay = document.getElementById('avatarDisplay');
-                    avatarDisplay.innerHTML = `<img src="/api/avatar/${avatarImages[0]}" alt="Avatar" class="avatar">`;
-                } else {
-                    // Keep the placeholder if no images
-                    const avatarDisplay = document.getElementById('avatarDisplay');
-                    avatarDisplay.innerHTML = '👤';
-                    avatarDisplay.className = 'avatar-placeholder';
-                }
-            } catch (error) {
-                console.log('No avatar images found or error loading:', error.message);
-            }
-        }
-
-        // Open gallery modal
-        function openGallery() {
-            if (avatarImages.length === 0) {
-                // If no images, try to create the avatar directory
-                createAvatarDirectory();
-                return;
-            }
-            
-            currentImageIndex = 0;
-            showGalleryImage();
-            document.getElementById('galleryModal').style.display = 'block';
-            updateGalleryCounter();
-        }
-
-        // Close gallery modal
-        function closeGallery() {
-            document.getElementById('galleryModal').style.display = 'none';
-        }
-
-        // Show current gallery image
-        function showGalleryImage() {
-            if (avatarImages.length > 0) {
-                const galleryImage = document.getElementById('galleryImage');
-                galleryImage.src = `/api/avatar/${avatarImages[currentImageIndex]}`;
-            }
-        }
-
-        // Navigate to previous image
-        function previousImage() {
-            if (avatarImages.length > 1) {
-                currentImageIndex = (currentImageIndex - 1 + avatarImages.length) % avatarImages.length;
-                showGalleryImage();
-                updateGalleryCounter();
-            }
-        }
-
-        // Navigate to next image
-        function nextImage() {
-            if (avatarImages.length > 1) {
-                currentImageIndex = (currentImageIndex + 1) % avatarImages.length;
-                showGalleryImage();
-                updateGalleryCounter();
-            }
-        }
-
-        // Update gallery counter
-        function updateGalleryCounter() {
-            document.getElementById('currentImageIndex').textContent = currentImageIndex + 1;
-            document.getElementById('totalImages').textContent = avatarImages.length;
-            
-            // Hide navigation arrows if only one image
-            const prevBtn = document.querySelector('.gallery-prev');
-            const nextBtn = document.querySelector('.gallery-next');
-            if (avatarImages.length <= 1) {
-                prevBtn.style.display = 'none';
-                nextBtn.style.display = 'none';
-            } else {
-                prevBtn.style.display = 'block';
-                nextBtn.style.display = 'block';
-            }
-        }
-
-        // Create avatar directory and show instructions
-        async function createAvatarDirectory() {
-            try {
-                // First ensure space184 directory exists
-                await fetch('/api/create', { method: 'POST' });
-                
-                alert('Avatar directory is ready!\n\nTo add your avatar:\n1. Navigate to your space184/images/avatar folder\n2. Place one or more image files (jpg, png, gif, etc.)\n3. Refresh this page\n\nThe first image will become your avatar, and you can browse all images by clicking on it.');
-            } catch (error) {
-                alert('Error creating avatar directory: ' + error.message);
-            }
-        }
-
-        // Load peer avatar images and return primary avatar info
-        async function getPeerAvatar(peerID) {
-            try {
-                const response = await fetch(`/api/peer-avatar/${peerID}`);
-                if (!response.ok) {
-                    return null;
-                }
-                const data = await response.json();
-                if (data.images && data.images.length > 0) {
-                    return {
-                        hasAvatar: true,
-                        primary: data.primary || data.images[0],
-                        count: data.count,
-                        url: `/api/peer-avatar/${peerID}/${data.primary || data.images[0]}`
-                    };
-                }
-                return null;
-            } catch (error) {
-                return null;
-            }
-        }
-
-        // Create avatar HTML element for peer
-        function createPeerAvatarElement(peerID, avatarInfo, size = '32px') {
-            if (avatarInfo && avatarInfo.hasAvatar) {
-                return `<img src="${avatarInfo.url}" alt="Avatar" style="width: ${size}; height: ${size}; border-radius: 50%; object-fit: cover; margin-right: 10px; border: 2px solid #ddd;" />`;
-            } else {
-                return `<div style="width: ${size}; height: ${size}; border-radius: 50%; background: #e9ecef; display: flex; align-items: center; justify-content: center; margin-right: 10px; border: 2px solid #ddd; font-size: 16px;">👤</div>`;
-            }
-        }
-
-        // Close modal when clicking outside the image
-        window.onclick = function(event) {
-            const modal = document.getElementById('galleryModal');
-            if (event.target === modal) {
-                closeGallery();
-            }
-        }
-
-        // Keyboard navigation for gallery
-        document.addEventListener('keydown', function(event) {
-            const modal = document.getElementById('galleryModal');
-            if (modal.style.display === 'block') {
-                if (event.key === 'ArrowLeft') {
-                    previousImage();
-                } else if (event.key === 'ArrowRight') {
-                    nextImage();
-                } else if (event.key === 'Escape') {
-                    closeGallery();
-                }
-            }
-        });
 
         async function createDirectory() {
             try {

@@ -200,7 +200,7 @@ func main() {
 	fmt.Println("\n🎉 Distributed Social Network - Console Mode")
 	showHelp()
 	fmt.Println("💡 Application is running. Web interface available but console commands enabled.")
-	fmt.Printf("🌐 Web UI: http://localhost:%d/index.html\n", webUI.GetPort())
+	fmt.Printf("🌐 Web UI: http://localhost:%d/profile.html\n", webUI.GetPort())
 	fmt.Println("⌨️  Enter commands below (Q, W, H) or Ctrl+C to quit:")
 	
 	// Handle graceful shutdown

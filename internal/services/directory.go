@@ -22,6 +22,10 @@ type DirectoryServiceInterface interface {
 	CreatePeerAvatarDirectory(peerID string) error
 	SavePeerAvatar(peerID string, filename string, data []byte) error
 	GetPeerAvatarImages(peerID string) ([]string, error)
+	GetNotesDirectory() string
+	CreateNotesDirectory() error
+	GetNotes() ([]models.Note, error)
+	GetNote(filename string) (*models.Note, error)
 }
 
 // DirectoryService handles directory operations
@@ -50,6 +54,12 @@ func (d *DirectoryService) CreateDirectory() error {
 	if err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
+	
+	// Also create the notes directory as part of the standard setup
+	if err := d.CreateNotesDirectory(); err != nil {
+		return fmt.Errorf("failed to create notes directory: %w", err)
+	}
+	
 	return nil
 }
 
@@ -199,4 +209,116 @@ func (d *DirectoryService) GetPeerAvatarImages(peerID string) ([]string, error) 
 	}
 
 	return imageFiles, nil
+}
+
+// GetNotesDirectory returns the path to the notes directory
+func (d *DirectoryService) GetNotesDirectory() string {
+	return filepath.Join(d.directoryPath, "notes")
+}
+
+// CreateNotesDirectory creates the notes directory if it doesn't exist
+func (d *DirectoryService) CreateNotesDirectory() error {
+	notesDir := d.GetNotesDirectory()
+	err := os.MkdirAll(notesDir, 0755)
+	if err != nil {
+		return fmt.Errorf("failed to create notes directory: %w", err)
+	}
+	return nil
+}
+
+// GetNotes returns a list of all notes in the notes directory
+func (d *DirectoryService) GetNotes() ([]models.Note, error) {
+	notesDir := d.GetNotesDirectory()
+	
+	// Ensure the directory exists
+	if err := d.CreateNotesDirectory(); err != nil {
+		return nil, err
+	}
+
+	files, err := os.ReadDir(notesDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read notes directory: %w", err)
+	}
+
+	var notes []models.Note
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		
+		// Only process .txt files
+		if !strings.HasSuffix(strings.ToLower(file.Name()), ".txt") {
+			continue
+		}
+
+		fileInfo, err := file.Info()
+		if err != nil {
+			// Log error but continue with other files
+			continue
+		}
+		
+		note, err := d.loadNoteFile(file.Name(), fileInfo)
+		if err != nil {
+			// Log error but continue with other files
+			continue
+		}
+		
+		notes = append(notes, *note)
+	}
+
+	return notes, nil
+}
+
+// GetNote returns a specific note by filename
+func (d *DirectoryService) GetNote(filename string) (*models.Note, error) {
+	// Validate filename to prevent directory traversal
+	if strings.Contains(filename, "..") || strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
+		return nil, fmt.Errorf("invalid filename: %s", filename)
+	}
+
+	notesDir := d.GetNotesDirectory()
+	filePath := filepath.Join(notesDir, filename)
+	
+	fileInfo, err := os.Stat(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get file info: %w", err)
+	}
+
+	return d.loadNoteFile(filename, fileInfo)
+}
+
+// loadNoteFile loads a note from a file
+func (d *DirectoryService) loadNoteFile(filename string, fileInfo os.FileInfo) (*models.Note, error) {
+	notesDir := d.GetNotesDirectory()
+	filePath := filepath.Join(notesDir, filename)
+	
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read note file: %w", err)
+	}
+
+	contentStr := string(content)
+	
+	// Create title from filename (remove .txt extension)
+	title := filename
+	if strings.HasSuffix(title, ".txt") {
+		title = title[:len(title)-4]
+	}
+	
+	// Create preview (first 150 characters)
+	preview := contentStr
+	if len(preview) > 150 {
+		preview = preview[:150] + "..."
+	}
+
+	note := &models.Note{
+		Filename:   filename,
+		Title:      title,
+		Content:    contentStr,
+		Preview:    preview,
+		ModifiedAt: fileInfo.ModTime(),
+		Size:       fileInfo.Size(),
+	}
+
+	return note, nil
 }

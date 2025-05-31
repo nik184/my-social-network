@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>My Social Network - Profile</title>
+    <link rel="stylesheet" href="css/shared.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Navigation -->
+        <nav class="nav">
+            <div class="nav-brand">🌐 My Social Network</div>
+            <div class="nav-links">
+                <a href="profile.html" class="nav-link active">Profile</a>
+                <a href="index.html" class="nav-link">Network</a>
+            </div>
+        </nav>
+
+        <!-- Profile Header -->
+        <div class="header profile-header">
+            <div id="profileAvatar" class="profile-avatar" onclick="openAvatarGallery()">
+                👤
+            </div>
+            <h1 id="profileName" class="profile-name">Loading...</h1>
+            <p id="profileId" class="profile-id">Peer ID: ...</p>
+        </div>
+
+        <!-- Notes Section -->
+        <div class="section">
+            <h3>📝 My Notes</h3>
+            <div id="notesStatus" class="status" style="display: none;"></div>
+            <div id="notesContent">
+                <div class="empty-state">
+                    <div class="empty-state-icon">📝</div>
+                    <div>Loading notes...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Avatar Gallery Modal -->
+    <div id="avatarModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">Avatar Gallery</div>
+                <span class="close" onclick="closeAvatarGallery()">&times;</span>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <div id="avatarGalleryContent">
+                    <p>Loading avatar images...</p>
+                </div>
+                <div id="avatarCounter" style="margin-top: 15px; color: #666; font-size: 14px;"></div>
+                <div style="margin-top: 20px;">
+                    <button onclick="previousAvatar()" id="prevAvatarBtn" class="read-more-btn" style="margin-right: 10px;">← Previous</button>
+                    <button onclick="nextAvatar()" id="nextAvatarBtn" class="read-more-btn">Next →</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Note Detail Modal -->
+    <div id="noteModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div id="noteModalTitle" class="modal-title">Note</div>
+                <span class="close" onclick="closeNoteModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="noteModalMeta" class="note-full-meta"></div>
+                <div id="noteModalContent" class="note-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/shared.js"></script>
+    <script>
+        let userInfo = null;
+        let currentAvatarIndex = 0;
+
+        // Load initial data when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadUserInfo();
+            loadNotes();
+        });
+
+        // Load user information and avatar
+        async function loadUserInfo() {
+            try {
+                const data = await sharedApp.getUserInfo();
+                if (!data) {
+                    document.getElementById('profileName').textContent = 'Error loading profile';
+                    return;
+                }
+                
+                userInfo = data;
+
+                // Update profile name
+                let name = 'Unknown User';
+                if (data.node && data.node.id) {
+                    const nodeId = data.node.id.toString();
+                    document.getElementById('profileId').textContent = `Peer ID: ${nodeId}`;
+                }
+
+                // Try to get user name from database/settings
+                // For now, we'll use a default name
+                document.getElementById('profileName').textContent = name;
+
+                // Load avatar
+                await loadAvatar();
+            } catch (error) {
+                console.error('Error loading user info:', error);
+                document.getElementById('profileName').textContent = 'Error loading profile';
+            }
+        }
+
+        // Load user avatar
+        async function loadAvatar() {
+            try {
+                const data = await sharedApp.loadAvatarImages();
+                
+                if (avatarImages.length > 0) {
+                    const primaryAvatar = data.primary || avatarImages[0];
+                    const avatarUrl = `/api/avatar/${primaryAvatar}`;
+                    
+                    document.getElementById('profileAvatar').innerHTML = 
+                        `<img src="${avatarUrl}" alt="Avatar" />`;
+                } else {
+                    // No avatar, keep default icon
+                    document.getElementById('profileAvatar').innerHTML = '👤';
+                }
+            } catch (error) {
+                console.error('Error loading avatar:', error);
+                document.getElementById('profileAvatar').innerHTML = '👤';
+            }
+        }
+
+        // Load notes from the server
+        async function loadNotes() {
+            try {
+                sharedApp.showStatus('notesStatus', 'Loading notes...', false);
+                
+                const data = await sharedApp.fetchAPI('/api/notes');
+                
+                displayNotes(data.notes || []);
+                sharedApp.hideStatus('notesStatus');
+            } catch (error) {
+                console.error('Error loading notes:', error);
+                sharedApp.showStatus('notesStatus', 'Error loading notes: ' + error.message, true);
+                displayEmptyState('Failed to load notes');
+            }
+        }
+
+        // Display notes in the grid
+        function displayNotes(notes) {
+            const notesContent = document.getElementById('notesContent');
+            
+            if (notes.length === 0) {
+                displayEmptyState('No notes found');
+                return;
+            }
+
+            const notesGrid = document.createElement('div');
+            notesGrid.className = 'notes-grid';
+
+            notes.forEach(note => {
+                const noteCard = document.createElement('div');
+                noteCard.className = 'note-card';
+
+                const modifiedDate = new Date(note.modified_at).toLocaleDateString();
+                const sizeKB = Math.round(note.size / 1024 * 100) / 100;
+
+                noteCard.innerHTML = `
+                    <div class="note-title">${sharedApp.escapeHtml(note.title)}</div>
+                    <div class="note-meta">
+                        <span>📅 ${modifiedDate}</span>
+                        <span>📄 ${sizeKB} KB</span>
+                    </div>
+                    <div class="note-preview">${sharedApp.escapeHtml(note.preview)}</div>
+                    <div class="note-actions">
+                        <button class="read-more-btn" onclick="openNote('${sharedApp.escapeHtml(note.filename)}')">
+                            Read more
+                        </button>
+                    </div>
+                `;
+
+                notesGrid.appendChild(noteCard);
+            });
+
+            notesContent.innerHTML = '';
+            notesContent.appendChild(notesGrid);
+        }
+
+        // Display empty state
+        function displayEmptyState(message) {
+            const notesContent = document.getElementById('notesContent');
+            notesContent.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📝</div>
+                    <div>${message}</div>
+                    <div class="create-note-hint">
+                        💡 To add notes, create .txt files in your space184/notes directory
+                    </div>
+                </div>
+            `;
+        }
+
+        // Open a specific note
+        async function openNote(filename) {
+            try {
+                const note = await sharedApp.fetchAPI(`/api/notes/${encodeURIComponent(filename)}`);
+                
+                document.getElementById('noteModalTitle').textContent = note.title;
+                document.getElementById('noteModalMeta').innerHTML = `
+                    <strong>Filename:</strong> ${sharedApp.escapeHtml(note.filename)}<br>
+                    <strong>Modified:</strong> ${new Date(note.modified_at).toLocaleString()}<br>
+                    <strong>Size:</strong> ${Math.round(note.size / 1024 * 100) / 100} KB
+                `;
+                document.getElementById('noteModalContent').textContent = note.content;
+                
+                document.getElementById('noteModal').style.display = 'block';
+            } catch (error) {
+                console.error('Error loading note:', error);
+                alert('Error loading note: ' + error.message);
+            }
+        }
+
+        // Avatar gallery functions - use shared functions
+        function openAvatarGallery() {
+            sharedApp.openAvatarGallery();
+        }
+
+        function closeAvatarGallery() {
+            sharedApp.closeAvatarGallery();
+        }
+
+        function previousAvatar() {
+            sharedApp.previousAvatar();
+        }
+
+        function nextAvatar() {
+            sharedApp.nextAvatar();
+        }
+
+        // Modal functions
+        function closeNoteModal() {
+            sharedApp.closeNoteModal();
+        }
+    </script>
+</body>
+</html>
