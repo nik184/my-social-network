@@ -6,9 +6,18 @@
     <link rel="stylesheet" href="/css/shared.css">
 </head>
 <body>
-    <div class="container">
-        {{template "navigation" .}}
-        {{template "content" .}}
+    <div class="layout">
+        {{template "header" .}}
+        
+        <div class="content-wrapper">
+            {{template "navigation" .}}
+            
+            <div class="main-content">
+                <div class="container">
+                    {{template "content" .}}
+                </div>
+            </div>
+        </div>
     </div>
 
     {{template "modals" .}}

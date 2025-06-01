@@ -1,11 +1,22 @@
 {{define "navigation"}}
-<!-- Navigation -->
-<nav class="nav">
-    <div class="nav-brand">🌐 My Social Network</div>
-    <div class="nav-links">
-        <a href="/profile" class="nav-link{{if eq .CurrentPage "profile"}} active{{end}}">Profile</a>
-        <a href="/network" class="nav-link{{if eq .CurrentPage "network"}} active{{end}}">Network</a>
-        <a href="/friends" class="nav-link{{if eq .CurrentPage "friends"}} active{{end}}">Friends</a>
-    </div>
-</nav>
+<!-- Sidebar Navigation -->
+<div class="sidebar">
+    <nav class="sidebar-nav">
+        <div class="nav-item">
+            <a href="/profile" class="nav-link{{if eq .CurrentPage "profile"}} active{{end}}">
+                <span class="nav-icon">👤</span>Profile
+            </a>
+        </div>
+        <div class="nav-item">
+            <a href="/network" class="nav-link{{if eq .CurrentPage "network"}} active{{end}}">
+                <span class="nav-icon">🌐</span>Network
+            </a>
+        </div>
+        <div class="nav-item">
+            <a href="/friends" class="nav-link{{if eq .CurrentPage "friends"}} active{{end}}">
+                <span class="nav-icon">👥</span>Friends
+            </a>
+        </div>
+    </nav>
+</div>
 {{end}}

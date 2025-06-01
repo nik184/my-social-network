@@ -42,6 +42,7 @@ func (ts *TemplateService) loadTemplates(templateDir string) error {
 	// Base layout with components
 	layoutPath := filepath.Join(templateDir, "layouts", "base.html")
 	navPath := filepath.Join(templateDir, "components", "navigation.html")
+	headerPath := filepath.Join(templateDir, "components", "header.html")
 	modalsPath := filepath.Join(templateDir, "components", "modals.html")
 	
 	// Page templates
@@ -50,7 +51,7 @@ func (ts *TemplateService) loadTemplates(templateDir string) error {
 	for _, page := range pages {
 		pagePath := filepath.Join(templateDir, "pages", page+".html")
 		
-		tmpl, err := template.ParseFiles(layoutPath, navPath, modalsPath, pagePath)
+		tmpl, err := template.ParseFiles(layoutPath, navPath, headerPath, modalsPath, pagePath)
 		if err != nil {
 			return err
 		}
