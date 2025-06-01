@@ -1,0 +1,74 @@
+{{define "content"}}
+<div class="header">
+    <div class="avatar-container">
+        <div id="avatarDisplay" class="avatar-placeholder" onclick="openGallery()">👤</div>
+    </div>
+    <h1>🌐 Distributed Social Network</h1>
+    <p>Manage and share your space184 directory using libp2p peer-to-peer networking</p>
+    <p style="font-size: 0.9em; color: #666;">✨ Features: DHT discovery, NAT traversal, hole punching, auto file monitoring</p>
+</div>
+
+<div class="section">
+    <h3>📁 Directory Management</h3>
+    <button class="button" onclick="createDirectory()">Create space184 Directory</button>
+    <button class="button" onclick="scanDirectory()">Manual Scan</button>
+    <button class="button" onclick="getMonitorStatus()">Monitor Status</button>
+    <div id="directoryStatus"></div>
+    <div id="monitorStatus" class="status" style="margin: 10px 0;"></div>
+    <div id="directoryInfo" class="result"></div>
+</div>
+
+<div class="section">
+    <h3>🔍 P2P Network Discovery</h3>
+    <div style="margin-bottom: 15px;">
+        <h4>🔗 Connect by Peer ID (Local Network)</h4>
+        <input type="text" id="peerIdInput" class="input" placeholder="Enter Peer ID" style="width: 400px;">
+        <button class="button" onclick="discoverPeer()">Discover Peer</button>
+    </div>
+    <div style="margin-bottom: 15px;">
+        <h4>🌐 Connect by IP Address (Internet)</h4>
+        <input type="text" id="ipInput" class="input" placeholder="IP Address (e.g., 203.0.113.1)" style="width: 150px;">
+        <input type="text" id="portInput" class="input" placeholder="Port (e.g., 9001)" style="width: 100px;">
+        <input type="text" id="targetPeerIdInput" class="input" placeholder="Target Peer ID" style="width: 300px;">
+        <button class="button" onclick="connectByIP()">Connect by IP</button>
+    </div>
+    <div style="margin-bottom: 15px;">
+        <h4>📋 Connection String</h4>
+        <input type="text" id="connectionStringInput" class="input" placeholder="Paste connection string (IP:PORT:PEER_ID)" style="width: 500px;">
+        <button class="button" onclick="connectByString()">Connect</button>
+    </div>
+    <button class="button" onclick="getConnectedPeers()">Show Connected Peers</button>
+    <button class="button" onclick="getConnectionInfo()">Get My Connection Info</button>
+    <div id="discoveryStatus"></div>
+    <div id="discoveryResult" class="result"></div>
+</div>
+
+<div class="section">
+    <h3>ℹ️ Current Node Info</h3>
+    <button class="button" onclick="getNodeInfo()">Refresh Info</button>
+    <div id="natStatus" class="status" style="margin: 10px 0;"></div>
+    <div id="nodeInfo" class="result"></div>
+</div>
+
+<div class="section">
+    <h3>👥 Connected Peer Details</h3>
+    <button class="button" onclick="getDetailedPeerInfo()">Show Detailed Peer Info</button>
+    <div id="peerInfoStatus" class="status" style="margin: 10px 0;"></div>
+    <div id="detailedPeerInfo" class="result"></div>
+</div>
+
+<div class="section">
+    <h3>📜 Connection History</h3>
+    <button class="button" onclick="getConnectionHistory()">Refresh History</button>
+    <div id="connectionHistoryStatus" class="status" style="margin: 10px 0;"></div>
+    <div id="connectionHistory" style="margin: 10px 0;"></div>
+</div>
+
+<div class="section">
+    <h3>🔗 Second-Degree Connections</h3>
+    <p style="font-size: 0.9em; color: #666;">Peers connected to your direct connections (friends of friends)</p>
+    <button class="button" onclick="getSecondDegreeConnections()">Discover Peers</button>
+    <div id="secondDegreeStatus" class="status" style="margin: 10px 0;"></div>
+    <div id="secondDegreeConnections" style="margin: 10px 0;"></div>
+</div>
+{{end}}

@@ -1,0 +1,11 @@
+{{define "navigation"}}
+<!-- Navigation -->
+<nav class="nav">
+    <div class="nav-brand">🌐 My Social Network</div>
+    <div class="nav-links">
+        <a href="/profile" class="nav-link{{if eq .CurrentPage "profile"}} active{{end}}">Profile</a>
+        <a href="/network" class="nav-link{{if eq .CurrentPage "network"}} active{{end}}">Network</a>
+        <a href="/friends" class="nav-link{{if eq .CurrentPage "friends"}} active{{end}}">Friends</a>
+    </div>
+</nav>
+{{end}}

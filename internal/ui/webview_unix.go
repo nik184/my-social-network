@@ -19,9 +19,10 @@ import (
 
 // WebViewUI manages the WebView interface on Unix systems
 type WebViewUI struct {
-	appService *services.AppService
-	handler    *handlers.Handler
-	port       int
+	appService      *services.AppService
+	templateService *services.TemplateService
+	handler         *handlers.Handler
+	port            int
 }
 
 // NewWebViewUI creates a new WebView UI manager with automatic port discovery
@@ -34,10 +35,31 @@ func NewWebViewUI(appService *services.AppService, preferredPort int) (*WebViewU
 	
 	log.Printf("🌐 Using port %d for HTTP server (preferred: %d)", availablePort, preferredPort)
 	
+	// Find the project root directory
+	wd, _ := os.Getwd()
+	for {
+		if _, err := os.Stat(filepath.Join(wd, "go.mod")); err == nil {
+			break
+		}
+		parent := filepath.Dir(wd)
+		if parent == wd {
+			log.Fatal("Could not find project root")
+		}
+		wd = parent
+	}
+	
+	// Initialize template service
+	templateDir := filepath.Join(wd, "web", "templates")
+	templateService, err := services.NewTemplateService(templateDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create template service: %w", err)
+	}
+	
 	return &WebViewUI{
-		appService: appService,
-		handler:    handlers.NewHandler(appService),
-		port:       availablePort,
+		appService:      appService,
+		templateService: templateService,
+		handler:         handlers.NewHandler(appService, templateService),
+		port:            availablePort,
 	}, nil
 }
 
@@ -48,7 +70,7 @@ func (w *WebViewUI) GetPort() int {
 
 // StartServer starts the HTTP server for the API and static files
 func (w *WebViewUI) StartServer() {
-	// Register API routes
+	// Register API routes and page handlers
 	w.handler.RegisterRoutes()
 	
 	// Find the project root directory
@@ -67,8 +89,10 @@ func (w *WebViewUI) StartServer() {
 	staticDir := filepath.Join(wd, "web", "static")
 	log.Printf("Serving static files from: %s", staticDir)
 	
-	// Serve static files
-	http.Handle("/", http.FileServer(http.Dir(staticDir)))
+	// Serve static files under specific paths only
+	http.Handle("/css/", http.StripPrefix("/css/", http.FileServer(http.Dir(filepath.Join(staticDir, "css")))))
+	http.Handle("/js/", http.StripPrefix("/js/", http.FileServer(http.Dir(filepath.Join(staticDir, "js")))))
+	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))))
 	
 	go func() {
 		log.Printf("Starting web server on port %d", w.port)
@@ -83,7 +107,7 @@ func (w *WebViewUI) StartServer() {
 
 // ShowWebView displays the WebView window using system browser
 func (w *WebViewUI) ShowWebView() {
-	url := fmt.Sprintf("http://localhost:%d/profile.html", w.port)
+	url := fmt.Sprintf("http://localhost:%d/network", w.port)
 	log.Printf("🌐 Opening application in system browser: %s", url)
 	
 	// Try to open in system browser

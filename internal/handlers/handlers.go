@@ -13,13 +13,15 @@ import (
 
 // Handler manages HTTP requests
 type Handler struct {
-	appService *services.AppService
+	appService      *services.AppService
+	templateService *services.TemplateService
 }
 
 // NewHandler creates a new handler
-func NewHandler(appService *services.AppService) *Handler {
+func NewHandler(appService *services.AppService, templateService *services.TemplateService) *Handler {
 	return &Handler{
-		appService: appService,
+		appService:      appService,
+		templateService: templateService,
 	}
 }
 
@@ -598,8 +600,49 @@ func (h *Handler) HandlePeerNotes(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(noteResponse.Note)
 }
 
+// Page handlers
+func (h *Handler) HandleNetworkPage(w http.ResponseWriter, r *http.Request) {
+	data := services.TemplateData{
+		PageTitle:   "Distributed Social Network",
+		CurrentPage: "network",
+	}
+	h.templateService.RenderPage(w, "network", data)
+}
+
+func (h *Handler) HandleProfilePage(w http.ResponseWriter, r *http.Request) {
+	data := services.TemplateData{
+		PageTitle:   "Profile",
+		CurrentPage: "profile",
+	}
+	h.templateService.RenderPage(w, "profile", data)
+}
+
+func (h *Handler) HandleFriendsPage(w http.ResponseWriter, r *http.Request) {
+	data := services.TemplateData{
+		PageTitle:   "Friends",
+		CurrentPage: "friends",
+	}
+	h.templateService.RenderPage(w, "friends", data)
+}
+
+func (h *Handler) HandleFriendProfilePage(w http.ResponseWriter, r *http.Request) {
+	data := services.TemplateData{
+		PageTitle:   "Friend Profile",
+		CurrentPage: "friends", // Keep friends nav active
+	}
+	h.templateService.RenderPage(w, "friend-profile", data)
+}
+
 // RegisterRoutes registers all HTTP routes
 func (h *Handler) RegisterRoutes() {
+	// Page routes
+	http.HandleFunc("/", h.HandleNetworkPage)
+	http.HandleFunc("/network", h.HandleNetworkPage)
+	http.HandleFunc("/profile", h.HandleProfilePage)
+	http.HandleFunc("/friends", h.HandleFriendsPage)
+	http.HandleFunc("/friend-profile", h.HandleFriendProfilePage)
+	
+	// API routes
 	http.HandleFunc("/api/info", h.HandleGetInfo)
 	http.HandleFunc("/api/scan", h.HandleScan)
 	http.HandleFunc("/api/create", h.HandleCreate)

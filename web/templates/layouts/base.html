@@ -1,0 +1,24 @@
+{{define "base.html"}}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{.PageTitle}} - My Social Network</title>
+    <link rel="stylesheet" href="/css/shared.css">
+</head>
+<body>
+    <div class="container">
+        {{template "navigation" .}}
+        {{template "content" .}}
+    </div>
+
+    {{template "modals" .}}
+
+    <script src="/js/shared.js"></script>
+    {{if .PageScript}}
+    <script>
+        {{.PageScript}}
+    </script>
+    {{end}}
+</body>
+</html>
+{{end}}
