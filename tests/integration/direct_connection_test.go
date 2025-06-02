@@ -260,6 +260,50 @@ func (t *testDirectoryService) GetDirectoryPath() string {
 	return filepath.Join(t.baseDir, "space184")
 }
 
+func (t *testDirectoryService) GetAvatarDirectory() string {
+	return filepath.Join(t.baseDir, "space184", "avatars")
+}
+
+func (t *testDirectoryService) CreateAvatarDirectory() error {
+	return os.MkdirAll(t.GetAvatarDirectory(), 0755)
+}
+
+func (t *testDirectoryService) GetAvatarImages() ([]string, error) {
+	return []string{}, nil
+}
+
+func (t *testDirectoryService) GetPeerAvatarDirectory(peerID string) string {
+	return filepath.Join(t.GetAvatarDirectory(), "peers", peerID)
+}
+
+func (t *testDirectoryService) CreatePeerAvatarDirectory(peerID string) error {
+	return os.MkdirAll(t.GetPeerAvatarDirectory(peerID), 0755)
+}
+
+func (t *testDirectoryService) SavePeerAvatar(peerID string, filename string, data []byte) error {
+	return nil
+}
+
+func (t *testDirectoryService) GetPeerAvatarImages(peerID string) ([]string, error) {
+	return []string{}, nil
+}
+
+func (t *testDirectoryService) GetNotesDirectory() string {
+	return filepath.Join(t.baseDir, "space184", "notes")
+}
+
+func (t *testDirectoryService) CreateNotesDirectory() error {
+	return os.MkdirAll(t.GetNotesDirectory(), 0755)
+}
+
+func (t *testDirectoryService) GetNotes() ([]models.Note, error) {
+	return []models.Note{}, nil
+}
+
+func (t *testDirectoryService) GetNote(filename string) (*models.Note, error) {
+	return nil, fmt.Errorf("note not found")
+}
+
 // extractIPAndPort extracts IP and port from a multiaddr string
 func extractIPAndPort(addr string) (string, int) {
 	// Parse multiaddr format: /ip4/x.x.x.x/tcp/port
