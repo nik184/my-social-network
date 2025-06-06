@@ -4,7 +4,7 @@
     <div class="modal-content">
         <div class="modal-header">
             <div id="galleryModalTitle" class="modal-title">Gallery</div>
-            <span class="close" onclick="closeImageGallery()">&times;</span>
+            <span class="close" onclick="sharedApp.closeImageGallery()">&times;</span>
         </div>
         <div class="modal-body" style="text-align: center;">
             <div id="galleryImageContent">
@@ -12,8 +12,8 @@
             </div>
             <div id="galleryImageCounter" style="margin-top: 15px; color: #666; font-size: 14px;"></div>
             <div style="margin-top: 20px;">
-                <button onclick="previousGalleryImage()" id="prevGalleryBtn" class="read-more-btn" style="margin-right: 10px;">← Previous</button>
-                <button onclick="nextGalleryImage()" id="nextGalleryBtn" class="read-more-btn">Next →</button>
+                <button onclick="sharedApp.previousGalleryImage()" id="prevGalleryBtn" class="read-more-btn" style="margin-right: 10px;">← Previous</button>
+                <button onclick="sharedApp.nextGalleryImage()" id="nextGalleryBtn" class="read-more-btn">Next →</button>
             </div>
         </div>
     </div>
@@ -24,7 +24,7 @@
     <div class="modal-content">
         <div class="modal-header">
             <div id="noteModalTitle" class="modal-title">Note</div>
-            <span class="close" onclick="closeNoteModal()">&times;</span>
+            <span class="close" onclick="sharedApp.closeNoteModal()">&times;</span>
         </div>
         <div class="modal-body">
             <div id="noteModalMeta" class="note-full-meta"></div>

@@ -1,5 +1,4 @@
 let userInfo = null;
-let currentAvatarIndex = 0;
 
 // Load initial data when page loads
 document.addEventListener('DOMContentLoaded', function() {
@@ -148,15 +147,7 @@ async function openNote(filename) {
     }
 }
 
-// Avatar gallery functions - use shared functions
-function openAvatarGallery() {
-    sharedApp.openAvatarGallery();
-}
-
-// Modal functions
-function closeNoteModal() {
-    sharedApp.closeNoteModal();
-}
+// Avatar gallery functions - use shared functions directly
 
 // Tab switching functionality
 function switchTab(tabName) {

@@ -9,7 +9,6 @@ let galleryUrlProvider = null;
 
 // Legacy avatar variables (for backward compatibility)
 let avatarImages = [];
-let currentImageIndex = 0;
 
 // Shared utility functions
 function showStatus(elementId, message, isError = false) {
@@ -155,22 +154,6 @@ function openGallery() {
     openImageGallery(avatarImages, 'Avatar Gallery', 'avatar');
 }
 
-function closeGallery() {
-    closeImageGallery();
-}
-
-function previousImage() {
-    previousGalleryImage();
-}
-
-function nextImage() {
-    nextGalleryImage();
-}
-
-function updateGalleryCounter() {
-    updateGalleryImageCounter();
-}
-
 // Create avatar directory instruction
 async function createAvatarDirectory() {
     try {
@@ -286,11 +269,6 @@ function closeNoteModal() {
     }
 }
 
-// Avatar gallery functions (now using unified system)
-function closeAvatarGallery() {
-    closeImageGallery();
-}
-
 function openAvatarGallery() {
     if (avatarImages.length === 0) {
         alert('No avatar images available. Add images to your space184/images/avatar directory.');
@@ -298,14 +276,6 @@ function openAvatarGallery() {
     }
     
     openImageGallery(avatarImages, 'Avatar Gallery', 'avatar');
-}
-
-function previousAvatar() {
-    previousGalleryImage();
-}
-
-function nextAvatar() {
-    nextGalleryImage();
 }
 
 // Export functions for global access
@@ -322,10 +292,6 @@ window.sharedApp = {
     loadAvatarImages,
     updateHeaderAvatar,
     openGallery,
-    closeGallery,
-    previousImage,
-    nextImage,
-    updateGalleryCounter,
     createAvatarDirectory,
     openAvatarGallery,
 

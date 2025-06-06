@@ -6,59 +6,13 @@ async function loadAvatarImages() {
     return data;
 }
 
-// Gallery functions - use shared functions
-function openGallery() {
-    sharedApp.openGallery();
-}
-
-function closeGallery() {
-    sharedApp.closeGallery();
-}
-
-function showGalleryImage() {
-    sharedApp.showGalleryImage();
-}
-
-function previousImage() {
-    sharedApp.previousImage();
-}
-
-function nextImage() {
-    sharedApp.nextImage();
-}
-
-function updateGalleryCounter() {
-    sharedApp.updateGalleryCounter();
-}
-
-function createAvatarDirectory() {
-    sharedApp.createAvatarDirectory();
-}
-
-function getPeerAvatar(peerID) {
-    return sharedApp.getPeerAvatar(peerID);
-}
-
-function createPeerAvatarElement(peerID, avatarInfo, size = '32px') {
-    return sharedApp.createPeerAvatarElement(peerID, avatarInfo, size);
-}
-
-// Utility functions - use shared functions
-function showStatus(elementId, message, isError = false) {
-    sharedApp.showStatus(elementId, message, isError);
-}
-
-function showResult(elementId, data) {
-    sharedApp.showResult(elementId, data);
-}
-
 async function createDirectory() {
     try {
         const response = await fetch('/api/create', { method: 'POST' });
         const data = await response.json();
-        showStatus('directoryStatus', 'Directory created successfully!');
+        sharedApp.sharedApp.showStatus('directoryStatus', 'Directory created successfully!');
     } catch (error) {
-        showStatus('directoryStatus', 'Error creating directory: ' + error.message, true);
+        sharedApp.sharedApp.showStatus('directoryStatus', 'Error creating directory: ' + error.message, true);
     }
 }
 
@@ -66,10 +20,10 @@ async function scanDirectory() {
     try {
         const response = await fetch('/api/scan', { method: 'POST' });
         const data = await response.json();
-        showStatus('directoryStatus', 'Manual scan completed successfully!');
+        sharedApp.sharedApp.showStatus('directoryStatus', 'Manual scan completed successfully!');
         getNodeInfo(); // Refresh the info
     } catch (error) {
-        showStatus('directoryStatus', 'Error scanning directory: ' + error.message, true);
+        sharedApp.sharedApp.showStatus('directoryStatus', 'Error scanning directory: ' + error.message, true);
     }
 }
 
@@ -80,19 +34,19 @@ async function getMonitorStatus() {
         
         if (data.monitoring) {
             const lastScan = data.lastScan ? new Date(data.lastScan).toLocaleTimeString() : 'Never';
-            showStatus('monitorStatus', `📡 Auto-monitoring active | Last scan: ${lastScan}`, false);
+            sharedApp.sharedApp.showStatus('monitorStatus', `📡 Auto-monitoring active | Last scan: ${lastScan}`, false);
         } else {
-            showStatus('monitorStatus', '❌ Auto-monitoring inactive', true);
+            sharedApp.sharedApp.showStatus('monitorStatus', '❌ Auto-monitoring inactive', true);
         }
     } catch (error) {
-        showStatus('monitorStatus', 'Error getting monitor status: ' + error.message, true);
+        sharedApp.sharedApp.showStatus('monitorStatus', 'Error getting monitor status: ' + error.message, true);
     }
 }
 
 async function discoverPeer() {
     const peerId = document.getElementById('peerIdInput').value;
     if (!peerId) {
-        showStatus('discoveryStatus', 'Please enter a Peer ID', true);
+        sharedApp.sharedApp.showStatus('discoveryStatus', 'Please enter a Peer ID', true);
         return;
     }
 
@@ -108,10 +62,10 @@ async function discoverPeer() {
         }
         
         const data = await response.json();
-        showStatus('discoveryStatus', 'Peer discovered successfully!');
-        showResult('discoveryResult', data);
+        sharedApp.sharedApp.showStatus('discoveryStatus', 'Peer discovered successfully!');
+        sharedApp.showResult('discoveryResult', data);
     } catch (error) {
-        showStatus('discoveryStatus', 'Error discovering peer: ' + error.message, true);
+        sharedApp.sharedApp.showStatus('discoveryStatus', 'Error discovering peer: ' + error.message, true);
         document.getElementById('discoveryResult').textContent = '';
     }
 }
@@ -125,9 +79,9 @@ async function getConnectedPeers() {
         const totalCount = data.totalConnectedCount || 0;
         
         if (totalCount > validatedCount) {
-            showStatus('discoveryStatus', `✅ ${validatedCount} app peers | 🔗 ${totalCount} total connections`, false);
+            sharedApp.sharedApp.showStatus('discoveryStatus', `✅ ${validatedCount} app peers | 🔗 ${totalCount} total connections`, false);
         } else {
-            showStatus('discoveryStatus', `✅ Connected to ${validatedCount} app peers`, false);
+            sharedApp.sharedApp.showStatus('discoveryStatus', `✅ Connected to ${validatedCount} app peers`, false);
         }
         
         // Show detailed information
@@ -138,9 +92,9 @@ async function getConnectedPeers() {
             'Filtering': totalCount > validatedCount ? 'Active - Non-app peers filtered out' : 'No non-app peers detected'
         };
         
-        showResult('discoveryResult', peerInfo);
+        sharedApp.showResult('discoveryResult', peerInfo);
     } catch (error) {
-        showStatus('discoveryStatus', 'Error getting peers: ' + error.message, true);
+        sharedApp.sharedApp.showStatus('discoveryStatus', 'Error getting peers: ' + error.message, true);
     }
 }
 
@@ -154,7 +108,7 @@ async function getNodeInfo() {
             const natStatusMsg = data.isPublicNode 
                 ? '🌐 PUBLIC NODE - Can assist with NAT traversal' 
                 : '🏠 NAT\'d NODE - Seeks assistance for connections';
-            showStatus('natStatus', natStatusMsg, !data.isPublicNode);
+            sharedApp.sharedApp.showStatus('natStatus', natStatusMsg, !data.isPublicNode);
         }
         
         // Create a clean display object
@@ -167,9 +121,9 @@ async function getNodeInfo() {
             'Connected Peers': data.connectedPeerInfo ? Object.keys(data.connectedPeerInfo).length : 0
         };
         
-        showResult('nodeInfo', displayData);
+        sharedApp.showResult('nodeInfo', displayData);
     } catch (error) {
-        showStatus('nodeInfo', 'Error getting node info: ' + error.message, true);
+        sharedApp.sharedApp.showStatus('nodeInfo', 'Error getting node info: ' + error.message, true);
     }
 }
 
@@ -179,7 +133,7 @@ async function connectByIP() {
     const peerId = document.getElementById('targetPeerIdInput').value;
     
     if (!ip || !port || !peerId) {
-        showStatus('discoveryStatus', 'Please enter IP address, port, and peer ID', true);
+        sharedApp.sharedApp.showStatus('discoveryStatus', 'Please enter IP address, port, and peer ID', true);
         return;
     }
 
@@ -199,10 +153,10 @@ async function connectByIP() {
         }
         
         const data = await response.json();
-        showStatus('discoveryStatus', 'Successfully connected via IP address!');
-        showResult('discoveryResult', data);
+        sharedApp.sharedApp.showStatus('discoveryStatus', 'Successfully connected via IP address!');
+        sharedApp.showResult('discoveryResult', data);
     } catch (error) {
-        showStatus('discoveryStatus', 'Error connecting by IP: ' + error.message, true);
+        sharedApp.sharedApp.showStatus('discoveryStatus', 'Error connecting by IP: ' + error.message, true);
         document.getElementById('discoveryResult').textContent = '';
     }
 }
@@ -211,14 +165,14 @@ async function connectByString() {
     const connectionString = document.getElementById('connectionStringInput').value;
     
     if (!connectionString) {
-        showStatus('discoveryStatus', 'Please enter a connection string', true);
+        sharedApp.sharedApp.showStatus('discoveryStatus', 'Please enter a connection string', true);
         return;
     }
 
     // Parse connection string (format: IP:PORT:PEER_ID)
     const parts = connectionString.split(':');
     if (parts.length < 3) {
-        showStatus('discoveryStatus', 'Invalid connection string format. Use IP:PORT:PEER_ID', true);
+        sharedApp.sharedApp.showStatus('discoveryStatus', 'Invalid connection string format. Use IP:PORT:PEER_ID', true);
         return;
     }
 
@@ -242,10 +196,10 @@ async function connectByString() {
         }
         
         const data = await response.json();
-        showStatus('discoveryStatus', 'Successfully connected using connection string!');
-        showResult('discoveryResult', data);
+        sharedApp.sharedApp.showStatus('discoveryStatus', 'Successfully connected using connection string!');
+        sharedApp.showResult('discoveryResult', data);
     } catch (error) {
-        showStatus('discoveryStatus', 'Error connecting by string: ' + error.message, true);
+        sharedApp.sharedApp.showStatus('discoveryStatus', 'Error connecting by string: ' + error.message, true);
         document.getElementById('discoveryResult').textContent = '';
     }
 }
@@ -292,12 +246,12 @@ async function getConnectionInfo() {
             'Important': 'Use P2P port for connections, NOT the web interface port!'
         };
         
-        showStatus('discoveryStatus', 
+        sharedApp.sharedApp.showStatus('discoveryStatus', 
             data.isPublicNode 
                 ? '✅ Connection info ready for sharing' 
                 : '⚠️ Node behind NAT - direct connections not possible', 
             !data.isPublicNode);
-        showResult('discoveryResult', connectionInfo);
+        sharedApp.showResult('discoveryResult', connectionInfo);
         
         // Auto-select connection string for easy copying
         if (connectionString && document.getElementById('connectionStringInput')) {
@@ -305,7 +259,7 @@ async function getConnectionInfo() {
         }
         
     } catch (error) {
-        showStatus('discoveryStatus', 'Error getting connection info: ' + error.message, true);
+        sharedApp.sharedApp.showStatus('discoveryStatus', 'Error getting connection info: ' + error.message, true);
     }
 }
 
@@ -318,7 +272,7 @@ async function getDetailedPeerInfo() {
             const peerCount = Object.keys(data.connectedPeerInfo).length;
             const publicNode = data.isPublicNode;
             
-            showStatus('peerInfoStatus', 
+            sharedApp.showStatus('peerInfoStatus', 
                 `📊 ${peerCount} detailed peer record${peerCount === 1 ? '' : 's'} ${publicNode ? '(stored for relay assistance)' : ''}`, 
                 false);
             
@@ -344,11 +298,11 @@ async function getDetailedPeerInfo() {
             
             showResult('detailedPeerInfo', formattedPeerInfo);
         } else {
-            showStatus('peerInfoStatus', '📭 No detailed peer information available', true);
+            sharedApp.showStatus('peerInfoStatus', '📭 No detailed peer information available', true);
             document.getElementById('detailedPeerInfo').textContent = '';
         }
     } catch (error) {
-        showStatus('peerInfoStatus', 'Error getting detailed peer info: ' + error.message, true);
+        sharedApp.showStatus('peerInfoStatus', 'Error getting detailed peer info: ' + error.message, true);
     }
 }
 
@@ -358,13 +312,13 @@ async function getConnectionHistory() {
         const data = await response.json();
         
         if (data.connections && data.connections.length > 0) {
-            showStatus('connectionHistoryStatus', `📚 Found ${data.connections.length} connection record${data.connections.length === 1 ? '' : 's'}`, false);
+            sharedApp.showStatus('connectionHistoryStatus', `📚 Found ${data.connections.length} connection record${data.connections.length === 1 ? '' : 's'}`, false);
             
             // Create HTML for connection history with connect buttons
             let historyHtml = '<div style="display: grid; gap: 10px;">';
             
             // Load avatars for all peers in parallel
-            const avatarPromises = data.connections.map(conn => getPeerAvatar(conn.peer_id));
+            const avatarPromises = data.connections.map(conn => sharedApp.getPeerAvatar(conn.peer_id));
             const avatars = await Promise.all(avatarPromises);
             
             data.connections.forEach((conn, index) => {
@@ -375,7 +329,7 @@ async function getConnectionHistory() {
                 const isCurrentlyConnected = conn.currently_connected || false;
                 const lastSeen = new Date(conn.last_connected).toLocaleString();
                 const avatarInfo = avatars[index];
-                const avatarHtml = createPeerAvatarElement(peerId, avatarInfo, '40px');
+                const avatarHtml = sharedApp.sharedApp.createPeerAvatarElement(peerId, avatarInfo, '40px');
                 
                 historyHtml += `
                     <div style="border: 1px solid #ddd; border-radius: 5px; padding: 10px; background: ${isCurrentlyConnected ? '#d4edda' : '#f8f9fa'};">
@@ -406,11 +360,11 @@ async function getConnectionHistory() {
             historyHtml += '</div>';
             document.getElementById('connectionHistory').innerHTML = historyHtml;
         } else {
-            showStatus('connectionHistoryStatus', '📭 No connection history found', true);
+            sharedApp.showStatus('connectionHistoryStatus', '📭 No connection history found', true);
             document.getElementById('connectionHistory').innerHTML = '';
         }
     } catch (error) {
-        showStatus('connectionHistoryStatus', 'Error getting connection history: ' + error.message, true);
+        sharedApp.showStatus('connectionHistoryStatus', 'Error getting connection history: ' + error.message, true);
         document.getElementById('connectionHistory').innerHTML = '';
     }
 }
@@ -440,7 +394,7 @@ async function reconnectToPeer(peerId, address, displayName) {
             throw new Error('Could not extract IP and port from address: ' + address);
         }
         
-        showStatus('connectionHistoryStatus', `🔄 Reconnecting to ${displayName}...`, false);
+        sharedApp.showStatus('connectionHistoryStatus', `🔄 Reconnecting to ${displayName}...`, false);
         
         const response = await fetch('/api/connect-ip', {
             method: 'POST',
@@ -457,7 +411,7 @@ async function reconnectToPeer(peerId, address, displayName) {
         }
         
         const data = await response.json();
-        showStatus('connectionHistoryStatus', `✅ Successfully reconnected to ${displayName}!`, false);
+        sharedApp.showStatus('connectionHistoryStatus', `✅ Successfully reconnected to ${displayName}!`, false);
         
         // Refresh the connection history to update status
         setTimeout(() => {
@@ -466,13 +420,13 @@ async function reconnectToPeer(peerId, address, displayName) {
         }, 1000);
         
     } catch (error) {
-        showStatus('connectionHistoryStatus', `❌ Failed to reconnect to ${displayName}: ${error.message}`, true);
+        sharedApp.showStatus('connectionHistoryStatus', `❌ Failed to reconnect to ${displayName}: ${error.message}`, true);
     }
 }
 
 async function addToFriends(peerID, displayName) {
     try {
-        showStatus('connectionHistoryStatus', `👥 Adding ${displayName} to friends...`, false);
+        sharedApp.showStatus('connectionHistoryStatus', `👥 Adding ${displayName} to friends...`, false);
         
         const response = await fetch('/api/friends', {
             method: 'POST',
@@ -488,28 +442,28 @@ async function addToFriends(peerID, displayName) {
         }
         
         const data = await response.json();
-        showStatus('connectionHistoryStatus', `✅ ${displayName} added to friends!`, false);
+        sharedApp.showStatus('connectionHistoryStatus', `✅ ${displayName} added to friends!`, false);
         
     } catch (error) {
-        showStatus('connectionHistoryStatus', `❌ Failed to add ${displayName} to friends: ${error.message}`, true);
+        sharedApp.showStatus('connectionHistoryStatus', `❌ Failed to add ${displayName} to friends: ${error.message}`, true);
     }
 }
 
 async function getSecondDegreeConnections() {
     try {
-        showStatus('secondDegreeStatus', '🔍 Discovering second-degree connections...', false);
+        sharedApp.showStatus('secondDegreeStatus', '🔍 Discovering second-degree connections...', false);
         
         const response = await fetch('/api/second-degree-peers');
         const data = await response.json();
         
         if (data.peers && data.peers.length > 0) {
-            showStatus('secondDegreeStatus', `🔗 Found ${data.peers.length} second-degree peer${data.peers.length === 1 ? '' : 's'}`, false);
+            sharedApp.showStatus('secondDegreeStatus', `🔗 Found ${data.peers.length} second-degree peer${data.peers.length === 1 ? '' : 's'}`, false);
             
             // Create HTML for second-degree peers with connect buttons
             let peersHtml = '<div style="display: grid; gap: 10px;">';
             
             // Load avatars for all peers in parallel
-            const avatarPromises = data.peers.map(peer => getPeerAvatar(peer.peer_id));
+            const avatarPromises = data.peers.map(peer => sharedApp.getPeerAvatar(peer.peer_id));
             const avatars = await Promise.all(avatarPromises);
             
             data.peers.forEach((peer, index) => {
@@ -519,7 +473,7 @@ async function getSecondDegreeConnections() {
                     : 'Unknown';
                 const connectionPath = peer.connection_path ? ` (via ${peer.connection_path})` : '';
                 const avatarInfo = avatars[index];
-                const avatarHtml = createPeerAvatarElement(peer.peer_id, avatarInfo, '40px');
+                const avatarHtml = sharedApp.createPeerAvatarElement(peer.peer_id, avatarInfo, '40px');
                 
                 peersHtml += `
                     <div style="border: 1px solid #ddd; border-radius: 5px; padding: 10px; background: #f8f9fa;">
@@ -547,18 +501,18 @@ async function getSecondDegreeConnections() {
             peersHtml += '</div>';
             document.getElementById('secondDegreeConnections').innerHTML = peersHtml;
         } else {
-            showStatus('secondDegreeStatus', '📭 No second-degree connections found', true);
+            sharedApp.showStatus('secondDegreeStatus', '📭 No second-degree connections found', true);
             document.getElementById('secondDegreeConnections').innerHTML = '';
         }
     } catch (error) {
-        showStatus('secondDegreeStatus', 'Error discovering second-degree connections: ' + error.message, true);
+        sharedApp.showStatus('secondDegreeStatus', 'Error discovering second-degree connections: ' + error.message, true);
         document.getElementById('secondDegreeConnections').innerHTML = '';
     }
 }
 
 async function connectToSecondDegreePeer(targetPeerId, viaPeerId, displayName) {
     try {
-        showStatus('secondDegreeStatus', `🔄 Connecting to ${displayName} via hole punching...`, false);
+        sharedApp.showStatus('secondDegreeStatus', `🔄 Connecting to ${displayName} via hole punching...`, false);
         
         const response = await fetch('/api/connect-second-degree', {
             method: 'POST',
@@ -574,7 +528,7 @@ async function connectToSecondDegreePeer(targetPeerId, viaPeerId, displayName) {
         }
         
         const data = await response.json();
-        showStatus('secondDegreeStatus', `✅ Successfully connected to ${displayName}!`, false);
+        sharedApp.showStatus('secondDegreeStatus', `✅ Successfully connected to ${displayName}!`, false);
         
         // Refresh the lists to update connection status
         setTimeout(() => {
@@ -583,7 +537,7 @@ async function connectToSecondDegreePeer(targetPeerId, viaPeerId, displayName) {
         }, 1000);
         
     } catch (error) {
-        showStatus('secondDegreeStatus', `❌ Failed to connect to ${displayName}: ${error.message}`, true);
+        sharedApp.showStatus('secondDegreeStatus', `❌ Failed to connect to ${displayName}: ${error.message}`, true);
     }
 }
 
