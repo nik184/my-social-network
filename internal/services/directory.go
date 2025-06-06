@@ -26,6 +26,8 @@ type DirectoryServiceInterface interface {
 	CreateNotesDirectory() error
 	GetNotes() ([]models.Note, error)
 	GetNote(filename string) (*models.Note, error)
+	GetGalleries() ([]models.Gallery, error)
+	GetGalleryImages(galleryName string) ([]string, error)
 }
 
 // DirectoryService handles directory operations
@@ -321,4 +323,106 @@ func (d *DirectoryService) loadNoteFile(filename string, fileInfo os.FileInfo) (
 	}
 
 	return note, nil
+}
+
+// GetGalleries returns a list of all photo galleries (subdirectories in space184/images/)
+func (d *DirectoryService) GetGalleries() ([]models.Gallery, error) {
+	imagesDir := filepath.Join(d.directoryPath, "images")
+	
+	// Check if images directory exists
+	if _, err := os.Stat(imagesDir); os.IsNotExist(err) {
+		return []models.Gallery{}, nil // Return empty list if directory doesn't exist
+	}
+
+	files, err := os.ReadDir(imagesDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read images directory: %w", err)
+	}
+
+	var galleries []models.Gallery
+	validExtensions := map[string]bool{
+		".jpg":  true,
+		".jpeg": true,
+		".png":  true,
+		".gif":  true,
+		".bmp":  true,
+		".webp": true,
+	}
+
+	for _, file := range files {
+		if !file.IsDir() {
+			continue
+		}
+		
+		galleryPath := filepath.Join(imagesDir, file.Name())
+		galleryFiles, err := os.ReadDir(galleryPath)
+		if err != nil {
+			continue // Skip galleries we can't read
+		}
+
+		var images []string
+		for _, galleryFile := range galleryFiles {
+			if galleryFile.IsDir() {
+				continue
+			}
+			
+			ext := strings.ToLower(filepath.Ext(galleryFile.Name()))
+			if validExtensions[ext] {
+				images = append(images, galleryFile.Name())
+			}
+		}
+
+		gallery := models.Gallery{
+			Name:       file.Name(),
+			ImageCount: len(images),
+			Images:     images,
+		}
+		
+		galleries = append(galleries, gallery)
+	}
+
+	return galleries, nil
+}
+
+// GetGalleryImages returns a list of image files in a specific gallery
+func (d *DirectoryService) GetGalleryImages(galleryName string) ([]string, error) {
+	// Validate gallery name to prevent directory traversal
+	if strings.Contains(galleryName, "..") || strings.Contains(galleryName, "/") || strings.Contains(galleryName, "\\") {
+		return nil, fmt.Errorf("invalid gallery name: %s", galleryName)
+	}
+
+	galleryDir := filepath.Join(d.directoryPath, "images", galleryName)
+	
+	// Check if directory exists
+	if _, err := os.Stat(galleryDir); os.IsNotExist(err) {
+		return []string{}, nil // Return empty list if directory doesn't exist
+	}
+
+	files, err := os.ReadDir(galleryDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read gallery directory: %w", err)
+	}
+
+	var imageFiles []string
+	validExtensions := map[string]bool{
+		".jpg":  true,
+		".jpeg": true,
+		".png":  true,
+		".gif":  true,
+		".bmp":  true,
+		".webp": true,
+	}
+
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		
+		ext := strings.ToLower(filepath.Ext(file.Name()))
+		if validExtensions[ext] {
+			imageFiles = append(imageFiles, file.Name())
+		}
+	}
+
+	return imageFiles, nil
 }

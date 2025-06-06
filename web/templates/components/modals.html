@@ -1,32 +1,19 @@
 {{define "modals"}}
-<!-- Avatar Gallery Modal -->
-<div id="galleryModal" class="gallery-modal">
-    <div class="gallery-content">
-        <span class="gallery-close" onclick="closeGallery()">&times;</span>
-        <button class="gallery-nav gallery-prev" onclick="previousImage()">&#10094;</button>
-        <img id="galleryImage" class="gallery-image" src="" alt="Avatar">
-        <button class="gallery-nav gallery-next" onclick="nextImage()">&#10095;</button>
-        <div class="gallery-counter">
-            <span id="currentImageIndex">1</span> / <span id="totalImages">1</span>
-        </div>
-    </div>
-</div>
-
-<!-- Avatar Gallery Modal (Profile) -->
-<div id="avatarModal" class="modal">
+<!-- Unified Image Gallery Modal -->
+<div id="imageGalleryModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
-            <div class="modal-title">Avatar Gallery</div>
-            <span class="close" onclick="closeAvatarGallery()">&times;</span>
+            <div id="galleryModalTitle" class="modal-title">Gallery</div>
+            <span class="close" onclick="closeImageGallery()">&times;</span>
         </div>
         <div class="modal-body" style="text-align: center;">
-            <div id="avatarGalleryContent">
-                <p>Loading avatar images...</p>
+            <div id="galleryImageContent">
+                <p>Loading images...</p>
             </div>
-            <div id="avatarCounter" style="margin-top: 15px; color: #666; font-size: 14px;"></div>
+            <div id="galleryImageCounter" style="margin-top: 15px; color: #666; font-size: 14px;"></div>
             <div style="margin-top: 20px;">
-                <button onclick="previousAvatar()" id="prevAvatarBtn" class="read-more-btn" style="margin-right: 10px;">← Previous</button>
-                <button onclick="nextAvatar()" id="nextAvatarBtn" class="read-more-btn">Next →</button>
+                <button onclick="previousGalleryImage()" id="prevGalleryBtn" class="read-more-btn" style="margin-right: 10px;">← Previous</button>
+                <button onclick="nextGalleryImage()" id="nextGalleryBtn" class="read-more-btn">Next →</button>
             </div>
         </div>
     </div>

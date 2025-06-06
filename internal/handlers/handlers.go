@@ -600,6 +600,117 @@ func (h *Handler) HandlePeerNotes(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(noteResponse.Note)
 }
 
+// HandleGalleries handles GET /api/galleries requests
+func (h *Handler) HandleGalleries(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	galleries, err := h.appService.DirectoryService.GetGalleries()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"galleries": galleries,
+		"count":     len(galleries),
+	})
+}
+
+// HandleGalleryImage handles GET /api/galleries/{galleryName} and /api/galleries/{galleryName}/{filename} requests
+func (h *Handler) HandleGalleryImage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" && r.Method != "HEAD" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse URL path to extract gallery name and optional filename
+	pathParts := strings.Split(r.URL.Path[len("/api/galleries/"):], "/")
+	if len(pathParts) < 1 || pathParts[0] == "" {
+		http.Error(w, "Gallery name required", http.StatusBadRequest)
+		return
+	}
+
+	galleryName := pathParts[0]
+
+	// If only gallery name is provided, return images list
+	if len(pathParts) == 1 {
+		images, err := h.appService.DirectoryService.GetGalleryImages(galleryName)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"gallery": galleryName,
+			"images":  images,
+			"count":   len(images),
+		})
+		return
+	}
+
+	// If gallery name and filename are provided, serve the image
+	filename := strings.Join(pathParts[1:], "/") // Join in case filename has slashes
+
+	// Validate gallery name and filename to prevent directory traversal
+	if strings.Contains(galleryName, "..") || strings.Contains(galleryName, "/") || strings.Contains(galleryName, "\\") {
+		http.Error(w, "Invalid gallery name", http.StatusBadRequest)
+		return
+	}
+	if strings.Contains(filename, "..") || strings.Contains(filename, "\\") {
+		http.Error(w, "Invalid filename", http.StatusBadRequest)
+		return
+	}
+
+	// Get gallery images list to verify the file exists
+	images, err := h.appService.DirectoryService.GetGalleryImages(galleryName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Check if the requested file exists in the gallery
+	found := false
+	for _, img := range images {
+		if img == filename {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		http.Error(w, "Image not found in gallery", http.StatusNotFound)
+		return
+	}
+
+	// Serve the file
+	galleryDir := filepath.Join(h.appService.DirectoryService.GetDirectoryPath(), "images", galleryName)
+	filePath := filepath.Join(galleryDir, filename)
+	
+	// Set appropriate content type based on file extension
+	ext := filepath.Ext(filename)
+	switch ext {
+	case ".jpg", ".jpeg":
+		w.Header().Set("Content-Type", "image/jpeg")
+	case ".png":
+		w.Header().Set("Content-Type", "image/png")
+	case ".gif":
+		w.Header().Set("Content-Type", "image/gif")
+	case ".webp":
+		w.Header().Set("Content-Type", "image/webp")
+	case ".bmp":
+		w.Header().Set("Content-Type", "image/bmp")
+	default:
+		w.Header().Set("Content-Type", "application/octet-stream")
+	}
+
+	http.ServeFile(w, r, filePath)
+}
+
 // Page handlers
 func (h *Handler) HandleNetworkPage(w http.ResponseWriter, r *http.Request) {
 	data := services.TemplateData{
@@ -662,4 +773,6 @@ func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/api/friends", h.HandleFriends)
 	http.HandleFunc("/api/friends/", h.HandleFriend)
 	http.HandleFunc("/api/peer-notes/", h.HandlePeerNotes)
+	http.HandleFunc("/api/galleries", h.HandleGalleries)
+	http.HandleFunc("/api/galleries/", h.HandleGalleryImage)
 }

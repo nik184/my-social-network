@@ -153,19 +153,116 @@ function openAvatarGallery() {
     sharedApp.openAvatarGallery();
 }
 
-function closeAvatarGallery() {
-    sharedApp.closeAvatarGallery();
-}
-
-function previousAvatar() {
-    sharedApp.previousAvatar();
-}
-
-function nextAvatar() {
-    sharedApp.nextAvatar();
-}
-
 // Modal functions
 function closeNoteModal() {
     sharedApp.closeNoteModal();
+}
+
+// Tab switching functionality
+function switchTab(tabName) {
+    // Remove active class from all tabs and buttons
+    document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+    
+    // Add active class to clicked button and corresponding content
+    event.target.classList.add('active');
+    document.getElementById(tabName + 'Tab').classList.add('active');
+    
+    // Load tab content if needed
+    if (tabName === 'photos' && !photosLoaded) {
+        loadPhotos();
+    }
+}
+
+// Gallery variables
+let photosLoaded = false;
+
+// Load photos and galleries
+async function loadPhotos() {
+    try {
+        sharedApp.showStatus('photosStatus', 'Loading galleries...', false);
+        
+        const data = await sharedApp.fetchAPI('/api/galleries');
+        
+        displayGalleries(data.galleries || []);
+        photosLoaded = true;
+        sharedApp.hideStatus('photosStatus');
+    } catch (error) {
+        console.error('Error loading galleries:', error);
+        sharedApp.showStatus('photosStatus', 'Error loading galleries: ' + error.message, true);
+        displayPhotosEmptyState('Failed to load galleries');
+    }
+}
+
+// Display galleries in the grid
+function displayGalleries(galleries) {
+    const photosContent = document.getElementById('photosContent');
+    
+    if (galleries.length === 0) {
+        displayPhotosEmptyState('No photo galleries found');
+        return;
+    }
+
+    const galleriesGrid = document.createElement('div');
+    galleriesGrid.className = 'galleries-grid';
+
+    galleries.forEach(gallery => {
+        const galleryCard = document.createElement('div');
+        galleryCard.className = 'gallery-card';
+        galleryCard.onclick = () => openGallery(gallery.name);
+
+        const preview = gallery.images.length > 0 
+            ? `<img src="/api/galleries/${encodeURIComponent(gallery.name)}/${encodeURIComponent(gallery.images[0])}" alt="${sharedApp.escapeHtml(gallery.name)}" />`
+            : '<div class="gallery-placeholder">📷</div>';
+
+        galleryCard.innerHTML = `
+            <div class="gallery-preview">
+                ${preview}
+            </div>
+            <div class="gallery-info">
+                <div class="gallery-name">${sharedApp.escapeHtml(gallery.name)}</div>
+                <div class="gallery-count">${gallery.image_count} images</div>
+            </div>
+        `;
+
+        galleriesGrid.appendChild(galleryCard);
+    });
+
+    photosContent.innerHTML = '';
+    photosContent.appendChild(galleriesGrid);
+}
+
+// Display empty state for photos
+function displayPhotosEmptyState(message) {
+    const photosContent = document.getElementById('photosContent');
+    photosContent.innerHTML = `
+        <div class="empty-state">
+            <div class="empty-state-icon">📷</div>
+            <div>${message}</div>
+            <div class="create-note-hint">
+                💡 To add photo galleries, create subdirectories in your space184/images directory and add images to them
+            </div>
+        </div>
+    `;
+}
+
+// Open gallery view
+async function openGallery(galleryName) {
+    try {
+        const data = await sharedApp.fetchAPI(`/api/galleries/${encodeURIComponent(galleryName)}`);
+        const images = data.images || [];
+        
+        if (images.length > 0) {
+            // Create URL provider function for gallery images
+            const urlProvider = (imageName) => 
+                `/api/galleries/${encodeURIComponent(galleryName)}/${encodeURIComponent(imageName)}`;
+            
+            sharedApp.openImageGallery(images, `${galleryName} Gallery`, 'gallery', urlProvider);
+        } else {
+            alert('No images found in this gallery');
+        }
+    } catch (error) {
+        console.error('Error loading gallery:', error);
+        alert('Error loading gallery: ' + error.message);
+    }
 }

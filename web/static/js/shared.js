@@ -1,6 +1,13 @@
 // Shared JavaScript functionality for both Profile and Network pages
 
-// Global variables
+// Global variables for unified image gallery
+let galleryImages = [];
+let currentGalleryIndex = 0;
+let galleryType = '';
+let galleryTitle = '';
+let galleryUrlProvider = null;
+
+// Legacy avatar variables (for backward compatibility)
 let avatarImages = [];
 let currentImageIndex = 0;
 
@@ -53,73 +60,115 @@ function updateHeaderAvatar(avatarDisplay) {
     }
 }
 
-// Gallery modal functions
-function openGallery() {
-    if (avatarImages.length === 0) {
-        createAvatarDirectory();
+// Unified Image Gallery System
+function openImageGallery(images, title = 'Gallery', type = 'default', urlProvider = null) {
+    if (!images || images.length === 0) {
+        if (type === 'avatar') {
+            createAvatarDirectory();
+        }
         return;
     }
     
-    currentImageIndex = 0;
+    galleryImages = images;
+    galleryTitle = title;
+    galleryType = type;
+    galleryUrlProvider = urlProvider;
+    currentGalleryIndex = 0;
+    
+    // Set title
+    const titleElement = document.getElementById('galleryModalTitle');
+    if (titleElement) {
+        titleElement.textContent = title;
+    }
+    
     showGalleryImage();
-    document.getElementById('galleryModal').style.display = 'block';
-    updateGalleryCounter();
+    updateGalleryImageCounter();
+    document.getElementById('imageGalleryModal').style.display = 'block';
 }
 
-function closeGallery() {
-    const modal = document.getElementById('galleryModal');
+function closeImageGallery() {
+    const modal = document.getElementById('imageGalleryModal');
     if (modal) {
         modal.style.display = 'none';
     }
+    
+    // Reset gallery state
+    galleryImages = [];
+    galleryType = '';
+    galleryTitle = '';
+    galleryUrlProvider = null;
+    currentGalleryIndex = 0;
 }
 
 function showGalleryImage() {
-    if (avatarImages.length > 0) {
-        const galleryImage = document.getElementById('galleryImage');
-        if (galleryImage) {
-            galleryImage.src = `/api/avatar/${avatarImages[currentImageIndex]}`;
-        }
+    if (galleryImages.length === 0) return;
+    
+    const imageUrl = galleryUrlProvider ? galleryUrlProvider(galleryImages[currentGalleryIndex], currentGalleryIndex) : 
+                     galleryType === 'avatar' ? `/api/avatar/${galleryImages[currentGalleryIndex]}` :
+                     galleryImages[currentGalleryIndex];
+    
+    const galleryContent = document.getElementById('galleryImageContent');
+    if (galleryContent) {
+        galleryContent.innerHTML = 
+            `<img src="${imageUrl}" alt="${galleryTitle}" style="max-width: 100%; max-height: 400px; border-radius: 10px;" />`;
     }
 }
 
-function previousImage() {
-    if (avatarImages.length > 1) {
-        currentImageIndex = (currentImageIndex - 1 + avatarImages.length) % avatarImages.length;
+function previousGalleryImage() {
+    if (galleryImages.length > 1) {
+        currentGalleryIndex = (currentGalleryIndex - 1 + galleryImages.length) % galleryImages.length;
         showGalleryImage();
-        updateGalleryCounter();
+        updateGalleryImageCounter();
     }
 }
 
-function nextImage() {
-    if (avatarImages.length > 1) {
-        currentImageIndex = (currentImageIndex + 1) % avatarImages.length;
+function nextGalleryImage() {
+    if (galleryImages.length > 1) {
+        currentGalleryIndex = (currentGalleryIndex + 1) % galleryImages.length;
         showGalleryImage();
-        updateGalleryCounter();
+        updateGalleryImageCounter();
     }
 }
 
-function updateGalleryCounter() {
-    const currentElement = document.getElementById('currentImageIndex');
-    const totalElement = document.getElementById('totalImages');
-    
-    if (currentElement && totalElement) {
-        currentElement.textContent = currentImageIndex + 1;
-        totalElement.textContent = avatarImages.length;
+function updateGalleryImageCounter() {
+    const counterElement = document.getElementById('galleryImageCounter');
+    if (counterElement) {
+        counterElement.textContent = `${currentGalleryIndex + 1} of ${galleryImages.length}`;
     }
     
-    // Hide navigation arrows if only one image
-    const prevBtn = document.querySelector('.gallery-prev');
-    const nextBtn = document.querySelector('.gallery-next');
-    
+    // Hide navigation if only one image
+    const prevBtn = document.getElementById('prevGalleryBtn');
+    const nextBtn = document.getElementById('nextGalleryBtn');
     if (prevBtn && nextBtn) {
-        if (avatarImages.length <= 1) {
+        if (galleryImages.length <= 1) {
             prevBtn.style.display = 'none';
             nextBtn.style.display = 'none';
         } else {
-            prevBtn.style.display = 'block';
-            nextBtn.style.display = 'block';
+            prevBtn.style.display = 'inline-block';
+            nextBtn.style.display = 'inline-block';
         }
     }
+}
+
+// Legacy functions for backward compatibility
+function openGallery() {
+    openImageGallery(avatarImages, 'Avatar Gallery', 'avatar');
+}
+
+function closeGallery() {
+    closeImageGallery();
+}
+
+function previousImage() {
+    previousGalleryImage();
+}
+
+function nextImage() {
+    nextGalleryImage();
+}
+
+function updateGalleryCounter() {
+    updateGalleryImageCounter();
 }
 
 // Create avatar directory instruction
@@ -195,52 +244,37 @@ function escapeHtml(text) {
 
 // Global event handlers
 window.onclick = function(event) {
-    const galleryModal = document.getElementById('galleryModal');
+    const imageGalleryModal = document.getElementById('imageGalleryModal');
     const noteModal = document.getElementById('noteModal');
-    const avatarModal = document.getElementById('avatarModal');
     
-    if (galleryModal && event.target === galleryModal) {
-        closeGallery();
+    if (imageGalleryModal && event.target === imageGalleryModal) {
+        closeImageGallery();
     }
     if (noteModal && event.target === noteModal) {
         closeNoteModal();
-    }
-    if (avatarModal && event.target === avatarModal) {
-        closeAvatarGallery();
     }
 }
 
 // Keyboard navigation
 document.addEventListener('keydown', function(event) {
-    const galleryModal = document.getElementById('galleryModal');
+    const imageGalleryModal = document.getElementById('imageGalleryModal');
     const noteModal = document.getElementById('noteModal');
-    const avatarModal = document.getElementById('avatarModal');
     
-    // Gallery modal keyboard controls
-    if (galleryModal && galleryModal.style.display === 'block') {
+    // Image gallery modal keyboard controls
+    if (imageGalleryModal && imageGalleryModal.style.display === 'block') {
         if (event.key === 'ArrowLeft') {
-            previousImage();
+            previousGalleryImage();
         } else if (event.key === 'ArrowRight') {
-            nextImage();
+            nextGalleryImage();
         } else if (event.key === 'Escape') {
-            closeGallery();
+            closeImageGallery();
         }
+        event.preventDefault();
     }
     
     // Note modal keyboard controls
     if (noteModal && noteModal.style.display === 'block' && event.key === 'Escape') {
         closeNoteModal();
-    }
-    
-    // Avatar modal keyboard controls
-    if (avatarModal && avatarModal.style.display === 'block') {
-        if (event.key === 'Escape') {
-            closeAvatarGallery();
-        } else if (event.key === 'ArrowLeft') {
-            previousAvatar();
-        } else if (event.key === 'ArrowRight') {
-            nextAvatar();
-        }
     }
 });
 
@@ -252,11 +286,9 @@ function closeNoteModal() {
     }
 }
 
+// Avatar gallery functions (now using unified system)
 function closeAvatarGallery() {
-    const modal = document.getElementById('avatarModal');
-    if (modal) {
-        modal.style.display = 'none';
-    }
+    closeImageGallery();
 }
 
 function openAvatarGallery() {
@@ -265,71 +297,39 @@ function openAvatarGallery() {
         return;
     }
     
-    showAvatarImage();
-    updateAvatarCounter();
-    document.getElementById('avatarModal').style.display = 'block';
-}
-
-function showAvatarImage() {
-    if (avatarImages.length === 0) return;
-    
-    const image = avatarImages[currentAvatarIndex];
-    const imageUrl = `/api/avatar/${image}`;
-    
-    const galleryContent = document.getElementById('avatarGalleryContent');
-    if (galleryContent) {
-        galleryContent.innerHTML = 
-            `<img src="${imageUrl}" alt="Avatar" style="max-width: 100%; max-height: 400px; border-radius: 10px;" />`;
-    }
-}
-
-function updateAvatarCounter() {
-    const counterElement = document.getElementById('avatarCounter');
-    if (counterElement) {
-        counterElement.textContent = `${currentAvatarIndex + 1} of ${avatarImages.length}`;
-    }
-    
-    // Hide navigation if only one image
-    const prevBtn = document.getElementById('prevAvatarBtn');
-    const nextBtn = document.getElementById('nextAvatarBtn');
-    if (prevBtn && nextBtn) {
-        if (avatarImages.length <= 1) {
-            prevBtn.style.display = 'none';
-            nextBtn.style.display = 'none';
-        } else {
-            prevBtn.style.display = 'inline-block';
-            nextBtn.style.display = 'inline-block';
-        }
-    }
+    openImageGallery(avatarImages, 'Avatar Gallery', 'avatar');
 }
 
 function previousAvatar() {
-    if (avatarImages.length > 1) {
-        currentAvatarIndex = (currentAvatarIndex - 1 + avatarImages.length) % avatarImages.length;
-        showAvatarImage();
-        updateAvatarCounter();
-    }
+    previousGalleryImage();
 }
 
 function nextAvatar() {
-    if (avatarImages.length > 1) {
-        currentAvatarIndex = (currentAvatarIndex + 1) % avatarImages.length;
-        showAvatarImage();
-        updateAvatarCounter();
-    }
+    nextGalleryImage();
 }
 
 // Export functions for global access
 window.sharedApp = {
+    // Unified image gallery functions
+    openImageGallery,
+    closeImageGallery,
+    showGalleryImage,
+    previousGalleryImage,
+    nextGalleryImage,
+    updateGalleryImageCounter,
+    
+    // Legacy functions (for backward compatibility)
     loadAvatarImages,
     updateHeaderAvatar,
     openGallery,
     closeGallery,
-    showGalleryImage,
     previousImage,
     nextImage,
     updateGalleryCounter,
     createAvatarDirectory,
+    openAvatarGallery,
+
+    // Utility functions
     getPeerAvatar,
     createPeerAvatarElement,
     fetchAPI,
@@ -338,11 +338,5 @@ window.sharedApp = {
     showStatus,
     hideStatus,
     showResult,
-    closeNoteModal,
-    closeAvatarGallery,
-    openAvatarGallery,
-    showAvatarImage,
-    updateAvatarCounter,
-    previousAvatar,
-    nextAvatar
+    closeNoteModal
 };

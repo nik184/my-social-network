@@ -454,6 +454,125 @@ body {
     color: #666;
 }
 
+/* Tab Styles */
+.tab-navigation {
+    display: flex;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 20px;
+}
+
+.tab-button {
+    background: transparent;
+    border: none;
+    padding: 15px 30px;
+    cursor: pointer;
+    font-size: 16px;
+    color: #666;
+    border-bottom: 3px solid transparent;
+    transition: all 0.3s;
+}
+
+.tab-button:hover {
+    color: #007bff;
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+.tab-button.active {
+    color: #007bff;
+    border-bottom-color: #007bff;
+    font-weight: bold;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Photo Gallery Styles */
+.galleries-grid {
+    display: grid;
+    gap: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+}
+
+.gallery-card {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: box-shadow 0.3s;
+    cursor: pointer;
+}
+
+.gallery-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.gallery-preview {
+    height: 200px;
+    background: #f8f9fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.gallery-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.gallery-placeholder {
+    font-size: 48px;
+    color: #dee2e6;
+}
+
+.gallery-info {
+    padding: 15px;
+}
+
+.gallery-name {
+    font-size: 18px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 5px;
+}
+
+.gallery-count {
+    font-size: 14px;
+    color: #666;
+}
+
+.photos-grid {
+    display: grid;
+    gap: 15px;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+
+.photo-item {
+    aspect-ratio: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s;
+    border: 1px solid #ddd;
+}
+
+.photo-item:hover {
+    transform: scale(1.02);
+}
+
+.photo-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
 /* Gallery Modal Styles */
 .gallery-modal {
     display: none;

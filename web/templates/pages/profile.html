@@ -8,14 +8,32 @@
     <p id="profileId" class="profile-id">Peer ID: ...</p>
 </div>
 
-<!-- Notes Section -->
+<!-- Tab Navigation -->
 <div class="section">
-    <h3>📝 My Notes</h3>
-    <div id="notesStatus" class="status" style="display: none;"></div>
-    <div id="notesContent">
-        <div class="empty-state">
-            <div class="empty-state-icon">📝</div>
-            <div>Loading notes...</div>
+    <div class="tab-navigation">
+        <button class="tab-button active" onclick="switchTab('notes')">📝 Notes</button>
+        <button class="tab-button" onclick="switchTab('photos')">📷 Photos</button>
+    </div>
+
+    <!-- Notes Tab Content -->
+    <div id="notesTab" class="tab-content active">
+        <div id="notesStatus" class="status" style="display: none;"></div>
+        <div id="notesContent">
+            <div class="empty-state">
+                <div class="empty-state-icon">📝</div>
+                <div>Loading notes...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Photos Tab Content -->
+    <div id="photosTab" class="tab-content">
+        <div id="photosStatus" class="status" style="display: none;"></div>
+        <div id="photosContent">
+            <div class="empty-state">
+                <div class="empty-state-icon">📷</div>
+                <div>Loading galleries...</div>
+            </div>
         </div>
     </div>
 </div>

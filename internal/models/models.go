@@ -24,6 +24,13 @@ type Note struct {
 	Size        int64     `json:"size"`
 }
 
+// Gallery represents a photo gallery (subdirectory in images/)
+type Gallery struct {
+	Name       string   `json:"name"`
+	ImageCount int      `json:"image_count"`
+	Images     []string `json:"images"`
+}
+
 // NetworkNode represents a node in the distributed network
 type NetworkNode struct {
 	ID        peer.ID             `json:"id"`
