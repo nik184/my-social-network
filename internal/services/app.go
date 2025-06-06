@@ -10,11 +10,12 @@ import (
 
 // AppService coordinates all application services
 type AppService struct {
-	DirectoryService DirectoryServiceInterface
-	DatabaseService  *DatabaseService
-	P2PService       *P2PService
-	MonitorService   *MonitorService
-	folderInfo       *models.FolderInfo
+	DirectoryService   DirectoryServiceInterface
+	DatabaseService    *DatabaseService
+	FileScannerService *FileScannerService
+	P2PService         *P2PService
+	MonitorService     *MonitorService
+	folderInfo         *models.FolderInfo
 }
 
 // NewAppService creates a new application service
@@ -33,6 +34,9 @@ func NewAppService() *AppService {
 		log.Fatalf("Failed to create database service: %v", err)
 	}
 	appService.DatabaseService = dbService
+	
+	// Initialize file scanner service with database
+	appService.FileScannerService = NewFileScannerService(dbService)
 
 	// Initialize P2P service with database
 	p2pService, err := NewP2PService(appService, dbService)
@@ -49,12 +53,12 @@ func NewAppService() *AppService {
 	appService.MonitorService = monitorService
 
 	// Clean up deleted files
-	if err := appService.DatabaseService.CleanupDeletedFiles(); err != nil {
+	if err := appService.FileScannerService.CleanupDeletedFiles(); err != nil {
 		log.Printf("⚠️ Warning: failed to cleanup deleted files: %v", err)
 	}
 	
 	// Perform initial file scan
-	if err := appService.DatabaseService.ScanFiles(); err != nil {
+	if err := appService.FileScannerService.ScanFiles(); err != nil {
 		log.Printf("⚠️ Warning: failed to perform initial file scan: %v", err)
 	}
 

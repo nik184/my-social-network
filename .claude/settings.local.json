@@ -18,7 +18,8 @@
       "Bash(curl:*)",
       "Bash(pkill:*)",
       "Bash(./distributed-app)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   },
