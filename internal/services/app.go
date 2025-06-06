@@ -22,32 +22,42 @@ func NewAppService() *AppService {
 	appService := &AppService{
 		DirectoryService: NewDirectoryService(),
 	}
-	
+
 	// Create database path in space184 directory
 	space184Path := appService.DirectoryService.GetDirectoryPath()
 	dbPath := filepath.Join(space184Path, "node.db")
-	
+
 	// Initialize database service with space184 path
 	dbService, err := NewDatabaseService(dbPath)
 	if err != nil {
 		log.Fatalf("Failed to create database service: %v", err)
 	}
 	appService.DatabaseService = dbService
-	
+
 	// Initialize P2P service with database
 	p2pService, err := NewP2PService(appService, dbService)
 	if err != nil {
 		log.Fatalf("Failed to create P2P service: %v", err)
 	}
 	appService.P2PService = p2pService
-	
+
 	// Initialize monitoring service
 	monitorService, err := NewMonitorService(appService.DirectoryService, appService)
 	if err != nil {
 		log.Fatalf("Failed to create monitor service: %v", err)
 	}
 	appService.MonitorService = monitorService
+
+	// Clean up deleted files
+	if err := appService.DatabaseService.CleanupDeletedFiles(); err != nil {
+		log.Printf("⚠️ Warning: failed to cleanup deleted files: %v", err)
+	}
 	
+	// Perform initial file scan
+	if err := appService.DatabaseService.ScanFiles(); err != nil {
+		log.Printf("⚠️ Warning: failed to perform initial file scan: %v", err)
+	}
+
 	return appService
 }
 
@@ -67,11 +77,11 @@ func (a *AppService) GetNodeInfo() *models.NodeInfoResponse {
 		FolderInfo: a.folderInfo,
 		Node:       a.P2PService.GetNode(),
 	}
-	
+
 	// Add NAT status and peer information if available
 	if a.P2PService != nil {
 		response.IsPublicNode = a.P2PService.IsPublicNode()
-		
+
 		// Convert PeerInfo to PeerInfoJSON for serialization
 		peerInfo := a.P2PService.GetConnectedPeerInfo()
 		if len(peerInfo) > 0 {
@@ -90,7 +100,7 @@ func (a *AppService) GetNodeInfo() *models.NodeInfoResponse {
 			}
 		}
 	}
-	
+
 	return response
 }
 
@@ -99,13 +109,13 @@ func (a *AppService) GetConnectionHistory() (*models.ConnectionHistoryResponse, 
 	if a.DatabaseService == nil {
 		return nil, fmt.Errorf("database service not available")
 	}
-	
+
 	// Get connection history from database
 	connections, err := a.DatabaseService.GetConnectionHistory()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get connection history: %w", err)
 	}
-	
+
 	// Get currently connected peers
 	currentlyConnected := make(map[string]bool)
 	if a.P2PService != nil {
@@ -114,22 +124,22 @@ func (a *AppService) GetConnectionHistory() (*models.ConnectionHistoryResponse, 
 			currentlyConnected[peerID.String()] = true
 		}
 	}
-	
+
 	// Convert to response format with current connection status
 	var historyConnections []models.ConnectionHistoryItem
 	for _, conn := range connections {
 		item := models.ConnectionHistoryItem{
-			PeerID:              conn.PeerID,
-			PeerName:            conn.PeerName,
-			Address:             conn.Address,
-			LastConnected:       conn.LastConnected,
-			ConnectionType:      conn.ConnectionType,
-			IsValidated:         conn.IsValidated,
-			CurrentlyConnected:  currentlyConnected[conn.PeerID],
+			PeerID:             conn.PeerID,
+			PeerName:           conn.PeerName,
+			Address:            conn.Address,
+			LastConnected:      conn.LastConnected,
+			ConnectionType:     conn.ConnectionType,
+			IsValidated:        conn.IsValidated,
+			CurrentlyConnected: currentlyConnected[conn.PeerID],
 		}
 		historyConnections = append(historyConnections, item)
 	}
-	
+
 	return &models.ConnectionHistoryResponse{
 		Connections: historyConnections,
 		Count:       len(historyConnections),
@@ -141,7 +151,7 @@ func (a *AppService) GetSecondDegreeConnections() (*models.SecondDegreeConnectio
 	if a.P2PService == nil {
 		return nil, fmt.Errorf("P2P service not available")
 	}
-	
+
 	return a.P2PService.GetSecondDegreeConnections()
 }
 
@@ -150,7 +160,7 @@ func (a *AppService) ConnectToSecondDegreePeer(targetPeerID, viaPeerID string) (
 	if a.P2PService == nil {
 		return nil, fmt.Errorf("P2P service not available")
 	}
-	
+
 	return a.P2PService.ConnectToSecondDegreePeer(targetPeerID, viaPeerID)
 }
 
