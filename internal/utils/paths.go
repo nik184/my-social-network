@@ -17,7 +17,7 @@ func NewPathManager() (*PathManager, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user home directory: %w", err)
 	}
-	
+
 	return &PathManager{homeDir: homeDir}, nil
 }
 
@@ -26,9 +26,9 @@ func (pm *PathManager) GetSpace184Path() string {
 	return filepath.Join(pm.homeDir, "space184")
 }
 
-// GetNotesPath returns the notes directory path
-func (pm *PathManager) GetNotesPath() string {
-	return filepath.Join(pm.GetSpace184Path(), "notes")
+// GetDocsPath returns the docs directory path
+func (pm *PathManager) GetDocsPath() string {
+	return filepath.Join(pm.GetSpace184Path(), "docs")
 }
 
 // GetImagesPath returns the images directory path

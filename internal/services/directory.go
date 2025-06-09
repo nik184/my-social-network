@@ -23,10 +23,10 @@ type DirectoryServiceInterface interface {
 	CreatePeerAvatarDirectory(peerID string) error
 	SavePeerAvatar(peerID string, filename string, data []byte) error
 	GetPeerAvatarImages(peerID string) ([]string, error)
-	GetNotesDirectory() string
-	CreateNotesDirectory() error
-	GetNotes() ([]models.Note, error)
-	GetNote(filename string) (*models.Note, error)
+	GetDocsDirectory() string
+	CreateDocsDirectory() error
+	GetDocs() ([]models.Doc, error)
+	GetDoc(filename string) (*models.Doc, error)
 	GetGalleries() ([]models.Gallery, error)
 	GetGalleryImages(galleryName string) ([]string, error)
 }
@@ -56,12 +56,12 @@ func (d *DirectoryService) CreateDirectory() error {
 	if err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
-	
-	// Also create the notes directory as part of the standard setup
-	if err := d.CreateNotesDirectory(); err != nil {
-		return fmt.Errorf("failed to create notes directory: %w", err)
+
+	// Also create the docs directory as part of the standard setup
+	if err := d.CreateDocsDirectory(); err != nil {
+		return fmt.Errorf("failed to create docs directory: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -103,7 +103,7 @@ func (d *DirectoryService) CreateAvatarDirectory() error {
 // GetAvatarImages returns a list of image files in the avatar directory
 func (d *DirectoryService) GetAvatarImages() ([]string, error) {
 	avatarDir := d.GetAvatarDirectory()
-	
+
 	// Ensure the directory exists
 	if err := d.CreateAvatarDirectory(); err != nil {
 		return nil, err
@@ -120,7 +120,7 @@ func (d *DirectoryService) GetAvatarImages() ([]string, error) {
 		if file.IsDir() {
 			continue
 		}
-		
+
 		if utils.IsImageFile(file.Name()) {
 			imageFiles = append(imageFiles, file.Name())
 		}
@@ -158,19 +158,19 @@ func (d *DirectoryService) SavePeerAvatar(peerID string, filename string, data [
 
 	peerAvatarDir := d.GetPeerAvatarDirectory(peerID)
 	filePath := filepath.Join(peerAvatarDir, filename)
-	
+
 	err := os.WriteFile(filePath, data, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to save peer avatar: %w", err)
 	}
-	
+
 	return nil
 }
 
 // GetPeerAvatarImages returns a list of image files in a peer's avatar directory
 func (d *DirectoryService) GetPeerAvatarImages(peerID string) ([]string, error) {
 	peerAvatarDir := d.GetPeerAvatarDirectory(peerID)
-	
+
 	// Check if directory exists
 	if _, err := os.Stat(peerAvatarDir); os.IsNotExist(err) {
 		return []string{}, nil // Return empty list if directory doesn't exist
@@ -187,7 +187,7 @@ func (d *DirectoryService) GetPeerAvatarImages(peerID string) ([]string, error) 
 		if file.IsDir() {
 			continue
 		}
-		
+
 		if utils.IsImageFile(file.Name()) {
 			imageFiles = append(imageFiles, file.Name())
 		}
@@ -196,41 +196,41 @@ func (d *DirectoryService) GetPeerAvatarImages(peerID string) ([]string, error) 
 	return imageFiles, nil
 }
 
-// GetNotesDirectory returns the path to the notes directory
-func (d *DirectoryService) GetNotesDirectory() string {
-	return d.pathManager.GetNotesPath()
+// GetDocsDirectory returns the path to the docs directory
+func (d *DirectoryService) GetDocsDirectory() string {
+	return d.pathManager.GetDocsPath()
 }
 
-// CreateNotesDirectory creates the notes directory if it doesn't exist
-func (d *DirectoryService) CreateNotesDirectory() error {
-	notesDir := d.GetNotesDirectory()
-	err := utils.EnsureDir(notesDir)
+// CreateDocsDirectory creates the docs directory if it doesn't exist
+func (d *DirectoryService) CreateDocsDirectory() error {
+	docsDir := d.GetDocsDirectory()
+	err := utils.EnsureDir(docsDir)
 	if err != nil {
-		return fmt.Errorf("failed to create notes directory: %w", err)
+		return fmt.Errorf("failed to create docs directory: %w", err)
 	}
 	return nil
 }
 
-// GetNotes returns a list of all notes in the notes directory
-func (d *DirectoryService) GetNotes() ([]models.Note, error) {
-	notesDir := d.GetNotesDirectory()
-	
+// GetDocs returns a list of all docs in the docs directory
+func (d *DirectoryService) GetDocs() ([]models.Doc, error) {
+	docsDir := d.GetDocsDirectory()
+
 	// Ensure the directory exists
-	if err := d.CreateNotesDirectory(); err != nil {
+	if err := d.CreateDocsDirectory(); err != nil {
 		return nil, err
 	}
 
-	files, err := os.ReadDir(notesDir)
+	files, err := os.ReadDir(docsDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read notes directory: %w", err)
+		return nil, fmt.Errorf("failed to read docs directory: %w", err)
 	}
 
-	var notes []models.Note
+	var docs []models.Doc
 	for _, file := range files {
 		if file.IsDir() {
 			continue
 		}
-		
+
 		// Only process .txt files
 		if !strings.HasSuffix(strings.ToLower(file.Name()), ".txt") {
 			continue
@@ -241,62 +241,62 @@ func (d *DirectoryService) GetNotes() ([]models.Note, error) {
 			// Log error but continue with other files
 			continue
 		}
-		
-		note, err := d.loadNoteFile(file.Name(), fileInfo)
+
+		doc, err := d.loadDocFile(file.Name(), fileInfo)
 		if err != nil {
 			// Log error but continue with other files
 			continue
 		}
-		
-		notes = append(notes, *note)
+
+		docs = append(docs, *doc)
 	}
 
-	return notes, nil
+	return docs, nil
 }
 
-// GetNote returns a specific note by filename
-func (d *DirectoryService) GetNote(filename string) (*models.Note, error) {
+// GetDoc returns a specific doc by filename
+func (d *DirectoryService) GetDoc(filename string) (*models.Doc, error) {
 	// Validate filename to prevent directory traversal
 	if err := d.pathValidator.ValidateFilename(filename); err != nil {
 		return nil, fmt.Errorf("invalid filename: %s - %w", filename, err)
 	}
 
-	notesDir := d.GetNotesDirectory()
-	filePath := filepath.Join(notesDir, filename)
-	
+	docsDir := d.GetDocsDirectory()
+	filePath := filepath.Join(docsDir, filename)
+
 	fileInfo, err := os.Stat(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get file info: %w", err)
 	}
 
-	return d.loadNoteFile(filename, fileInfo)
+	return d.loadDocFile(filename, fileInfo)
 }
 
-// loadNoteFile loads a note from a file
-func (d *DirectoryService) loadNoteFile(filename string, fileInfo os.FileInfo) (*models.Note, error) {
-	notesDir := d.GetNotesDirectory()
-	filePath := filepath.Join(notesDir, filename)
-	
+// loadDocFile loads a doc from a file
+func (d *DirectoryService) loadDocFile(filename string, fileInfo os.FileInfo) (*models.Doc, error) {
+	docsDir := d.GetDocsDirectory()
+	filePath := filepath.Join(docsDir, filename)
+
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read note file: %w", err)
+		return nil, fmt.Errorf("failed to read doc file: %w", err)
 	}
 
 	contentStr := string(content)
-	
+
 	// Create title from filename (remove .txt extension)
 	title := filename
 	if strings.HasSuffix(title, ".txt") {
 		title = title[:len(title)-4]
 	}
-	
+
 	// Create preview (first 150 characters)
 	preview := contentStr
 	if len(preview) > 150 {
 		preview = preview[:150] + "..."
 	}
 
-	note := &models.Note{
+	doc := &models.Doc{
 		Filename:   filename,
 		Title:      title,
 		Content:    contentStr,
@@ -305,13 +305,13 @@ func (d *DirectoryService) loadNoteFile(filename string, fileInfo os.FileInfo) (
 		Size:       fileInfo.Size(),
 	}
 
-	return note, nil
+	return doc, nil
 }
 
 // GetGalleries returns a list of all photo galleries (subdirectories in space184/images/)
 func (d *DirectoryService) GetGalleries() ([]models.Gallery, error) {
 	imagesDir := d.pathManager.GetImagesPath()
-	
+
 	// Check if images directory exists
 	if _, err := os.Stat(imagesDir); os.IsNotExist(err) {
 		return []models.Gallery{}, nil // Return empty list if directory doesn't exist
@@ -328,7 +328,7 @@ func (d *DirectoryService) GetGalleries() ([]models.Gallery, error) {
 		if !file.IsDir() {
 			continue
 		}
-		
+
 		galleryPath := filepath.Join(imagesDir, file.Name())
 		galleryFiles, err := os.ReadDir(galleryPath)
 		if err != nil {
@@ -340,7 +340,7 @@ func (d *DirectoryService) GetGalleries() ([]models.Gallery, error) {
 			if galleryFile.IsDir() {
 				continue
 			}
-			
+
 			if utils.IsImageFile(galleryFile.Name()) {
 				images = append(images, galleryFile.Name())
 			}
@@ -351,7 +351,7 @@ func (d *DirectoryService) GetGalleries() ([]models.Gallery, error) {
 			ImageCount: len(images),
 			Images:     images,
 		}
-		
+
 		galleries = append(galleries, gallery)
 	}
 
@@ -366,7 +366,7 @@ func (d *DirectoryService) GetGalleryImages(galleryName string) ([]string, error
 	}
 
 	galleryDir := filepath.Join(d.pathManager.GetImagesPath(), galleryName)
-	
+
 	// Check if directory exists
 	if _, err := os.Stat(galleryDir); os.IsNotExist(err) {
 		return []string{}, nil // Return empty list if directory doesn't exist
@@ -383,7 +383,7 @@ func (d *DirectoryService) GetGalleryImages(galleryName string) ([]string, error
 		if file.IsDir() {
 			continue
 		}
-		
+
 		if utils.IsImageFile(file.Name()) {
 			imageFiles = append(imageFiles, file.Name())
 		}

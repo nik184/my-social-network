@@ -31,12 +31,6 @@ func (h *Handler) HandleGetInfo(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(h.appService.GetNodeInfo())
 }
 
-// HandleGetPeerInfo handles GET /api/peer-info requests
-func (h *Handler) HandleGetPeerInfo(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(h.appService.GetP2PService().GetConnectedPeerInfo())
-}
-
 // HandleScan handles POST /api/scan requests
 func (h *Handler) HandleScan(w http.ResponseWriter, r *http.Request) {
 	// Use the monitor service for manual scan if available
@@ -416,14 +410,14 @@ func (h *Handler) HandlePeerAvatar(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Invalid request path", http.StatusBadRequest)
 }
 
-// HandleNotes handles GET /api/notes requests
-func (h *Handler) HandleNotes(w http.ResponseWriter, r *http.Request) {
+// HandleDocs handles GET /api/docs requests
+func (h *Handler) HandleDocs(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	notes, err := h.appService.GetDirectoryService().GetNotes()
+	docs, err := h.appService.GetDirectoryService().GetDocs()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -431,33 +425,33 @@ func (h *Handler) HandleNotes(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"notes": notes,
-		"count": len(notes),
+		"docs":  docs,
+		"count": len(docs),
 	})
 }
 
-// HandleNote handles GET /api/notes/{filename} requests
-func (h *Handler) HandleNote(w http.ResponseWriter, r *http.Request) {
+// HandleDoc handles GET /api/docs/{filename} requests
+func (h *Handler) HandleDoc(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	// Extract filename from URL path
-	filename := r.URL.Path[len("/api/notes/"):]
+	filename := r.URL.Path[len("/api/docs/"):]
 	if filename == "" {
 		http.Error(w, "Filename required", http.StatusBadRequest)
 		return
 	}
 
-	note, err := h.appService.GetDirectoryService().GetNote(filename)
+	doc, err := h.appService.GetDirectoryService().GetDoc(filename)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(note)
+	json.NewEncoder(w).Encode(doc)
 }
 
 // HandleFriends handles GET /api/friends requests
@@ -553,15 +547,15 @@ func (h *Handler) HandleFriend(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// HandlePeerNotes handles GET /api/peer-notes/{peerID} and /api/peer-notes/{peerID}/{filename} requests
-func (h *Handler) HandlePeerNotes(w http.ResponseWriter, r *http.Request) {
+// HandlePeerDocs handles GET /api/peer-docs/{peerID} and /api/peer-docs/{peerID}/{filename} requests
+func (h *Handler) HandlePeerDocs(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	// Parse URL path to extract peerID and optional filename
-	pathParts := strings.Split(r.URL.Path[len("/api/peer-notes/"):], "/")
+	pathParts := strings.Split(r.URL.Path[len("/api/peer-docs/"):], "/")
 	if len(pathParts) < 1 || pathParts[0] == "" {
 		http.Error(w, "Peer ID is required", http.StatusBadRequest)
 		return
@@ -569,41 +563,41 @@ func (h *Handler) HandlePeerNotes(w http.ResponseWriter, r *http.Request) {
 
 	peerID := pathParts[0]
 
-	// If no filename provided, return notes list
+	// If no filename provided, return docs list
 	if len(pathParts) == 1 {
-		// Request notes list from peer via P2P
-		notesResponse, err := h.appService.GetP2PService().RequestPeerNotes(peerID)
+		// Request docs list from peer via P2P
+		docsResponse, err := h.appService.GetP2PService().RequestPeerDocs(peerID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to get notes from peer: %v", err), http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("Failed to get docs from peer: %v", err), http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(notesResponse)
+		json.NewEncoder(w).Encode(docsResponse)
 		return
 	}
 
-	// If filename provided, return specific note
+	// If filename provided, return specific doc
 	filename := strings.Join(pathParts[1:], "/") // Join in case filename has slashes
 	if filename == "" {
 		http.Error(w, "Filename is required", http.StatusBadRequest)
 		return
 	}
 
-	// Request specific note from peer via P2P
-	noteResponse, err := h.appService.GetP2PService().RequestPeerNote(peerID, filename)
+	// Request specific doc from peer via P2P
+	docResponse, err := h.appService.GetP2PService().RequestPeerDoc(peerID, filename)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get note from peer: %v", err), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Failed to get doc from peer: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	if noteResponse.Note == nil {
-		http.Error(w, "Note not found", http.StatusNotFound)
+	if docResponse.Doc == nil {
+		http.Error(w, "Doc not found", http.StatusNotFound)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(noteResponse.Note)
+	json.NewEncoder(w).Encode(docResponse.Doc)
 }
 
 // HandleGalleries handles GET /api/galleries requests
@@ -761,7 +755,6 @@ func (h *Handler) RegisterRoutes() {
 
 	// API routes
 	http.HandleFunc("/api/info", h.HandleGetInfo)
-	http.HandleFunc("/api/peer-info", h.HandleGetPeerInfo)
 	http.HandleFunc("/api/scan", h.HandleScan)
 	http.HandleFunc("/api/create", h.HandleCreate)
 	http.HandleFunc("/api/discover", h.HandleDiscover)
@@ -775,11 +768,11 @@ func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/api/avatar", h.HandleAvatarList)
 	http.HandleFunc("/api/avatar/", h.HandleAvatarImage)
 	http.HandleFunc("/api/peer-avatar/", h.HandlePeerAvatar)
-	http.HandleFunc("/api/notes", h.HandleNotes)
-	http.HandleFunc("/api/notes/", h.HandleNote)
+	http.HandleFunc("/api/docs", h.HandleDocs)
+	http.HandleFunc("/api/docs/", h.HandleDoc)
 	http.HandleFunc("/api/friends", h.HandleFriends)
 	http.HandleFunc("/api/friends/", h.HandleFriend)
-	http.HandleFunc("/api/peer-notes/", h.HandlePeerNotes)
+	http.HandleFunc("/api/peer-docs/", h.HandlePeerDocs)
 	http.HandleFunc("/api/galleries", h.HandleGalleries)
 	http.HandleFunc("/api/galleries/", h.HandleGalleryImage)
 }

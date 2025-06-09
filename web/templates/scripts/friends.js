@@ -82,7 +82,7 @@ function displayEmptyState(message) {
         <div class="empty-state">
             <div class="empty-state-icon">👥</div>
             <div>${message}</div>
-            <div class="create-note-hint">
+            <div class="create-doc-hint">
                 💡 Add friends from the Network page's Connection History
             </div>
         </div>

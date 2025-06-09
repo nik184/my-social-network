@@ -14,14 +14,14 @@ type FolderInfo struct {
 	LastScan time.Time `json:"lastScan"`
 }
 
-// Note represents a text note from the notes directory
-type Note struct {
-	Filename    string    `json:"filename"`
-	Title       string    `json:"title"`
-	Content     string    `json:"content"`
-	Preview     string    `json:"preview"`
-	ModifiedAt  time.Time `json:"modified_at"`
-	Size        int64     `json:"size"`
+// Doc represents a text doc from the docs directory
+type Doc struct {
+	Filename   string    `json:"filename"`
+	Title      string    `json:"title"`
+	Content    string    `json:"content"`
+	Preview    string    `json:"preview"`
+	ModifiedAt time.Time `json:"modified_at"`
+	Size       int64     `json:"size"`
 }
 
 // Gallery represents a photo gallery (subdirectory in images/)
@@ -56,9 +56,9 @@ type FileRecord struct {
 
 // NetworkNode represents a node in the distributed network
 type NetworkNode struct {
-	ID        peer.ID             `json:"id"`
+	ID        peer.ID               `json:"id"`
 	Addresses []multiaddr.Multiaddr `json:"addresses"`
-	LastSeen  time.Time           `json:"lastSeen"`
+	LastSeen  time.Time             `json:"lastSeen"`
 }
 
 // DiscoveryRequest represents a request to discover a node
@@ -96,10 +96,10 @@ type PeerInfoJSON struct {
 
 // NodeInfoResponse represents the response containing node and folder information
 type NodeInfoResponse struct {
-	FolderInfo        *FolderInfo                   `json:"folderInfo"`
-	Node              *NetworkNode                  `json:"node"`
-	IsPublicNode      bool                          `json:"isPublicNode"`
-	ConnectedPeerInfo map[string]*PeerInfoJSON      `json:"connectedPeerInfo,omitempty"`
+	FolderInfo        *FolderInfo              `json:"folderInfo"`
+	Node              *NetworkNode             `json:"node"`
+	IsPublicNode      bool                     `json:"isPublicNode"`
+	ConnectedPeerInfo map[string]*PeerInfoJSON `json:"connectedPeerInfo,omitempty"`
 }
 
 // StatusResponse represents a generic status response
@@ -116,11 +116,11 @@ type P2PMessage struct {
 
 // SecondDegreePeer represents a peer that is connected to one of our direct connections
 type SecondDegreePeer struct {
-	PeerID           string `json:"peer_id"`
-	PeerName         string `json:"peer_name"`
-	ViaPeerID        string `json:"via_peer_id"`
-	ViaPeerName      string `json:"via_peer_name"`
-	ConnectionPath   string `json:"connection_path,omitempty"`
+	PeerID         string `json:"peer_id"`
+	PeerName       string `json:"peer_name"`
+	ViaPeerID      string `json:"via_peer_id"`
+	ViaPeerName    string `json:"via_peer_name"`
+	ConnectionPath string `json:"connection_path,omitempty"`
 }
 
 // SecondDegreeConnectionsResponse represents the response for second-degree peer discovery
@@ -166,12 +166,12 @@ type ConnectionHistoryResponse struct {
 
 // Friend represents a friend in the friends list
 type Friend struct {
-	ID       int       `json:"id"`
-	PeerID   string    `json:"peer_id"`
-	PeerName string    `json:"peer_name"`
-	AddedAt  time.Time `json:"added_at"`
+	ID       int        `json:"id"`
+	PeerID   string     `json:"peer_id"`
+	PeerName string     `json:"peer_name"`
+	AddedAt  time.Time  `json:"added_at"`
 	LastSeen *time.Time `json:"last_seen"`
-	IsOnline bool      `json:"is_online"`
+	IsOnline bool       `json:"is_online"`
 }
 
 // FriendsResponse represents the response for friends list
@@ -186,39 +186,39 @@ type AddFriendRequest struct {
 	PeerName string `json:"peer_name"`
 }
 
-// NotesRequest represents a P2P request for notes list
-type NotesRequest struct {
+// DocsRequest represents a P2P request for docs list
+type DocsRequest struct {
 	// Currently no additional fields needed
 }
 
-// NotesResponse represents a P2P response with notes list
-type NotesResponse struct {
-	Notes []Note `json:"notes"`
-	Count int    `json:"count"`
+// DocsResponse represents a P2P response with docs list
+type DocsResponse struct {
+	Docs  []Doc `json:"docs"`
+	Count int   `json:"count"`
 }
 
-// NoteRequest represents a P2P request for a specific note
-type NoteRequest struct {
+// DocRequest represents a P2P request for a specific doc
+type DocRequest struct {
 	Filename string `json:"filename"`
 }
 
-// NoteResponse represents a P2P response with note content
-type NoteResponse struct {
-	Note *Note `json:"note"`
+// DocResponse represents a P2P response with doc content
+type DocResponse struct {
+	Doc *Doc `json:"doc"`
 }
 
 // Constants for message types
 const (
-	MessageTypeGetInfo          = "getInfo"
-	MessageTypeGetInfoResp      = "getInfoResp"
-	MessageTypeDiscovery        = "discovery"
-	MessageTypeDiscoveryResp    = "discoveryResp"
-	MessageTypeGetPeerList      = "getPeerList"
-	MessageTypeGetPeerListResp  = "getPeerListResp"
-	MessageTypeHolePunchAssist  = "holePunchAssist"
-	MessageTypeHolePunchResp    = "holePunchResp"
-	MessageTypeGetNotes         = "getNotes"
-	MessageTypeGetNotesResp     = "getNotesResp"
-	MessageTypeGetNote          = "getNote"
-	MessageTypeGetNoteResp      = "getNoteResp"
+	MessageTypeGetInfo         = "getInfo"
+	MessageTypeGetInfoResp     = "getInfoResp"
+	MessageTypeDiscovery       = "discovery"
+	MessageTypeDiscoveryResp   = "discoveryResp"
+	MessageTypeGetPeerList     = "getPeerList"
+	MessageTypeGetPeerListResp = "getPeerListResp"
+	MessageTypeHolePunchAssist = "holePunchAssist"
+	MessageTypeHolePunchResp   = "holePunchResp"
+	MessageTypeGetDocs         = "getDocs"
+	MessageTypeGetDocsResp     = "getDocsResp"
+	MessageTypeGetDoc          = "getDoc"
+	MessageTypeGetDocResp      = "getDocResp"
 )

@@ -27,14 +27,13 @@ func NewFileScannerService(filesRepo interfaces.FilesRepository) *FileScannerSer
 	}
 }
 
-
-// ScanFiles scans the space184/notes and space184/images directories and updates the files table
+// ScanFiles scans the space184/docs and space184/images directories and updates the files table
 func (fs *FileScannerService) ScanFiles() error {
 	log.Printf("🔍 Starting file scan...")
 
 	// Define directories to scan using path manager
 	scanDirs := []string{
-		fs.pathManager.GetNotesPath(),
+		fs.pathManager.GetDocsPath(),
 		fs.pathManager.GetImagesPath(),
 	}
 

@@ -38,7 +38,7 @@ func GetFileType(extension string) string {
 	if imageExts[strings.ToLower(extension)] {
 		return "image"
 	}
-	return "note"
+	return "doc"
 }
 
 // IsImageFile checks if a file is an image based on extension
@@ -56,7 +56,7 @@ func IsImageFile(filename string) bool {
 	return validExtensions[ext]
 }
 
-// IsTextFile checks if a file is a text/note file based on extension
+// IsTextFile checks if a file is a text/doc file based on extension
 func IsTextFile(filename string) bool {
 	ext := strings.ToLower(filepath.Ext(filename))
 	validExtensions := map[string]bool{

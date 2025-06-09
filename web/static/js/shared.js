@@ -228,20 +228,20 @@ function escapeHtml(text) {
 // Global event handlers
 window.onclick = function(event) {
     const imageGalleryModal = document.getElementById('imageGalleryModal');
-    const noteModal = document.getElementById('noteModal');
+    const docModal = document.getElementById('docModal');
     
     if (imageGalleryModal && event.target === imageGalleryModal) {
         closeImageGallery();
     }
-    if (noteModal && event.target === noteModal) {
-        closeNoteModal();
+    if (docModal && event.target === docModal) {
+        closeDocModal();
     }
 }
 
 // Keyboard navigation
 document.addEventListener('keydown', function(event) {
     const imageGalleryModal = document.getElementById('imageGalleryModal');
-    const noteModal = document.getElementById('noteModal');
+    const docModal = document.getElementById('docModal');
     
     // Image gallery modal keyboard controls
     if (imageGalleryModal && imageGalleryModal.style.display === 'block') {
@@ -255,15 +255,15 @@ document.addEventListener('keydown', function(event) {
         event.preventDefault();
     }
     
-    // Note modal keyboard controls
-    if (noteModal && noteModal.style.display === 'block' && event.key === 'Escape') {
-        closeNoteModal();
+    // Doc modal keyboard controls
+    if (docModal && docModal.style.display === 'block' && event.key === 'Escape') {
+        closeDocModal();
     }
 });
 
 // Modal close functions (profile-specific)
-function closeNoteModal() {
-    const modal = document.getElementById('noteModal');
+function closeDocModal() {
+    const modal = document.getElementById('docModal');
     if (modal) {
         modal.style.display = 'none';
     }
@@ -304,5 +304,5 @@ window.sharedApp = {
     showStatus,
     hideStatus,
     showResult,
-    closeNoteModal
+    closeDocModal
 };

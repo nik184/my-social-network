@@ -11,7 +11,7 @@ function getPeerIdFromUrl() {
     return urlParams.get('peer_id');
 }
 
-// Load friend profile and notes
+// Load friend profile and docs
 async function loadFriendProfile() {
     const peerID = getPeerIdFromUrl();
     if (!peerID) {
@@ -44,8 +44,8 @@ async function loadFriendProfile() {
             friendAvatar.innerHTML = '👤';
         }
 
-        // Load friend's notes
-        await loadFriendNotes(peerID);
+        // Load friend's docs
+        await loadFriendDocs(peerID);
 
     } catch (error) {
         console.error('Error loading friend profile:', error);
@@ -64,100 +64,100 @@ async function loadFriendInfo(peerID) {
     }
 }
 
-// Load friend's notes via P2P
-async function loadFriendNotes(peerID) {
+// Load friend's docs via P2P
+async function loadFriendDocs(peerID) {
     try {
-        sharedApp.showStatus('notesStatus', 'Loading notes via P2P...', false);
+        sharedApp.showStatus('docsStatus', 'Loading docs via P2P...', false);
         
-        const data = await sharedApp.fetchAPI(`/api/peer-notes/${peerID}`);
+        const data = await sharedApp.fetchAPI(`/api/peer-docs/${peerID}`);
         
-        displayFriendNotes(data.notes || []);
-        sharedApp.hideStatus('notesStatus');
+        displayFriendDocs(data.docs || []);
+        sharedApp.hideStatus('docsStatus');
     } catch (error) {
-        console.error('Error loading friend notes:', error);
-        sharedApp.showStatus('notesStatus', 'Error loading notes: ' + error.message, true);
-        displayFriendNotesEmptyState('Failed to load notes from friend');
+        console.error('Error loading friend docs:', error);
+        sharedApp.showStatus('docsStatus', 'Error loading docs: ' + error.message, true);
+        displayFriendDocsEmptyState('Failed to load docs from friend');
     }
 }
 
-// Display friend's notes
-function displayFriendNotes(notes) {
-    const notesContent = document.getElementById('notesContent');
+// Display friend's docs
+function displayFriendDocs(docs) {
+    const docsContent = document.getElementById('docsContent');
     
-    if (notes.length === 0) {
-        displayFriendNotesEmptyState('No notes found');
+    if (docs.length === 0) {
+        displayFriendDocsEmptyState('No docs found');
         return;
     }
 
-    const notesGrid = document.createElement('div');
-    notesGrid.className = 'notes-grid';
+    const docsGrid = document.createElement('div');
+    docsGrid.className = 'docs-grid';
 
-    notes.forEach(note => {
-        const noteCard = document.createElement('div');
-        noteCard.className = 'note-card';
+    docs.forEach(doc => {
+        const docCard = document.createElement('div');
+        docCard.className = 'doc-card';
 
-        const modifiedDate = new Date(note.modified_at).toLocaleDateString();
-        const sizeKB = Math.round(note.size / 1024 * 100) / 100;
+        const modifiedDate = new Date(doc.modified_at).toLocaleDateString();
+        const sizeKB = Math.round(doc.size / 1024 * 100) / 100;
 
-        noteCard.innerHTML = `
-            <div class="note-title">${sharedApp.escapeHtml(note.title)}</div>
-            <div class="note-meta">
+        docCard.innerHTML = `
+            <div class="doc-title">${sharedApp.escapeHtml(doc.title)}</div>
+            <div class="doc-meta">
                 <span>📅 ${modifiedDate}</span>
                 <span>📄 ${sizeKB} KB</span>
             </div>
-            <div class="note-preview">${sharedApp.escapeHtml(note.preview)}</div>
-            <div class="note-actions">
-                <button class="read-more-btn" onclick="openFriendNote('${currentFriend.peer_id}', '${sharedApp.escapeHtml(note.filename)}')">
+            <div class="doc-preview">${sharedApp.escapeHtml(doc.preview)}</div>
+            <div class="doc-actions">
+                <button class="read-more-btn" onclick="openFriendDoc('${currentFriend.peer_id}', '${sharedApp.escapeHtml(doc.filename)}')">
                     Read more
                 </button>
             </div>
         `;
 
-        notesGrid.appendChild(noteCard);
+        docsGrid.appendChild(docCard);
     });
 
-    notesContent.innerHTML = '';
-    notesContent.appendChild(notesGrid);
+    docsContent.innerHTML = '';
+    docsContent.appendChild(docsGrid);
 }
 
-// Display empty state for friend notes
-function displayFriendNotesEmptyState(message) {
-    const notesContent = document.getElementById('notesContent');
-    notesContent.innerHTML = `
+// Display empty state for friend docs
+function displayFriendDocsEmptyState(message) {
+    const docsContent = document.getElementById('docsContent');
+    docsContent.innerHTML = `
         <div class="empty-state">
             <div class="empty-state-icon">📝</div>
             <div>${message}</div>
-            <div class="create-note-hint">
-                📡 Notes are requested directly from your friend via P2P connection
+            <div class="create-doc-hint">
+                📡 Docs are requested directly from your friend via P2P connection
             </div>
         </div>
     `;
 }
 
-// Open a specific friend note
-async function openFriendNote(peerID, filename) {
+// Open a specific friend doc
+async function openFriendDoc(peerID, filename) {
     try {
-        const note = await sharedApp.fetchAPI(`/api/peer-notes/${peerID}/${encodeURIComponent(filename)}`);
+        const doc = await sharedApp.fetchAPI(`/api/peer-docs/${peerID}/${encodeURIComponent(filename)}`);
         
-        document.getElementById('noteModalTitle').textContent = note.title;
-        document.getElementById('noteModalMeta').innerHTML = `
+        document.getElementById('docModalTitle').textContent = doc.title;
+        document.getElementById('docModalMeta').innerHTML = `
             <strong>From:</strong> ${sharedApp.escapeHtml(currentFriend.peer_name)}<br>
-            <strong>Filename:</strong> ${sharedApp.escapeHtml(note.filename)}<br>
-            <strong>Modified:</strong> ${new Date(note.modified_at).toLocaleString()}<br>
-            <strong>Size:</strong> ${Math.round(note.size / 1024 * 100) / 100} KB
+            <strong>Filename:</strong> ${sharedApp.escapeHtml(doc.filename)}<br>
+            <strong>Modified:</strong> ${new Date(doc.modified_at).toLocaleString()}<br>
+            <strong>Size:</strong> ${Math.round(doc.size / 1024 * 100) / 100} KB
         `;
-        document.getElementById('noteModalContent').textContent = note.content;
+        document.getElementById('docModalContent').textContent = doc.content;
         
-        document.getElementById('noteModal').style.display = 'block';
+        document.getElementById('docModal').style.display = 'block';
     } catch (error) {
-        console.error('Error loading friend note:', error);
-        alert('Error loading note: ' + error.message);
+        console.error('Error loading friend doc:', error);
+        alert('Error loading doc: ' + error.message);
     }
 }
 
-// Note modal functions
-function closeNoteModal() {
-    sharedApp.closeNoteModal();
+// Doc modal functions
+function closeDocModal() {
+    sharedApp.closeDocModal();
 }
 
 // Go back to friends page

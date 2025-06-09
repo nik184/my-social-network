@@ -3,7 +3,7 @@ let userInfo = null;
 // Load initial data when page loads
 document.addEventListener('DOMContentLoaded', function() {
     loadUserInfo();
-    loadNotes();
+    loadDocs();
 });
 
 // Load user information and avatar
@@ -57,93 +57,93 @@ async function loadAvatar() {
     }
 }
 
-// Load notes from the server
-async function loadNotes() {
+// Load docs from the server
+async function loadDocs() {
     try {
-        sharedApp.showStatus('notesStatus', 'Loading notes...', false);
+        sharedApp.showStatus('docsStatus', 'Loading docs...', false);
         
-        const data = await sharedApp.fetchAPI('/api/notes');
+        const data = await sharedApp.fetchAPI('/api/docs');
         
-        displayNotes(data.notes || []);
-        sharedApp.hideStatus('notesStatus');
+        displayDocs(data.docs || []);
+        sharedApp.hideStatus('docsStatus');
     } catch (error) {
-        console.error('Error loading notes:', error);
-        sharedApp.showStatus('notesStatus', 'Error loading notes: ' + error.message, true);
-        displayEmptyState('Failed to load notes');
+        console.error('Error loading docs:', error);
+        sharedApp.showStatus('docsStatus', 'Error loading docs: ' + error.message, true);
+        displayEmptyState('Failed to load docs');
     }
 }
 
-// Display notes in the grid
-function displayNotes(notes) {
-    const notesContent = document.getElementById('notesContent');
+// Display docs in the grid
+function displayDocs(docs) {
+    const docsContent = document.getElementById('docsContent');
     
-    if (notes.length === 0) {
-        displayEmptyState('No notes found');
+    if (docs.length === 0) {
+        displayEmptyState('No docs found');
         return;
     }
 
-    const notesGrid = document.createElement('div');
-    notesGrid.className = 'notes-grid';
+    const docsGrid = document.createElement('div');
+    docsGrid.className = 'docs-grid';
 
-    notes.forEach(note => {
-        const noteCard = document.createElement('div');
-        noteCard.className = 'note-card';
+    docs.forEach(doc => {
+        const docCard = document.createElement('div');
+        docCard.className = 'doc-card';
 
-        const modifiedDate = new Date(note.modified_at).toLocaleDateString();
-        const sizeKB = Math.round(note.size / 1024 * 100) / 100;
+        const modifiedDate = new Date(doc.modified_at).toLocaleDateString();
+        const sizeKB = Math.round(doc.size / 1024 * 100) / 100;
 
-        noteCard.innerHTML = `
-            <div class="note-title">${sharedApp.escapeHtml(note.title)}</div>
-            <div class="note-meta">
+        docCard.innerHTML = `
+            <div class="doc-title">${sharedApp.escapeHtml(doc.title)}</div>
+            <div class="doc-meta">
                 <span>📅 ${modifiedDate}</span>
                 <span>📄 ${sizeKB} KB</span>
             </div>
-            <div class="note-preview">${sharedApp.escapeHtml(note.preview)}</div>
-            <div class="note-actions">
-                <button class="read-more-btn" onclick="openNote('${sharedApp.escapeHtml(note.filename)}')">
+            <div class="doc-preview">${sharedApp.escapeHtml(doc.preview)}</div>
+            <div class="doc-actions">
+                <button class="read-more-btn" onclick="openDoc('${sharedApp.escapeHtml(doc.filename)}')">
                     Read more
                 </button>
             </div>
         `;
 
-        notesGrid.appendChild(noteCard);
+        docsGrid.appendChild(docCard);
     });
 
-    notesContent.innerHTML = '';
-    notesContent.appendChild(notesGrid);
+    docsContent.innerHTML = '';
+    docsContent.appendChild(docsGrid);
 }
 
 // Display empty state
 function displayEmptyState(message) {
-    const notesContent = document.getElementById('notesContent');
-    notesContent.innerHTML = `
+    const docsContent = document.getElementById('docsContent');
+    docsContent.innerHTML = `
         <div class="empty-state">
             <div class="empty-state-icon">📝</div>
             <div>${message}</div>
-            <div class="create-note-hint">
-                💡 To add notes, create .txt files in your space184/notes directory
+            <div class="create-doc-hint">
+                💡 To add docs, create .txt files in your space184/docs directory
             </div>
         </div>
     `;
 }
 
-// Open a specific note
-async function openNote(filename) {
+// Open a specific doc
+async function openDoc(filename) {
     try {
-        const note = await sharedApp.fetchAPI(`/api/notes/${encodeURIComponent(filename)}`);
+        const doc = await sharedApp.fetchAPI(`/api/docs/${encodeURIComponent(filename)}`);
         
-        document.getElementById('noteModalTitle').textContent = note.title;
-        document.getElementById('noteModalMeta').innerHTML = `
-            <strong>Filename:</strong> ${sharedApp.escapeHtml(note.filename)}<br>
-            <strong>Modified:</strong> ${new Date(note.modified_at).toLocaleString()}<br>
-            <strong>Size:</strong> ${Math.round(note.size / 1024 * 100) / 100} KB
+        document.getElementById('docModalTitle').textContent = doc.title;
+        document.getElementById('docModalMeta').innerHTML = `
+            <strong>Filename:</strong> ${sharedApp.escapeHtml(doc.filename)}<br>
+            <strong>Modified:</strong> ${new Date(doc.modified_at).toLocaleString()}<br>
+            <strong>Size:</strong> ${Math.round(doc.size / 1024 * 100) / 100} KB
         `;
-        document.getElementById('noteModalContent').textContent = note.content;
+        document.getElementById('docModalContent').textContent = doc.content;
         
-        document.getElementById('noteModal').style.display = 'block';
+        document.getElementById('docModal').style.display = 'block';
     } catch (error) {
-        console.error('Error loading note:', error);
-        alert('Error loading note: ' + error.message);
+        console.error('Error loading doc:', error);
+        alert('Error loading doc: ' + error.message);
     }
 }
 
@@ -230,7 +230,7 @@ function displayPhotosEmptyState(message) {
         <div class="empty-state">
             <div class="empty-state-icon">📷</div>
             <div>${message}</div>
-            <div class="create-note-hint">
+            <div class="create-doc-hint">
                 💡 To add photo galleries, create subdirectories in your space184/images directory and add images to them
             </div>
         </div>

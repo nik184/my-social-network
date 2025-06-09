@@ -297,14 +297,14 @@ body {
     font-family: 'Courier New', monospace;
 }
 
-/* Notes Styles */
-.notes-grid {
+/* Docs Styles */
+.docs-grid {
     display: grid;
     gap: 20px;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
 }
 
-.note-card {
+.doc-card {
     background: white;
     border: 1px solid #ddd;
     border-radius: 5px;
@@ -313,24 +313,24 @@ body {
     border-left: 4px solid #007bff;
 }
 
-.note-card:hover {
+.doc-card:hover {
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
-.note-title {
+.doc-title {
     font-size: 18px;
     font-weight: bold;
     color: #333;
     margin-bottom: 10px;
 }
 
-.note-preview {
+.doc-preview {
     color: #666;
     line-height: 1.5;
     margin-bottom: 15px;
 }
 
-.note-meta {
+.doc-meta {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -339,7 +339,7 @@ body {
     margin-bottom: 15px;
 }
 
-.note-actions {
+.doc-actions {
     display: flex;
     gap: 10px;
 }
@@ -372,7 +372,7 @@ body {
     opacity: 0.3;
 }
 
-.create-note-hint {
+.create-doc-hint {
     margin-top: 20px;
     padding: 15px;
     background: #e3f2fd;
@@ -438,13 +438,13 @@ body {
     max-height: 60vh;
 }
 
-.note-content {
+.doc-content {
     line-height: 1.6;
     color: #333;
     white-space: pre-wrap;
 }
 
-.note-full-meta {
+.doc-full-meta {
     background: #f8f9fa;
     padding: 15px;
     border: 1px solid #ddd;
@@ -734,7 +734,7 @@ body {
         font-size: 24px;
     }
 
-    .notes-grid {
+    .docs-grid {
         grid-template-columns: 1fr;
     }
 

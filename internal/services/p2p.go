@@ -454,7 +454,7 @@ func (p *P2PService) validatePeer(peerID peer.ID) bool {
 		p.markPeerValidation(peerID, false)
 		return false
 	}
-	
+
 	appStr, ok := app.(string)
 	if !ok || appStr != AppIdentifier {
 		log.Printf("❌ Peer %s is not running our application (app: %v)", peerID, app)
@@ -665,22 +665,22 @@ func (p *P2PService) handleStream(stream network.Stream) {
 			Payload: assistResponse,
 		}
 
-	case models.MessageTypeGetNotes:
-		// Handle notes list request
-		log.Printf("📝 Processing notes request from %s", peerID)
-		notesResponse := p.handleGetNotesRequest()
+	case models.MessageTypeGetDocs:
+		// Handle docs list request
+		log.Printf("📝 Processing docs request from %s", peerID)
+		docsResponse := p.handleGetDocsRequest()
 		response = models.P2PMessage{
-			Type:    models.MessageTypeGetNotesResp,
-			Payload: notesResponse,
+			Type:    models.MessageTypeGetDocsResp,
+			Payload: docsResponse,
 		}
 
-	case models.MessageTypeGetNote:
-		// Handle specific note request
-		log.Printf("📝 Processing note request from %s", peerID)
-		noteResponse := p.handleGetNoteRequest(msg.Payload)
+	case models.MessageTypeGetDoc:
+		// Handle specific doc request
+		log.Printf("📝 Processing doc request from %s", peerID)
+		docResponse := p.handleGetDocRequest(msg.Payload)
 		response = models.P2PMessage{
-			Type:    models.MessageTypeGetNoteResp,
-			Payload: noteResponse,
+			Type:    models.MessageTypeGetDocResp,
+			Payload: docResponse,
 		}
 
 	default:
@@ -855,23 +855,23 @@ func (p *P2PService) startPeerDataRetry() {
 func (p *P2PService) checkAndRetryMissingPeerData() {
 	p.peerInfoMutex.RLock()
 	var peersToRetry []peer.ID
-	
+
 	for peerID, peerInfo := range p.connectedPeers {
 		// Skip if peer is not validated or not connected
 		if !peerInfo.IsValidated || p.host.Network().Connectedness(peerID) != network.Connected {
 			continue
 		}
-		
+
 		// Check if peer has missing name or avatar
 		if (peerInfo.Name == "" || peerInfo.Name == "unknown") || !peerInfo.HasAvatar {
 			peersToRetry = append(peersToRetry, peerID)
 		}
 	}
 	p.peerInfoMutex.RUnlock()
-	
+
 	if len(peersToRetry) > 0 {
 		log.Printf("🔄 Found %d peers with missing data, scheduling retries", len(peersToRetry))
-		
+
 		// Retry data exchange for each peer
 		for _, peerID := range peersToRetry {
 			go p.retryPeerDataExchange(peerID)
@@ -1080,7 +1080,7 @@ func (p *P2PService) storePeerInfo(peerID peer.ID, connectionType string) {
 		if connectionType != "" && peerInfo.ConnectionType == "" {
 			peerInfo.ConnectionType = connectionType
 		}
-		
+
 		// Update address if we have a new one (handle case where peer reconnects from different address)
 		if address != "" {
 			peerInfo.Addresses = []string{address}
@@ -1640,62 +1640,62 @@ func (p *P2PService) ConnectToSecondDegreePeer(targetPeerID, viaPeerID string) (
 	return nil, fmt.Errorf("no valid addresses to connect to")
 }
 
-// handleGetNotesRequest handles P2P request for notes list
-func (p *P2PService) handleGetNotesRequest() *models.NotesResponse {
+// handleGetDocsRequest handles P2P request for docs list
+func (p *P2PService) handleGetDocsRequest() *models.DocsResponse {
 	if p.container == nil || p.container.GetDirectoryService() == nil {
-		return &models.NotesResponse{
-			Notes: []models.Note{},
+		return &models.DocsResponse{
+			Docs:  []models.Doc{},
 			Count: 0,
 		}
 	}
 
-	notes, err := p.container.GetDirectoryService().GetNotes()
+	docs, err := p.container.GetDirectoryService().GetDocs()
 	if err != nil {
-		log.Printf("Failed to get notes for P2P request: %v", err)
-		return &models.NotesResponse{
-			Notes: []models.Note{},
+		log.Printf("Failed to get docs for P2P request: %v", err)
+		return &models.DocsResponse{
+			Docs:  []models.Doc{},
 			Count: 0,
 		}
 	}
 
-	return &models.NotesResponse{
-		Notes: notes,
-		Count: len(notes),
+	return &models.DocsResponse{
+		Docs:  docs,
+		Count: len(docs),
 	}
 }
 
-// handleGetNoteRequest handles P2P request for specific note
-func (p *P2PService) handleGetNoteRequest(payload interface{}) *models.NoteResponse {
+// handleGetDocRequest handles P2P request for specific doc
+func (p *P2PService) handleGetDocRequest(payload interface{}) *models.DocResponse {
 	if p.container == nil || p.container.GetDirectoryService() == nil {
-		return &models.NoteResponse{
-			Note: nil,
+		return &models.DocResponse{
+			Doc: nil,
 		}
 	}
 
 	// Parse the request payload
 	requestData, err := json.Marshal(payload)
 	if err != nil {
-		log.Printf("Failed to marshal note request payload: %v", err)
-		return &models.NoteResponse{Note: nil}
+		log.Printf("Failed to marshal doc request payload: %v", err)
+		return &models.DocResponse{Doc: nil}
 	}
 
-	var noteRequest models.NoteRequest
-	if err := json.Unmarshal(requestData, &noteRequest); err != nil {
-		log.Printf("Failed to parse note request: %v", err)
-		return &models.NoteResponse{Note: nil}
+	var docRequest models.DocRequest
+	if err := json.Unmarshal(requestData, &docRequest); err != nil {
+		log.Printf("Failed to parse doc request: %v", err)
+		return &models.DocResponse{Doc: nil}
 	}
 
-	note, err := p.container.GetDirectoryService().GetNote(noteRequest.Filename)
+	doc, err := p.container.GetDirectoryService().GetDoc(docRequest.Filename)
 	if err != nil {
-		log.Printf("Failed to get note %s for P2P request: %v", noteRequest.Filename, err)
-		return &models.NoteResponse{Note: nil}
+		log.Printf("Failed to get doc %s for P2P request: %v", docRequest.Filename, err)
+		return &models.DocResponse{Doc: nil}
 	}
 
-	return &models.NoteResponse{Note: note}
+	return &models.DocResponse{Doc: doc}
 }
 
-// RequestPeerNotes requests notes list from a peer
-func (p *P2PService) RequestPeerNotes(peerID string) (*models.NotesResponse, error) {
+// RequestPeerDocs requests docs list from a peer
+func (p *P2PService) RequestPeerDocs(peerID string) (*models.DocsResponse, error) {
 	peer, err := peer.Decode(peerID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid peer ID: %w", err)
@@ -1710,15 +1710,15 @@ func (p *P2PService) RequestPeerNotes(peerID string) (*models.NotesResponse, err
 	}
 	defer stream.Close()
 
-	// Send notes request
+	// Send docs request
 	msg := models.P2PMessage{
-		Type:    models.MessageTypeGetNotes,
-		Payload: models.NotesRequest{},
+		Type:    models.MessageTypeGetDocs,
+		Payload: models.DocsRequest{},
 	}
 
 	encoder := json.NewEncoder(stream)
 	if err := encoder.Encode(msg); err != nil {
-		return nil, fmt.Errorf("failed to send notes request: %w", err)
+		return nil, fmt.Errorf("failed to send docs request: %w", err)
 	}
 
 	// Read response
@@ -1728,7 +1728,7 @@ func (p *P2PService) RequestPeerNotes(peerID string) (*models.NotesResponse, err
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	if response.Type != models.MessageTypeGetNotesResp {
+	if response.Type != models.MessageTypeGetDocsResp {
 		return nil, fmt.Errorf("unexpected response type: %s", response.Type)
 	}
 
@@ -1738,16 +1738,16 @@ func (p *P2PService) RequestPeerNotes(peerID string) (*models.NotesResponse, err
 		return nil, fmt.Errorf("failed to marshal response payload: %w", err)
 	}
 
-	var notesResponse models.NotesResponse
-	if err := json.Unmarshal(responseData, &notesResponse); err != nil {
-		return nil, fmt.Errorf("failed to parse notes response: %w", err)
+	var docsResponse models.DocsResponse
+	if err := json.Unmarshal(responseData, &docsResponse); err != nil {
+		return nil, fmt.Errorf("failed to parse docs response: %w", err)
 	}
 
-	return &notesResponse, nil
+	return &docsResponse, nil
 }
 
-// RequestPeerNote requests a specific note from a peer
-func (p *P2PService) RequestPeerNote(peerID, filename string) (*models.NoteResponse, error) {
+// RequestPeerDoc requests a specific doc from a peer
+func (p *P2PService) RequestPeerDoc(peerID, filename string) (*models.DocResponse, error) {
 	peer, err := peer.Decode(peerID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid peer ID: %w", err)
@@ -1762,17 +1762,17 @@ func (p *P2PService) RequestPeerNote(peerID, filename string) (*models.NoteRespo
 	}
 	defer stream.Close()
 
-	// Send note request
+	// Send doc request
 	msg := models.P2PMessage{
-		Type: models.MessageTypeGetNote,
-		Payload: models.NoteRequest{
+		Type: models.MessageTypeGetDoc,
+		Payload: models.DocRequest{
 			Filename: filename,
 		},
 	}
 
 	encoder := json.NewEncoder(stream)
 	if err := encoder.Encode(msg); err != nil {
-		return nil, fmt.Errorf("failed to send note request: %w", err)
+		return nil, fmt.Errorf("failed to send doc request: %w", err)
 	}
 
 	// Read response
@@ -1782,7 +1782,7 @@ func (p *P2PService) RequestPeerNote(peerID, filename string) (*models.NoteRespo
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	if response.Type != models.MessageTypeGetNoteResp {
+	if response.Type != models.MessageTypeGetDocResp {
 		return nil, fmt.Errorf("unexpected response type: %s", response.Type)
 	}
 
@@ -1792,12 +1792,12 @@ func (p *P2PService) RequestPeerNote(peerID, filename string) (*models.NoteRespo
 		return nil, fmt.Errorf("failed to marshal response payload: %w", err)
 	}
 
-	var noteResponse models.NoteResponse
-	if err := json.Unmarshal(responseData, &noteResponse); err != nil {
-		return nil, fmt.Errorf("failed to parse note response: %w", err)
+	var docResponse models.DocResponse
+	if err := json.Unmarshal(responseData, &docResponse); err != nil {
+		return nil, fmt.Errorf("failed to parse doc response: %w", err)
 	}
 
-	return &noteResponse, nil
+	return &docResponse, nil
 }
 
 // getNodeInfo creates a NodeInfoResponse for P2P communication
