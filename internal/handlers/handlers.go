@@ -891,7 +891,7 @@ func (h *Handler) HandleFriendProfilePage(w http.ResponseWriter, r *http.Request
 		PageTitle:   "Friend Profile",
 		CurrentPage: "friends", // Keep friends nav active
 	}
-	h.templateService.RenderPage(w, "friend-profile", data)
+	h.templateService.RenderPage(w, "profile", data)
 }
 
 // RegisterRoutes registers all HTTP routes

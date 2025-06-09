@@ -1,4 +1,9 @@
 {{define "content"}}
+<!-- Back Button (only for friend profiles) -->
+<div id="backButtonSection" class="section" style="padding: 10px 15px; display: none;">
+    <button class="button" onclick="goBack()">← Back to Friends</button>
+</div>
+
 <!-- Profile Header -->
 <div class="header profile-header">
     <div id="profileAvatar" class="profile-avatar" onclick="sharedApp.openAvatarGallery()">
@@ -6,11 +11,21 @@
     </div>
     <h1 id="profileName" class="profile-name">Loading...</h1>
     <p id="profileId" class="profile-id">Peer ID: ...</p>
+    <div id="friendStatus" class="status" style="display: none;"></div>
 </div>
 
-<!-- Tab Navigation -->
+<!-- Content Section -->
 <div class="section">
-    <div class="tab-navigation">
+    <!-- Download Button (only for friend profiles) -->
+    <div id="downloadSection" style="display: none; margin-bottom: 15px; text-align: center;">
+        <button class="button" id="downloadContentBtn" onclick="downloadAllContent()" style="background-color: #28a745;">
+            📥 Download All Content
+        </button>
+        <div id="downloadStatus" class="status" style="display: none;"></div>
+    </div>
+
+    <!-- Tab Navigation (only for own profile) -->
+    <div id="tabNavigation" class="tab-navigation">
         <button class="tab-button active" onclick="switchTab('docs')">📝 Docs</button>
         <button class="tab-button" onclick="switchTab('photos')">📷 Photos</button>
     </div>
@@ -26,7 +41,7 @@
         </div>
     </div>
 
-    <!-- Photos Tab Content -->
+    <!-- Photos Tab Content (only for own profile) -->
     <div id="photosTab" class="tab-content">
         <div id="photosStatus" class="status" style="display: none;"></div>
         <div id="photosContent">

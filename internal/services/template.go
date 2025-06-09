@@ -46,7 +46,7 @@ func (ts *TemplateService) loadTemplates(templateDir string) error {
 	modalsPath := filepath.Join(templateDir, "components", "modals.html")
 	
 	// Page templates
-	pages := []string{"network", "profile", "friends", "friend-profile"}
+	pages := []string{"network", "profile", "friends"}
 	
 	for _, page := range pages {
 		pagePath := filepath.Join(templateDir, "pages", page+".html")
