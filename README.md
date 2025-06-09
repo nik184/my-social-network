@@ -99,7 +99,6 @@ The application exposes a REST API on port 6996:
 
 - `GET /api/info` - Get current node and folder information
 - `POST /api/create` - Create the space184 directory
-- `POST /api/scan` - Manually trigger directory scan
 - `POST /api/discover` - Discover a peer (requires peer ID in JSON body)
 - `GET /api/peers` - Get list of connected peers
 - `GET /api/monitor` - Get file monitoring status and last scan time

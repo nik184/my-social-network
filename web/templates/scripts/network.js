@@ -16,17 +16,6 @@ async function createDirectory() {
     }
 }
 
-async function scanDirectory() {
-    try {
-        const response = await fetch('/api/scan', { method: 'POST' });
-        const data = await response.json();
-        sharedApp.showStatus('directoryStatus', 'Manual scan completed successfully!');
-        getNodeInfo(); // Refresh the info
-    } catch (error) {
-        sharedApp.showStatus('directoryStatus', 'Error scanning directory: ' + error.message, true);
-    }
-}
-
 async function getMonitorStatus() {
     try {
         const response = await fetch('/api/monitor');

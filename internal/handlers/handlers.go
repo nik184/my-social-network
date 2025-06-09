@@ -33,29 +33,6 @@ func (h *Handler) HandleGetInfo(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(h.appService.GetNodeInfo())
 }
 
-// HandleScan handles POST /api/scan requests
-func (h *Handler) HandleScan(w http.ResponseWriter, r *http.Request) {
-	// Use the monitor service for manual scan if available
-	if h.appService.GetMonitorService() != nil {
-		err := h.appService.GetMonitorService().TriggerManualScan()
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	} else {
-		// Fallback to direct scan
-		folderInfo, err := h.appService.GetDirectoryService().ScanDirectory()
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		h.appService.SetFolderInfo(folderInfo)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(models.StatusResponse{Status: "success"})
-}
-
 // HandleCreate handles POST /api/create requests
 func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	if err := h.appService.GetDirectoryService().CreateDirectory(); err != nil {
@@ -556,7 +533,7 @@ func (h *Handler) HandlePeerDocs(w http.ResponseWriter, r *http.Request) {
 		h.HandleDownloadPeerContent(w, r)
 		return
 	}
-	
+
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -658,7 +635,7 @@ func (h *Handler) downloadAndSavePeerContent(peerID string, docs []models.Doc) (
 	// Create directories
 	docsDir := pathManager.GetPeerDocsPath(peerID)
 	imagesDir := pathManager.GetPeerImagesPath(peerID)
-	
+
 	// Import utils package for EnsureDir function
 	if err := h.ensureDirectories(docsDir, imagesDir); err != nil {
 		return nil, fmt.Errorf("failed to create directories: %v", err)
@@ -668,8 +645,8 @@ func (h *Handler) downloadAndSavePeerContent(peerID string, docs []models.Doc) (
 		"peer_id":           peerID,
 		"docs_downloaded":   0,
 		"images_downloaded": 0,
-		"errors":           []string{},
-		"successful_files": []string{},
+		"errors":            []string{},
+		"successful_files":  []string{},
 	}
 
 	// Download each document
@@ -691,7 +668,7 @@ func (h *Handler) downloadAndSavePeerContent(peerID string, docs []models.Doc) (
 		// Determine file type and save to appropriate directory
 		var saveDir string
 		var statKey string
-		
+
 		if h.isImageFile(doc.Filename) {
 			saveDir = imagesDir
 			statKey = "images_downloaded"
@@ -931,7 +908,7 @@ func (h *Handler) HandleUploadDocs(w http.ResponseWriter, r *http.Request) {
 
 	// Get base docs directory
 	baseDocsDir := filepath.Join(h.appService.GetDirectoryService().GetDirectoryPath(), "docs")
-	
+
 	// Create target directory
 	targetDir := baseDocsDir
 	if subdirectory != "" {
@@ -1032,7 +1009,7 @@ func (h *Handler) HandleUploadPhotos(w http.ResponseWriter, r *http.Request) {
 
 	// Get base images directory
 	baseImagesDir := filepath.Join(h.appService.GetDirectoryService().GetDirectoryPath(), "images")
-	
+
 	// Create target directory
 	targetDir := baseImagesDir
 	if subdirectory != "" {
@@ -1132,7 +1109,6 @@ func (h *Handler) RegisterRoutes() {
 
 	// API routes
 	http.HandleFunc("/api/info", h.HandleGetInfo)
-	http.HandleFunc("/api/scan", h.HandleScan)
 	http.HandleFunc("/api/create", h.HandleCreate)
 	http.HandleFunc("/api/discover", h.HandleDiscover)
 	http.HandleFunc("/api/peers", h.HandlePeers)
@@ -1152,7 +1128,7 @@ func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/api/peer-docs/", h.HandlePeerDocs)
 	http.HandleFunc("/api/galleries", h.HandleGalleries)
 	http.HandleFunc("/api/galleries/", h.HandleGalleryImage)
-	
+
 	// Upload routes
 	http.HandleFunc("/api/upload/docs", h.HandleUploadDocs)
 	http.HandleFunc("/api/upload/photos", h.HandleUploadPhotos)

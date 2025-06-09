@@ -40,11 +40,6 @@ func NewSQLiteRepository(dbPath string) (*SQLiteRepository, error) {
 		return nil, utils.WrapDatabaseError("initialize_tables", err)
 	}
 
-	if err := repo.migrateTables(); err != nil {
-		db.Close()
-		return nil, utils.WrapDatabaseError("migrate_tables", err)
-	}
-
 	if err := repo.initializeDefaultSettings(); err != nil {
 		db.Close()
 		return nil, utils.WrapDatabaseError("initialize_settings", err)
@@ -77,7 +72,7 @@ func (r *SQLiteRepository) initializeTables() error {
 
 func (r *SQLiteRepository) getSettingsTableSQL() string {
 	return `CREATE TABLE IF NOT EXISTS settings (
-		key TEXT PRIMARY KEY,
+		key VARCHAR(255) PRIMARY KEY,
 		value TEXT NOT NULL
 	);`
 }
@@ -85,21 +80,21 @@ func (r *SQLiteRepository) getSettingsTableSQL() string {
 func (r *SQLiteRepository) getConnectionsTableSQL() string {
 	return `CREATE TABLE IF NOT EXISTS connections (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		peer_id TEXT NOT NULL UNIQUE,
-		address TEXT NOT NULL,
+		peer_id VARCHAR(255) NOT NULL UNIQUE,
+		address VARCHAR(255) NOT NULL,
 		first_connected DATETIME NOT NULL,
 		last_connected DATETIME NOT NULL,
-		connection_type TEXT NOT NULL,
+		connection_type VARCHAR(255) NOT NULL,
 		is_validated BOOLEAN NOT NULL DEFAULT 0,
-		peer_name TEXT DEFAULT ''
+		peer_name VARCHAR(255) DEFAULT ''
 	);`
 }
 
 func (r *SQLiteRepository) getFriendsTableSQL() string {
 	return `CREATE TABLE IF NOT EXISTS friends (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		peer_id TEXT NOT NULL UNIQUE,
-		peer_name TEXT NOT NULL,
+		peer_id VARCHAR(255) NOT NULL UNIQUE,
+		peer_name VARCHAR(255) NOT NULL,
 		added_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		last_seen DATETIME,
 		is_online BOOLEAN NOT NULL DEFAULT 0
@@ -109,47 +104,13 @@ func (r *SQLiteRepository) getFriendsTableSQL() string {
 func (r *SQLiteRepository) getFilesTableSQL() string {
 	return `CREATE TABLE IF NOT EXISTS files (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		filepath TEXT NOT NULL UNIQUE,
-		hash TEXT NOT NULL,
+		filepath VARCHAR(255) NOT NULL UNIQUE,
+		hash VARCHAR(255) NOT NULL,
 		size INTEGER NOT NULL,
-		extension TEXT NOT NULL,
-		type TEXT NOT NULL,
+		extension VARCHAR(255) NOT NULL,
+		type VARCHAR(255) NOT NULL,
 		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);`
-}
-
-// migrateTables handles database schema migrations
-func (r *SQLiteRepository) migrateTables() error {
-	// Check if peer_name column exists in connections table
-	rows, err := r.db.Query("PRAGMA table_info(connections)")
-	if err != nil {
-		return fmt.Errorf("failed to get table info: %w", err)
-	}
-	defer rows.Close()
-
-	var hasNameColumn bool
-	for rows.Next() {
-		var cid int
-		var name, dataType, notNull, defaultValue, pk interface{}
-		if err := rows.Scan(&cid, &name, &dataType, &notNull, &defaultValue, &pk); err != nil {
-			return fmt.Errorf("failed to scan column info: %w", err)
-		}
-		if nameStr, ok := name.(string); ok && nameStr == "peer_name" {
-			hasNameColumn = true
-			break
-		}
-	}
-
-	// Add peer_name column if it doesn't exist
-	if !hasNameColumn {
-		_, err := r.db.Exec("ALTER TABLE connections ADD COLUMN peer_name TEXT DEFAULT ''")
-		if err != nil {
-			return fmt.Errorf("failed to add peer_name column: %w", err)
-		}
-		log.Printf("📈 Database migrated: added peer_name column to connections table")
-	}
-
-	return nil
 }
 
 // initializeDefaultSettings creates default settings if they don't exist
