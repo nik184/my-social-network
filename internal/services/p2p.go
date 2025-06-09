@@ -683,6 +683,15 @@ func (p *P2PService) handleStream(stream network.Stream) {
 			Payload: docResponse,
 		}
 
+	case models.MessageTypeGetFiles:
+		// Handle files table request
+		log.Printf("📁 Processing files table request from %s", peerID)
+		filesResponse := p.handleGetFilesRequest()
+		response = models.P2PMessage{
+			Type:    models.MessageTypeGetFilesResp,
+			Payload: filesResponse,
+		}
+
 	default:
 		log.Printf("Unknown message type: %s", msg.Type)
 		return
@@ -1694,6 +1703,42 @@ func (p *P2PService) handleGetDocRequest(payload interface{}) *models.DocRespons
 	return &models.DocResponse{Doc: doc}
 }
 
+// handleGetFilesRequest handles P2P request for files table
+func (p *P2PService) handleGetFilesRequest() *models.FilesResponse {
+	if p.container == nil || p.container.GetDatabase() == nil {
+		return &models.FilesResponse{
+			Files:  []models.FileRecord{},
+			PeerID: p.GetNode().ID.String(),
+			Count:  0,
+		}
+	}
+
+	files, err := p.container.GetDatabase().GetFiles()
+	if err != nil {
+		log.Printf("Failed to get files for P2P request: %v", err)
+		return &models.FilesResponse{
+			Files:  []models.FileRecord{},
+			PeerID: p.GetNode().ID.String(),
+			Count:  0,
+		}
+	}
+
+	// Filter to only return files owned by this peer
+	var ownFiles []models.FileRecord
+	myPeerID := p.GetNode().ID.String()
+	for _, file := range files {
+		if file.PeerID == myPeerID {
+			ownFiles = append(ownFiles, file)
+		}
+	}
+
+	return &models.FilesResponse{
+		Files:  ownFiles,
+		PeerID: myPeerID,
+		Count:  len(ownFiles),
+	}
+}
+
 // RequestPeerDocs requests docs list from a peer
 func (p *P2PService) RequestPeerDocs(peerID string) (*models.DocsResponse, error) {
 	peer, err := peer.Decode(peerID)
@@ -1744,6 +1789,58 @@ func (p *P2PService) RequestPeerDocs(peerID string) (*models.DocsResponse, error
 	}
 
 	return &docsResponse, nil
+}
+
+// RequestPeerFiles requests files table from a peer
+func (p *P2PService) RequestPeerFiles(peerID string) (*models.FilesResponse, error) {
+	peer, err := peer.Decode(peerID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid peer ID: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(p.ctx, 10*time.Second)
+	defer cancel()
+
+	stream, err := p.host.NewStream(ctx, peer, protocol.ID(AppProtocol))
+	if err != nil {
+		return nil, fmt.Errorf("failed to open stream: %w", err)
+	}
+	defer stream.Close()
+
+	// Send files request
+	msg := models.P2PMessage{
+		Type:    models.MessageTypeGetFiles,
+		Payload: models.FilesRequest{},
+	}
+
+	encoder := json.NewEncoder(stream)
+	if err := encoder.Encode(msg); err != nil {
+		return nil, fmt.Errorf("failed to send files request: %w", err)
+	}
+
+	// Read response
+	decoder := json.NewDecoder(stream)
+	var response models.P2PMessage
+	if err := decoder.Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if response.Type != models.MessageTypeGetFilesResp {
+		return nil, fmt.Errorf("unexpected response type: %s", response.Type)
+	}
+
+	// Parse response payload
+	responseData, err := json.Marshal(response.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal response payload: %w", err)
+	}
+
+	var filesResponse models.FilesResponse
+	if err := json.Unmarshal(responseData, &filesResponse); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal files response: %w", err)
+	}
+
+	return &filesResponse, nil
 }
 
 // RequestPeerDoc requests a specific doc from a peer

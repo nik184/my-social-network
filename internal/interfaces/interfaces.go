@@ -32,7 +32,7 @@ type FriendsRepository interface {
 
 type FilesRepository interface {
 	FileExists(filePath string) (bool, string, error)
-	UpsertFileRecord(filePath, hash string, size int64, extension, fileType string) error
+	UpsertFileRecord(filePath, hash string, size int64, extension, fileType, peerID string) error
 	GetFiles() ([]models.FileRecord, error)
 	DeleteFileRecord(fileID int) error
 }

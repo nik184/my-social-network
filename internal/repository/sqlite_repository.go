@@ -104,12 +104,14 @@ func (r *SQLiteRepository) getFriendsTableSQL() string {
 func (r *SQLiteRepository) getFilesTableSQL() string {
 	return `CREATE TABLE IF NOT EXISTS files (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		filepath VARCHAR(255) NOT NULL UNIQUE,
+		filepath VARCHAR(255) NOT NULL,
 		hash VARCHAR(255) NOT NULL,
 		size INTEGER NOT NULL,
 		extension VARCHAR(255) NOT NULL,
 		type VARCHAR(255) NOT NULL,
-		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		peer_id VARCHAR(255) NOT NULL,
+		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(filepath, peer_id)
 	);`
 }
 
@@ -411,11 +413,11 @@ func (r *SQLiteRepository) FileExists(filePath string) (bool, string, error) {
 	return true, hash, nil
 }
 
-func (r *SQLiteRepository) UpsertFileRecord(filePath, hash string, size int64, extension, fileType string) error {
+func (r *SQLiteRepository) UpsertFileRecord(filePath, hash string, size int64, extension, fileType, peerID string) error {
 	_, err := r.db.Exec(`
-		INSERT OR REPLACE INTO files (filepath, hash, size, extension, type, updated_at)
-		VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-	`, filePath, hash, size, extension, fileType)
+		INSERT OR REPLACE INTO files (filepath, hash, size, extension, type, peer_id, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+	`, filePath, hash, size, extension, fileType, peerID)
 
 	if err != nil {
 		return utils.WrapDatabaseError("upsert_file_record", err)
@@ -425,7 +427,7 @@ func (r *SQLiteRepository) UpsertFileRecord(filePath, hash string, size int64, e
 
 func (r *SQLiteRepository) GetFiles() ([]models.FileRecord, error) {
 	rows, err := r.db.Query(`
-		SELECT id, filepath, hash, size, extension, type, updated_at
+		SELECT id, filepath, hash, size, extension, type, peer_id, updated_at
 		FROM files
 		ORDER BY updated_at DESC
 	`)
@@ -439,7 +441,7 @@ func (r *SQLiteRepository) GetFiles() ([]models.FileRecord, error) {
 		var file models.FileRecord
 		err := rows.Scan(
 			&file.ID, &file.FilePath, &file.Hash,
-			&file.Size, &file.Extension, &file.Type, &file.UpdatedAt,
+			&file.Size, &file.Extension, &file.Type, &file.PeerID, &file.UpdatedAt,
 		)
 		if err != nil {
 			return nil, utils.WrapDatabaseError("scan_file", err)

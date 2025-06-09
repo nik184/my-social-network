@@ -51,6 +51,7 @@ type FileRecord struct {
 	Size      int64     `json:"size"`
 	Extension string    `json:"extension"`
 	Type      string    `json:"type"`
+	PeerID    string    `json:"peer_id"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
@@ -186,6 +187,19 @@ type AddFriendRequest struct {
 	PeerName string `json:"peer_name"`
 }
 
+// FilesRequest represents a request for files table
+type FilesRequest struct {
+	RequestID string `json:"request_id"`
+}
+
+// FilesResponse represents a response with files table data
+type FilesResponse struct {
+	RequestID string       `json:"request_id"`
+	Files     []FileRecord `json:"files"`
+	PeerID    string       `json:"peer_id"`
+	Count     int          `json:"count"`
+}
+
 // DocsRequest represents a P2P request for docs list
 type DocsRequest struct {
 	// Currently no additional fields needed
@@ -221,4 +235,6 @@ const (
 	MessageTypeGetDocsResp     = "getDocsResp"
 	MessageTypeGetDoc          = "getDoc"
 	MessageTypeGetDocResp      = "getDocResp"
+	MessageTypeGetFiles        = "getFiles"
+	MessageTypeGetFilesResp    = "getFilesResp"
 )

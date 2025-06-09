@@ -1098,6 +1098,45 @@ func (h *Handler) isValidImageFile(filename string) bool {
 	return false
 }
 
+// HandleSyncFriendFiles handles POST /api/sync-friend-files requests
+func (h *Handler) HandleSyncFriendFiles(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	friendService := h.appService.GetFriendService()
+	if friendService == nil {
+		http.Error(w, "Friend service not available", http.StatusInternalServerError)
+		return
+	}
+
+	// Check if specific peer ID is provided
+	peerID := r.URL.Query().Get("peer_id")
+	
+	var err error
+	if peerID != "" {
+		// Sync specific friend
+		err = friendService.SyncSpecificFriendFiles(peerID)
+	} else {
+		// Sync all friends
+		err = friendService.SyncFriendFilesMetadata()
+	}
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"success": true,
+		"message": "Files metadata sync completed successfully",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
 // RegisterRoutes registers all HTTP routes
 func (h *Handler) RegisterRoutes() {
 	// Page routes
@@ -1132,4 +1171,7 @@ func (h *Handler) RegisterRoutes() {
 	// Upload routes
 	http.HandleFunc("/api/upload/docs", h.HandleUploadDocs)
 	http.HandleFunc("/api/upload/photos", h.HandleUploadPhotos)
+	
+	// Files sync routes
+	http.HandleFunc("/api/sync-friend-files", h.HandleSyncFriendFiles)
 }

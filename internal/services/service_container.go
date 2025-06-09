@@ -70,6 +70,16 @@ func (sc *ServiceContainer) initializeServices() error {
 		return fmt.Errorf("failed to create P2P service: %w", err)
 	}
 
+	// Set peer ID function for file scanner after P2P service is available
+	if fileScanner, ok := sc.fileSystemService.(*FileScannerService); ok {
+		fileScanner.SetPeerIDFunc(func() string {
+			if sc.p2pService != nil {
+				return sc.p2pService.GetNode().ID.String()
+			}
+			return "unknown"
+		})
+	}
+
 	// Initialize Friend service
 	sc.friendService = NewFriendService(database, sc.p2pService)
 
@@ -105,6 +115,12 @@ func (sc *ServiceContainer) PerformStartupTasks() error {
 	// Attempt to reconnect to friends
 	if sc.friendService != nil {
 		sc.friendService.AttemptReconnectToAllFriends()
+		
+		// Sync friends' files metadata after reconnection
+		log.Printf("📁 Starting friend files metadata sync...")
+		if err := sc.friendService.SyncFriendFilesMetadata(); err != nil {
+			log.Printf("⚠️ Warning: failed to sync friend files metadata: %v", err)
+		}
 	}
 
 	log.Printf("✅ Startup tasks completed")

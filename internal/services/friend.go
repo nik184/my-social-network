@@ -224,3 +224,136 @@ func (fs *FriendService) GetFriendsConnectionStatus() ([]models.Friend, error) {
 
 	return friends, nil
 }
+
+// SyncFriendFilesMetadata requests and stores friends' files table data
+func (fs *FriendService) SyncFriendFilesMetadata() error {
+	if fs.database == nil || fs.p2pService == nil {
+		return fmt.Errorf("database or P2P service not available")
+	}
+
+	log.Printf("📁 Starting friend files metadata sync...")
+
+	// Get friends list
+	friends, err := fs.database.GetFriends()
+	if err != nil {
+		return fmt.Errorf("failed to get friends list: %w", err)
+	}
+
+	if len(friends) == 0 {
+		log.Printf("📭 No friends found for files sync")
+		return nil
+	}
+
+	log.Printf("👥 Syncing files metadata from %d friend(s)", len(friends))
+
+	successCount := 0
+	errorCount := 0
+
+	for _, friend := range friends {
+		log.Printf("📁 Requesting files metadata from friend %s (%s)", friend.PeerName, friend.PeerID)
+
+		// Request friend's files table
+		filesResponse, err := fs.p2pService.RequestPeerFiles(friend.PeerID)
+		if err != nil {
+			log.Printf("❌ Failed to get files from friend %s: %v", friend.PeerName, err)
+			errorCount++
+			continue
+		}
+
+		if filesResponse == nil || len(filesResponse.Files) == 0 {
+			log.Printf("📭 No files found for friend %s", friend.PeerName)
+			continue
+		}
+
+		// Store friend's files metadata in our database
+		storedCount := 0
+		for _, file := range filesResponse.Files {
+			// The file already has the correct peer_id from the friend's response
+			err := fs.database.UpsertFileRecord(
+				file.FilePath, 
+				file.Hash, 
+				file.Size, 
+				file.Extension, 
+				file.Type, 
+				file.PeerID, // This will be the friend's peer ID
+			)
+			if err != nil {
+				log.Printf("⚠️ Failed to store file record %s from friend %s: %v", file.FilePath, friend.PeerName, err)
+				continue
+			}
+			storedCount++
+		}
+
+		log.Printf("✅ Stored %d files metadata from friend %s", storedCount, friend.PeerName)
+		successCount++
+
+		// Add a small delay between requests to avoid overwhelming friends
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	log.Printf("✅ Friend files metadata sync completed: %d/%d friends successful", successCount, len(friends))
+	if errorCount > 0 {
+		log.Printf("⚠️ %d friends had errors during sync", errorCount)
+	}
+
+	return nil
+}
+
+// SyncSpecificFriendFiles syncs files metadata from a specific friend
+func (fs *FriendService) SyncSpecificFriendFiles(peerID string) error {
+	if fs.database == nil || fs.p2pService == nil {
+		return fmt.Errorf("database or P2P service not available")
+	}
+
+	// Get friend info
+	friends, err := fs.database.GetFriends()
+	if err != nil {
+		return fmt.Errorf("failed to get friends list: %w", err)
+	}
+
+	var targetFriend *models.Friend
+	for _, friend := range friends {
+		if friend.PeerID == peerID {
+			targetFriend = &friend
+			break
+		}
+	}
+
+	if targetFriend == nil {
+		return fmt.Errorf("friend with peer ID %s not found", peerID)
+	}
+
+	log.Printf("📁 Syncing files metadata from friend %s (%s)", targetFriend.PeerName, peerID)
+
+	// Request friend's files table
+	filesResponse, err := fs.p2pService.RequestPeerFiles(peerID)
+	if err != nil {
+		return fmt.Errorf("failed to get files from friend %s: %w", targetFriend.PeerName, err)
+	}
+
+	if filesResponse == nil || len(filesResponse.Files) == 0 {
+		log.Printf("📭 No files found for friend %s", targetFriend.PeerName)
+		return nil
+	}
+
+	// Store friend's files metadata in our database
+	storedCount := 0
+	for _, file := range filesResponse.Files {
+		err := fs.database.UpsertFileRecord(
+			file.FilePath,
+			file.Hash,
+			file.Size,
+			file.Extension,
+			file.Type,
+			file.PeerID, // This will be the friend's peer ID
+		)
+		if err != nil {
+			log.Printf("⚠️ Failed to store file record %s from friend %s: %v", file.FilePath, targetFriend.PeerName, err)
+			continue
+		}
+		storedCount++
+	}
+
+	log.Printf("✅ Stored %d files metadata from friend %s", storedCount, targetFriend.PeerName)
+	return nil
+}

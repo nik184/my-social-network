@@ -13,18 +13,25 @@ import (
 
 // FileScannerService handles file system scanning and hash computation
 type FileScannerService struct {
-	filesRepo   interfaces.FilesRepository
-	hashService *utils.HashService
-	pathManager *utils.PathManager
+	filesRepo     interfaces.FilesRepository
+	hashService   *utils.HashService
+	pathManager   *utils.PathManager
+	getPeerIDFunc func() string
 }
 
 // NewFileScannerService creates a new file scanner service
 func NewFileScannerService(filesRepo interfaces.FilesRepository) *FileScannerService {
 	return &FileScannerService{
-		filesRepo:   filesRepo,
-		hashService: utils.DefaultHashService,
-		pathManager: utils.DefaultPathManager,
+		filesRepo:     filesRepo,
+		hashService:   utils.DefaultHashService,
+		pathManager:   utils.DefaultPathManager,
+		getPeerIDFunc: func() string { return "unknown" }, // Default placeholder
 	}
+}
+
+// SetPeerIDFunc sets the function to get current peer ID
+func (fs *FileScannerService) SetPeerIDFunc(fn func() string) {
+	fs.getPeerIDFunc = fn
 }
 
 // ScanFiles scans the space184/docs and space184/images directories and updates the files table
@@ -106,8 +113,11 @@ func (fs *FileScannerService) processFile(path string, info os.FileInfo, err err
 	// Determine file type using utility
 	fileType := utils.GetFileType(extension)
 
+	// Get current peer ID
+	peerID := fs.getPeerIDFunc()
+	
 	// Insert or update file record
-	if err := fs.filesRepo.UpsertFileRecord(relPath, hash, info.Size(), extension, fileType); err != nil {
+	if err := fs.filesRepo.UpsertFileRecord(relPath, hash, info.Size(), extension, fileType, peerID); err != nil {
 		log.Printf("⚠️ Error upserting file record for %s: %v", relPath, err)
 		return nil
 	}
