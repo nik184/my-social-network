@@ -88,12 +88,26 @@ func TestTwoIsolatedNodesConnection(t *testing.T) {
 	t.Log("⏳ Waiting for nodes to initialize...")
 	time.Sleep(15 * time.Second)
 
-	// Debug: Check container logs
+	// Debug: Check container logs for more details
 	logs, err := nodeA.Logs(ctx)
 	if err == nil {
-		logBytes := make([]byte, 4096)
+		// Read all available logs
+		logBytes := make([]byte, 16384)
 		n, _ := logs.Read(logBytes)
-		t.Logf("Node A logs (%d bytes): %s", n, string(logBytes[:n]))
+		fullLogs := string(logBytes[:n])
+		t.Logf("Node A full logs (%d bytes):\n%s", n, fullLogs)
+
+		// Check if there are any obvious error patterns
+		if strings.Contains(fullLogs, "error") || strings.Contains(fullLogs, "Error") ||
+			strings.Contains(fullLogs, "failed") || strings.Contains(fullLogs, "Failed") {
+			t.Logf("⚠️  Detected potential errors in Node A logs")
+		}
+	}
+
+	// Debug: Check what ports are actually exposed
+	ports, err := nodeA.Ports(ctx)
+	if err == nil {
+		t.Logf("Node A exposed ports: %v", ports)
 	}
 
 	// Get connection information from Node A
@@ -179,6 +193,7 @@ FROM alpine:latest
 RUN apk add --no-cache ca-certificates sqlite
 WORKDIR /app
 COPY --from=builder /app/distributed-app .
+COPY --from=builder /app/web ./web
 RUN mkdir -p /app/space184
 EXPOSE 6996 9000-9010
 CMD ["./distributed-app"]

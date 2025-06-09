@@ -35,25 +35,8 @@ func NewWebViewUI(appService *services.AppService, preferredPort int) (*WebViewU
 	
 	log.Printf("🌐 Using port %d for HTTP server (preferred: %d)", availablePort, preferredPort)
 	
-	// Find the project root directory
-	wd, _ := os.Getwd()
-	for {
-		if _, err := os.Stat(filepath.Join(wd, "go.mod")); err == nil {
-			break
-		}
-		parent := filepath.Dir(wd)
-		if parent == wd {
-			log.Fatal("Could not find project root")
-		}
-		wd = parent
-	}
-	
-	// Initialize template service
-	templateDir := filepath.Join(wd, "web", "templates")
-	templateService, err := services.NewTemplateService(templateDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create template service: %w", err)
-	}
+	// Use the existing template service from the app service container (no need to find project root)
+	templateService := appService.GetServiceContainer().GetTemplateService()
 	
 	return &WebViewUI{
 		appService:      appService,
@@ -73,15 +56,22 @@ func (w *WebViewUI) StartServer() {
 	// Register API routes and page handlers
 	w.handler.RegisterRoutes()
 	
-	// Find the project root directory
+	// Find the project root directory or use current working directory
 	wd, _ := os.Getwd()
+	originalWd := wd
+	
+	// Try to find go.mod (for development environment)
 	for {
 		if _, err := os.Stat(filepath.Join(wd, "go.mod")); err == nil {
 			break
 		}
 		parent := filepath.Dir(wd)
 		if parent == wd {
-			log.Fatal("Could not find project root")
+			// Could not find go.mod, fall back to original working directory
+			// This handles container environments where go.mod might not be present
+			wd = originalWd
+			log.Printf("Could not find go.mod, using working directory: %s", wd)
+			break
 		}
 		wd = parent
 	}
