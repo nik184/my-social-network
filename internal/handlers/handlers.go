@@ -1464,6 +1464,118 @@ func (h *Handler) handleDownloadedDocs(w http.ResponseWriter, r *http.Request, p
 	http.Error(w, "Downloaded docs serving not implemented yet", http.StatusNotImplemented)
 }
 
+// HandleDeleteDoc handles DELETE /api/delete/docs/{filename} requests
+func (h *Handler) HandleDeleteDoc(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "DELETE" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract filename from URL path
+	filename := r.URL.Path[len("/api/delete/docs/"):]
+	if filename == "" {
+		http.Error(w, "Filename required", http.StatusBadRequest)
+		return
+	}
+
+	// Validate filename to prevent directory traversal
+	if strings.Contains(filename, "..") || strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
+		http.Error(w, "Invalid filename", http.StatusBadRequest)
+		return
+	}
+
+	// Get docs directory and construct file path
+	docsDir := h.appService.GetDirectoryService().GetDocsDirectory()
+	filePath := filepath.Join(docsDir, filename)
+
+	// Check if file exists
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+
+	// Delete file from filesystem
+	if err := os.Remove(filePath); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to delete file: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Delete record from database
+	relativePath := filepath.Join("docs", filename)
+	if err := h.appService.GetDatabaseService().DeleteFileRecordByPath(relativePath); err != nil {
+		log.Printf("Warning: Failed to delete file record from database: %v", err)
+	}
+
+	log.Printf("🗑️ Deleted document: %s", filename)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":  true,
+		"message":  "Document deleted successfully",
+		"filename": filename,
+	})
+}
+
+// HandleDeleteImage handles DELETE /api/delete/images/{gallery}/{filename} requests
+func (h *Handler) HandleDeleteImage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "DELETE" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse URL path to extract gallery and filename
+	pathParts := strings.Split(r.URL.Path[len("/api/delete/images/"):], "/")
+	if len(pathParts) < 2 || pathParts[0] == "" || pathParts[1] == "" {
+		http.Error(w, "Gallery name and filename required", http.StatusBadRequest)
+		return
+	}
+
+	galleryName := pathParts[0]
+	filename := strings.Join(pathParts[1:], "/") // Join in case filename has slashes
+
+	// Validate gallery name and filename to prevent directory traversal
+	if strings.Contains(galleryName, "..") || strings.Contains(galleryName, "/") || strings.Contains(galleryName, "\\") {
+		http.Error(w, "Invalid gallery name", http.StatusBadRequest)
+		return
+	}
+	if strings.Contains(filename, "..") || strings.Contains(filename, "\\") {
+		http.Error(w, "Invalid filename", http.StatusBadRequest)
+		return
+	}
+
+	// Get images directory and construct file path
+	imagesDir := filepath.Join(h.appService.GetDirectoryService().GetDirectoryPath(), "images")
+	filePath := filepath.Join(imagesDir, galleryName, filename)
+
+	// Check if file exists
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		http.Error(w, "Image not found", http.StatusNotFound)
+		return
+	}
+
+	// Delete file from filesystem
+	if err := os.Remove(filePath); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to delete image: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Delete record from database
+	relativePath := filepath.Join("images", galleryName, filename)
+	if err := h.appService.GetDatabaseService().DeleteFileRecordByPath(relativePath); err != nil {
+		log.Printf("Warning: Failed to delete image record from database: %v", err)
+	}
+
+	log.Printf("🗑️ Deleted image: %s from gallery %s", filename, galleryName)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":  true,
+		"message":  "Image deleted successfully",
+		"filename": filename,
+		"gallery":  galleryName,
+	})
+}
+
 // RegisterRoutes registers all HTTP routes
 func (h *Handler) RegisterRoutes() {
 	// Page routes
@@ -1507,4 +1619,8 @@ func (h *Handler) RegisterRoutes() {
 
 	// Downloaded content routes
 	http.HandleFunc("/api/downloaded/", h.HandleDownloadedContent)
+
+	// Delete routes
+	http.HandleFunc("/api/delete/docs/", h.HandleDeleteDoc)
+	http.HandleFunc("/api/delete/images/", h.HandleDeleteImage)
 }

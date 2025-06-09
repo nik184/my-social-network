@@ -35,6 +35,7 @@ type FilesRepository interface {
 	UpsertFileRecord(filePath, hash string, size int64, extension, fileType, peerID string) error
 	GetFiles() ([]models.FileRecord, error)
 	DeleteFileRecord(fileID int) error
+	DeleteFileRecordByPath(filePath string) error
 }
 
 // Service interfaces for better abstraction

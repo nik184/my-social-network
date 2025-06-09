@@ -295,6 +295,9 @@ async function openDoc(filename) {
         `;
         document.getElementById('docModalContent').textContent = doc.content;
         
+        // Set current doc filename and show kebab menu for own docs
+        sharedApp.setCurrentDocFilename(filename);
+        
         document.getElementById('docModal').style.display = 'block';
     } catch (error) {
         console.error('Error loading doc:', error);
@@ -315,6 +318,9 @@ async function openFriendDoc(peerID, filename) {
             <strong>Size:</strong> ${Math.round(doc.size / 1024 * 100) / 100} KB
         `;
         document.getElementById('docModalContent').textContent = doc.content;
+        
+        // No kebab menu for friend docs - set empty filename
+        sharedApp.setCurrentDocFilename('');
         
         document.getElementById('docModal').style.display = 'block';
     } catch (error) {
@@ -559,7 +565,9 @@ async function openGallery(galleryName) {
             const urlProvider = (imageName) => 
                 `/api/galleries/${encodeURIComponent(galleryName)}/${encodeURIComponent(imageName)}`;
             
-            sharedApp.openImageGallery(images, `${galleryName} Gallery`, 'gallery', urlProvider);
+            // This is own content, so show kebab menu
+            const isOwnContent = !isViewingFriend;
+            sharedApp.openImageGallery(images, `${galleryName} Gallery`, 'gallery', urlProvider, galleryName, isOwnContent);
         } else {
             alert('No images found in this gallery');
         }
@@ -592,7 +600,8 @@ async function openFriendGallery(peerID, galleryName, source = 'live') {
         if (images.length > 0) {
             const friendName = currentFriend ? currentFriend.peer_name : 'Friend';
             const sourceLabel = source === 'downloaded' ? ' (Downloaded)' : ' (Live)';
-            sharedApp.openImageGallery(images, `${friendName}'s ${galleryName} Gallery${sourceLabel}`, 'friend-gallery', urlProvider);
+            // Friend galleries don't get kebab menu (not own content)
+            sharedApp.openImageGallery(images, `${friendName}'s ${galleryName} Gallery${sourceLabel}`, 'friend-gallery', urlProvider, galleryName, false);
         } else {
             alert('No images found in this gallery');
         }

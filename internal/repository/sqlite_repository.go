@@ -460,6 +460,15 @@ func (r *SQLiteRepository) DeleteFileRecord(fileID int) error {
 	return nil
 }
 
+func (r *SQLiteRepository) DeleteFileRecordByPath(filePath string) error {
+	_, err := r.db.Exec("DELETE FROM files WHERE filepath = ?", filePath)
+	if err != nil {
+		return utils.WrapDatabaseError("delete_file_record_by_path", err)
+	}
+	log.Printf("🗑️ Deleted file record from database: %s", filePath)
+	return nil
+}
+
 // Additional methods needed by the current system
 func (r *SQLiteRepository) GetNodePrivateKey() (crypto.PrivKey, error) {
 	privKeyStr, err := r.GetSetting("private_key")

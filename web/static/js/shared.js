@@ -6,6 +6,8 @@ let currentGalleryIndex = 0;
 let galleryType = '';
 let galleryTitle = '';
 let galleryUrlProvider = null;
+let currentGalleryName = '';
+let isOwnContent = false;
 
 // Legacy avatar variables (for backward compatibility)
 let avatarImages = [];
@@ -60,7 +62,7 @@ function updateHeaderAvatar(avatarDisplay) {
 }
 
 // Unified Image Gallery System
-function openImageGallery(images, title = 'Gallery', type = 'default', urlProvider = null) {
+function openImageGallery(images, title = 'Gallery', type = 'default', urlProvider = null, galleryName = '', ownContent = false) {
     if (!images || images.length === 0) {
         if (type === 'avatar') {
             createAvatarDirectory();
@@ -72,12 +74,20 @@ function openImageGallery(images, title = 'Gallery', type = 'default', urlProvid
     galleryTitle = title;
     galleryType = type;
     galleryUrlProvider = urlProvider;
+    currentGalleryName = galleryName;
+    isOwnContent = ownContent;
     currentGalleryIndex = 0;
     
     // Set title
     const titleElement = document.getElementById('galleryModalTitle');
     if (titleElement) {
         titleElement.textContent = title;
+    }
+    
+    // Show/hide kebab menu based on whether this is own content
+    const kebabMenu = document.getElementById('imageKebabMenu');
+    if (kebabMenu) {
+        kebabMenu.style.display = isOwnContent && type === 'gallery' ? 'block' : 'none';
     }
     
     showGalleryImage();
@@ -91,11 +101,19 @@ function closeImageGallery() {
         modal.style.display = 'none';
     }
     
+    // Hide kebab dropdown
+    const dropdown = document.getElementById('imageKebabDropdown');
+    if (dropdown) {
+        dropdown.classList.remove('show');
+    }
+    
     // Reset gallery state
     galleryImages = [];
     galleryType = '';
     galleryTitle = '';
     galleryUrlProvider = null;
+    currentGalleryName = '';
+    isOwnContent = false;
     currentGalleryIndex = 0;
 }
 
@@ -236,6 +254,17 @@ window.onclick = function(event) {
     if (docModal && event.target === docModal) {
         closeDocModal();
     }
+    
+    // Close kebab dropdowns when clicking outside
+    const imageKebabDropdown = document.getElementById('imageKebabDropdown');
+    const docKebabDropdown = document.getElementById('docKebabDropdown');
+    
+    if (imageKebabDropdown && !event.target.closest('.kebab-menu')) {
+        imageKebabDropdown.classList.remove('show');
+    }
+    if (docKebabDropdown && !event.target.closest('.kebab-menu')) {
+        docKebabDropdown.classList.remove('show');
+    }
 }
 
 // Keyboard navigation
@@ -278,6 +307,138 @@ function openAvatarGallery() {
     openImageGallery(avatarImages, 'Avatar Gallery', 'avatar');
 }
 
+// Kebab menu functions for images
+function toggleImageKebab(event) {
+    event.stopPropagation();
+    const dropdown = document.getElementById('imageKebabDropdown');
+    if (dropdown) {
+        dropdown.classList.toggle('show');
+    }
+}
+
+// Kebab menu functions for docs
+let currentDocFilename = '';
+
+function toggleDocKebab(event) {
+    event.stopPropagation();
+    const dropdown = document.getElementById('docKebabDropdown');
+    if (dropdown) {
+        dropdown.classList.toggle('show');
+    }
+}
+
+// Delete current image
+async function deleteCurrentImage() {
+    if (!isOwnContent || galleryImages.length === 0) {
+        return;
+    }
+    
+    const currentImage = galleryImages[currentGalleryIndex];
+    if (!currentImage || !currentGalleryName) {
+        alert('Unable to determine which image to delete');
+        return;
+    }
+    
+    if (!confirm(`Are you sure you want to delete "${currentImage}"?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/delete/images/${encodeURIComponent(currentGalleryName)}/${encodeURIComponent(currentImage)}`, {
+            method: 'DELETE'
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to delete image: ${errorText}`);
+        }
+        
+        // Remove image from gallery array
+        galleryImages.splice(currentGalleryIndex, 1);
+        
+        if (galleryImages.length === 0) {
+            // No more images, close gallery
+            closeImageGallery();
+            alert('Image deleted successfully. Gallery is now empty.');
+            
+            // Refresh the photos tab if we're on profile page
+            if (typeof loadPhotos === 'function') {
+                loadPhotos();
+            }
+        } else {
+            // Move to previous image if we were at the end
+            if (currentGalleryIndex >= galleryImages.length) {
+                currentGalleryIndex = galleryImages.length - 1;
+            }
+            
+            // Update display
+            showGalleryImage();
+            updateGalleryImageCounter();
+            
+            alert('Image deleted successfully');
+        }
+        
+        // Hide dropdown
+        const dropdown = document.getElementById('imageKebabDropdown');
+        if (dropdown) {
+            dropdown.classList.remove('show');
+        }
+        
+    } catch (error) {
+        console.error('Error deleting image:', error);
+        alert('Error deleting image: ' + error.message);
+    }
+}
+
+// Delete current document
+async function deleteCurrentDoc() {
+    if (!currentDocFilename) {
+        alert('Unable to determine which document to delete');
+        return;
+    }
+    
+    if (!confirm(`Are you sure you want to delete "${currentDocFilename}"?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/delete/docs/${encodeURIComponent(currentDocFilename)}`, {
+            method: 'DELETE'
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to delete document: ${errorText}`);
+        }
+        
+        // Close modal
+        closeDocModal();
+        alert('Document deleted successfully');
+        
+        // Refresh the docs tab if we're on profile page
+        if (typeof loadDocs === 'function') {
+            loadDocs();
+        }
+        
+    } catch (error) {
+        console.error('Error deleting document:', error);
+        alert('Error deleting document: ' + error.message);
+    }
+}
+
+// Function to set current doc filename (called when opening doc modal)
+function setCurrentDocFilename(filename) {
+    currentDocFilename = filename;
+    
+    // Show/hide kebab menu for own documents only
+    const kebabMenu = document.getElementById('docKebabMenu');
+    if (kebabMenu) {
+        // Show kebab menu only if we're not viewing a friend's profile
+        const isViewingOwnContent = !isViewingFriend; // This variable should be available in profile.js
+        kebabMenu.style.display = isViewingOwnContent ? 'block' : 'none';
+    }
+}
+
 // Export functions for global access
 window.sharedApp = {
     // Unified image gallery functions
@@ -287,6 +448,13 @@ window.sharedApp = {
     previousGalleryImage,
     nextGalleryImage,
     updateGalleryImageCounter,
+    
+    // Kebab menu functions
+    toggleImageKebab,
+    toggleDocKebab,
+    deleteCurrentImage,
+    deleteCurrentDoc,
+    setCurrentDocFilename,
     
     // Legacy functions (for backward compatibility)
     loadAvatarImages,

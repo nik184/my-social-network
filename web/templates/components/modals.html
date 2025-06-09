@@ -4,6 +4,12 @@
     <div class="modal-content">
         <div class="modal-header">
             <div id="galleryModalTitle" class="modal-title">Gallery</div>
+            <div id="imageKebabMenu" class="kebab-menu" style="display: none;">
+                <button class="kebab-button" onclick="sharedApp.toggleImageKebab(event)">⋮</button>
+                <div id="imageKebabDropdown" class="kebab-dropdown">
+                    <button class="kebab-item delete" onclick="sharedApp.deleteCurrentImage()">🗑️ Delete</button>
+                </div>
+            </div>
             <span class="close" onclick="sharedApp.closeImageGallery()">&times;</span>
         </div>
         <div class="modal-body" style="text-align: center;">
@@ -24,6 +30,12 @@
     <div class="modal-content">
         <div class="modal-header">
             <div id="docModalTitle" class="modal-title">Doc</div>
+            <div id="docKebabMenu" class="kebab-menu" style="display: none;">
+                <button class="kebab-button" onclick="sharedApp.toggleDocKebab(event)">⋮</button>
+                <div id="docKebabDropdown" class="kebab-dropdown">
+                    <button class="kebab-item delete" onclick="sharedApp.deleteCurrentDoc()">🗑️ Delete</button>
+                </div>
+            </div>
             <span class="close" onclick="sharedApp.closeDocModal()">&times;</span>
         </div>
         <div class="modal-body">
