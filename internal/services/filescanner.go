@@ -115,7 +115,7 @@ func (fs *FileScannerService) processFile(path string, info os.FileInfo, err err
 
 	// Get current peer ID
 	peerID := fs.getPeerIDFunc()
-	
+
 	// Insert or update file record
 	if err := fs.filesRepo.UpsertFileRecord(relPath, hash, info.Size(), extension, fileType, peerID); err != nil {
 		log.Printf("⚠️ Error upserting file record for %s: %v", relPath, err)

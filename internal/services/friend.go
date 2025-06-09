@@ -270,11 +270,11 @@ func (fs *FriendService) SyncFriendFilesMetadata() error {
 		for _, file := range filesResponse.Files {
 			// The file already has the correct peer_id from the friend's response
 			err := fs.database.UpsertFileRecord(
-				file.FilePath, 
-				file.Hash, 
-				file.Size, 
-				file.Extension, 
-				file.Type, 
+				file.FilePath,
+				file.Hash,
+				file.Size,
+				file.Extension,
+				file.Type,
 				file.PeerID, // This will be the friend's peer ID
 			)
 			if err != nil {

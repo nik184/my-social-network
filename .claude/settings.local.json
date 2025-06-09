@@ -20,7 +20,8 @@
       "Bash(./distributed-app)",
       "Bash(find:*)",
       "Bash(grep:*)",
-      "Bash(./build.sh)"
+      "Bash(./build.sh)",
+      "Bash(go fmt:*)"
     ],
     "deny": []
   },

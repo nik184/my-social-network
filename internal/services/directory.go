@@ -29,6 +29,8 @@ type DirectoryServiceInterface interface {
 	GetDoc(filename string) (*models.Doc, error)
 	GetGalleries() ([]models.Gallery, error)
 	GetGalleryImages(galleryName string) ([]string, error)
+	GetPeerGalleries(peerID string) ([]models.Gallery, error)
+	GetPeerGalleryImages(peerID, galleryName string) ([]string, error)
 }
 
 // DirectoryService handles directory operations
@@ -179,6 +181,90 @@ func (d *DirectoryService) GetPeerAvatarImages(peerID string) ([]string, error) 
 	files, err := os.ReadDir(peerAvatarDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read peer avatar directory: %w", err)
+	}
+
+	var imageFiles []string
+
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+
+		if utils.IsImageFile(file.Name()) {
+			imageFiles = append(imageFiles, file.Name())
+		}
+	}
+
+	return imageFiles, nil
+}
+
+// GetPeerGalleries returns a list of all downloaded photo galleries for a specific peer
+func (d *DirectoryService) GetPeerGalleries(peerID string) ([]models.Gallery, error) {
+	peerImagesDir := d.pathManager.GetPeerImagesPath(peerID)
+
+	// Check if peer images directory exists
+	if _, err := os.Stat(peerImagesDir); os.IsNotExist(err) {
+		return []models.Gallery{}, nil // Return empty list if directory doesn't exist
+	}
+
+	files, err := os.ReadDir(peerImagesDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read peer images directory: %w", err)
+	}
+
+	var galleries []models.Gallery
+
+	for _, file := range files {
+		if !file.IsDir() {
+			continue
+		}
+
+		galleryPath := filepath.Join(peerImagesDir, file.Name())
+		galleryFiles, err := os.ReadDir(galleryPath)
+		if err != nil {
+			continue // Skip galleries we can't read
+		}
+
+		var images []string
+		for _, galleryFile := range galleryFiles {
+			if galleryFile.IsDir() {
+				continue
+			}
+
+			if utils.IsImageFile(galleryFile.Name()) {
+				images = append(images, galleryFile.Name())
+			}
+		}
+
+		gallery := models.Gallery{
+			Name:       file.Name(),
+			ImageCount: len(images),
+			Images:     images,
+		}
+
+		galleries = append(galleries, gallery)
+	}
+
+	return galleries, nil
+}
+
+// GetPeerGalleryImages returns a list of image files in a specific peer's gallery
+func (d *DirectoryService) GetPeerGalleryImages(peerID, galleryName string) ([]string, error) {
+	// Validate gallery name to prevent directory traversal
+	if err := d.pathValidator.ValidateGalleryName(galleryName); err != nil {
+		return nil, fmt.Errorf("invalid gallery name: %s - %w", galleryName, err)
+	}
+
+	galleryDir := d.pathManager.GetPeerGalleryPath(peerID, galleryName)
+
+	// Check if directory exists
+	if _, err := os.Stat(galleryDir); os.IsNotExist(err) {
+		return []string{}, nil // Return empty list if directory doesn't exist
+	}
+
+	files, err := os.ReadDir(galleryDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read peer gallery directory: %w", err)
 	}
 
 	var imageFiles []string

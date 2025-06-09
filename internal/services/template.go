@@ -27,13 +27,13 @@ func NewTemplateService(templateDir string) (*TemplateService, error) {
 		templates:   make(map[string]*template.Template),
 		templateDir: templateDir,
 	}
-	
+
 	// Load templates
 	err := service.loadTemplates(templateDir)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return service, nil
 }
 
@@ -44,21 +44,21 @@ func (ts *TemplateService) loadTemplates(templateDir string) error {
 	navPath := filepath.Join(templateDir, "components", "navigation.html")
 	headerPath := filepath.Join(templateDir, "components", "header.html")
 	modalsPath := filepath.Join(templateDir, "components", "modals.html")
-	
+
 	// Page templates
 	pages := []string{"network", "profile", "friends"}
-	
+
 	for _, page := range pages {
 		pagePath := filepath.Join(templateDir, "pages", page+".html")
-		
+
 		tmpl, err := template.ParseFiles(layoutPath, navPath, headerPath, modalsPath, pagePath)
 		if err != nil {
 			return err
 		}
-		
+
 		ts.templates[page] = tmpl
 	}
-	
+
 	return nil
 }
 
@@ -79,7 +79,7 @@ func (ts *TemplateService) RenderPage(w http.ResponseWriter, page string, data T
 		http.Error(w, "Template not found", http.StatusNotFound)
 		return nil
 	}
-	
+
 	// Load page script if not already provided
 	if data.PageScript == "" {
 		script, err := ts.loadPageScript(page)
@@ -87,7 +87,7 @@ func (ts *TemplateService) RenderPage(w http.ResponseWriter, page string, data T
 			data.PageScript = script
 		}
 	}
-	
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	return tmpl.ExecuteTemplate(w, "base.html", data)
 }

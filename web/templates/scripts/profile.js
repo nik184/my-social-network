@@ -61,8 +61,7 @@ async function loadFriendProfile() {
         // Show friend-specific UI elements
         document.getElementById('backButtonSection').style.display = 'block';
         document.getElementById('downloadSection').style.display = 'block';
-        document.getElementById('tabNavigation').style.display = 'none';
-        document.getElementById('photosTab').style.display = 'none';
+        document.getElementById('tabNavigation').style.display = 'block';
         
         // Hide upload buttons for friend profiles
         document.getElementById('addDocsBtn').style.display = 'none';
@@ -338,7 +337,11 @@ function switchTab(tabName) {
     
     // Load tab content if needed
     if (tabName === 'photos' && !photosLoaded) {
-        loadPhotos();
+        if (isViewingFriend && currentFriend) {
+            loadFriendPhotos(currentFriend.peer_id);
+        } else {
+            loadPhotos();
+        }
     }
 }
 
@@ -359,6 +362,43 @@ async function loadPhotos() {
         console.error('Error loading galleries:', error);
         sharedApp.showStatus('photosStatus', 'Error loading galleries: ' + error.message, true);
         displayPhotosEmptyState('Failed to load galleries');
+    }
+}
+
+// Load friend's photos and galleries via P2P and downloaded content
+async function loadFriendPhotos(peerID) {
+    try {
+        sharedApp.showStatus('photosStatus', 'Loading friend\'s galleries...', false);
+        
+        // Load both live P2P galleries and downloaded galleries
+        const [liveData, downloadedData] = await Promise.allSettled([
+            sharedApp.fetchAPI(`/api/peer-galleries/${peerID}`),
+            sharedApp.fetchAPI(`/api/downloaded/${peerID}/images`)
+        ]);
+        
+        let liveGalleries = [];
+        let downloadedGalleries = [];
+        
+        if (liveData.status === 'fulfilled') {
+            liveGalleries = liveData.value.galleries || [];
+        } else {
+            console.warn('Failed to load live galleries:', liveData.reason);
+        }
+        
+        if (downloadedData.status === 'fulfilled') {
+            downloadedGalleries = downloadedData.value.galleries || [];
+        } else {
+            console.warn('Failed to load downloaded galleries:', downloadedData.reason);
+        }
+        
+        // Combine and display galleries with source indication
+        displayFriendGalleries(liveGalleries, downloadedGalleries, peerID);
+        photosLoaded = true;
+        sharedApp.hideStatus('photosStatus');
+    } catch (error) {
+        console.error('Error loading friend galleries:', error);
+        sharedApp.showStatus('photosStatus', 'Error loading friend galleries: ' + error.message, true);
+        displayFriendPhotosEmptyState('Failed to load galleries from friend');
     }
 }
 
@@ -400,6 +440,86 @@ function displayGalleries(galleries) {
     photosContent.appendChild(galleriesGrid);
 }
 
+// Display friend's galleries in the grid (both live and downloaded)
+function displayFriendGalleries(liveGalleries, downloadedGalleries, peerID) {
+    const photosContent = document.getElementById('photosContent');
+    
+    // Merge galleries and mark their source
+    const allGalleries = [];
+    const galleriesMap = new Map();
+    
+    // Add live galleries
+    liveGalleries.forEach(gallery => {
+        gallery.source = 'live';
+        gallery.sourceLabel = 'Live P2P';
+        galleriesMap.set(gallery.name, gallery);
+        allGalleries.push(gallery);
+    });
+    
+    // Add downloaded galleries (avoid duplicates)
+    downloadedGalleries.forEach(gallery => {
+        if (!galleriesMap.has(gallery.name)) {
+            gallery.source = 'downloaded';
+            gallery.sourceLabel = 'Downloaded';
+            allGalleries.push(gallery);
+        } else {
+            // Mark that this gallery is also downloaded
+            galleriesMap.get(gallery.name).isDownloaded = true;
+        }
+    });
+    
+    if (allGalleries.length === 0) {
+        displayFriendPhotosEmptyState('No photo galleries found');
+        return;
+    }
+
+    const galleriesGrid = document.createElement('div');
+    galleriesGrid.className = 'galleries-grid';
+
+    allGalleries.forEach(gallery => {
+        const galleryCard = document.createElement('div');
+        galleryCard.className = 'gallery-card';
+        galleryCard.onclick = () => openFriendGallery(peerID, gallery.name, gallery.source);
+
+        // Choose appropriate preview source
+        let previewSrc = '';
+        if (gallery.images.length > 0) {
+            if (gallery.source === 'live') {
+                previewSrc = `/api/peer-galleries/${encodeURIComponent(peerID)}/${encodeURIComponent(gallery.name)}/${encodeURIComponent(gallery.images[0])}`;
+            } else {
+                previewSrc = `/api/downloaded/${encodeURIComponent(peerID)}/images/${encodeURIComponent(gallery.name)}/${encodeURIComponent(gallery.images[0])}`;
+            }
+        }
+
+        const preview = gallery.images.length > 0 
+            ? `<img src="${previewSrc}" alt="${sharedApp.escapeHtml(gallery.name)}" />`
+            : '<div class="gallery-placeholder">📷</div>';
+
+        // Create source indicator
+        let sourceIndicator = `<div class="gallery-source">${gallery.sourceLabel}`;
+        if (gallery.isDownloaded) {
+            sourceIndicator += ' (Also Downloaded)';
+        }
+        sourceIndicator += '</div>';
+
+        galleryCard.innerHTML = `
+            <div class="gallery-preview">
+                ${preview}
+            </div>
+            <div class="gallery-info">
+                <div class="gallery-name">${sharedApp.escapeHtml(gallery.name)}</div>
+                <div class="gallery-count">${gallery.image_count} images</div>
+                ${sourceIndicator}
+            </div>
+        `;
+
+        galleriesGrid.appendChild(galleryCard);
+    });
+
+    photosContent.innerHTML = '';
+    photosContent.appendChild(galleriesGrid);
+}
+
 // Display empty state for photos
 function displayPhotosEmptyState(message) {
     const photosContent = document.getElementById('photosContent');
@@ -409,6 +529,20 @@ function displayPhotosEmptyState(message) {
             <div>${message}</div>
             <div class="create-doc-hint">
                 💡 To add photo galleries, create subdirectories in your space184/images directory and add images to them
+            </div>
+        </div>
+    `;
+}
+
+// Display empty state for friend photos
+function displayFriendPhotosEmptyState(message) {
+    const photosContent = document.getElementById('photosContent');
+    photosContent.innerHTML = `
+        <div class="empty-state">
+            <div class="empty-state-icon">📷</div>
+            <div>${message}</div>
+            <div class="create-doc-hint">
+                📡 Photo galleries are requested directly from your friend via P2P connection
             </div>
         </div>
     `;
@@ -432,6 +566,39 @@ async function openGallery(galleryName) {
     } catch (error) {
         console.error('Error loading gallery:', error);
         alert('Error loading gallery: ' + error.message);
+    }
+}
+
+// Open friend gallery view
+async function openFriendGallery(peerID, galleryName, source = 'live') {
+    try {
+        let apiUrl, urlProvider;
+        
+        if (source === 'downloaded') {
+            // Use downloaded content API
+            apiUrl = `/api/downloaded/${encodeURIComponent(peerID)}/images/${encodeURIComponent(galleryName)}`;
+            urlProvider = (imageName) => 
+                `/api/downloaded/${encodeURIComponent(peerID)}/images/${encodeURIComponent(galleryName)}/${encodeURIComponent(imageName)}`;
+        } else {
+            // Use live P2P API
+            apiUrl = `/api/peer-galleries/${encodeURIComponent(peerID)}/${encodeURIComponent(galleryName)}`;
+            urlProvider = (imageName) => 
+                `/api/peer-galleries/${encodeURIComponent(peerID)}/${encodeURIComponent(galleryName)}/${encodeURIComponent(imageName)}`;
+        }
+        
+        const data = await sharedApp.fetchAPI(apiUrl);
+        const images = data.images || [];
+        
+        if (images.length > 0) {
+            const friendName = currentFriend ? currentFriend.peer_name : 'Friend';
+            const sourceLabel = source === 'downloaded' ? ' (Downloaded)' : ' (Live)';
+            sharedApp.openImageGallery(images, `${friendName}'s ${galleryName} Gallery${sourceLabel}`, 'friend-gallery', urlProvider);
+        } else {
+            alert('No images found in this gallery');
+        }
+    } catch (error) {
+        console.error('Error loading friend gallery:', error);
+        alert('Error loading friend gallery: ' + error.message);
     }
 }
 

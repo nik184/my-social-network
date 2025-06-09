@@ -31,12 +31,12 @@ func NewWebViewUI(appService *services.AppService, preferredPort int) (*WebViewU
 	if err != nil {
 		return nil, fmt.Errorf("failed to find available port: %w", err)
 	}
-	
+
 	log.Printf("🌐 Using port %d for HTTP server (preferred: %d)", availablePort, preferredPort)
-	
+
 	// Use the existing template service from the app service container (no need to find project root)
 	templateService := appService.GetServiceContainer().GetTemplateService()
-	
+
 	return &WebViewUI{
 		appService:      appService,
 		templateService: templateService,
@@ -54,11 +54,11 @@ func (w *WebViewUI) GetPort() int {
 func (w *WebViewUI) StartServer() {
 	// Register API routes and page handlers
 	w.handler.RegisterRoutes()
-	
+
 	// Find the project root directory or use current working directory
 	wd, _ := os.Getwd()
 	originalWd := wd
-	
+
 	// Try to find go.mod (for development environment)
 	for {
 		if _, err := os.Stat(filepath.Join(wd, "go.mod")); err == nil {
@@ -74,22 +74,22 @@ func (w *WebViewUI) StartServer() {
 		}
 		wd = parent
 	}
-	
+
 	staticDir := filepath.Join(wd, "web", "static")
 	log.Printf("Serving static files from: %s", staticDir)
-	
+
 	// Serve static files under specific paths only
 	http.Handle("/css/", http.StripPrefix("/css/", http.FileServer(http.Dir(filepath.Join(staticDir, "css")))))
 	http.Handle("/js/", http.StripPrefix("/js/", http.FileServer(http.Dir(filepath.Join(staticDir, "js")))))
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))))
-	
+
 	go func() {
 		log.Printf("Starting web server on port %d", w.port)
 		if err := http.ListenAndServe(fmt.Sprintf(":%d", w.port), nil); err != nil {
 			log.Printf("Server error: %v", err)
 		}
 	}()
-	
+
 	// Give the server a moment to start
 	time.Sleep(100 * time.Millisecond)
 }
@@ -98,14 +98,14 @@ func (w *WebViewUI) StartServer() {
 func (w *WebViewUI) ShowWebView() {
 	url := fmt.Sprintf("http://localhost:%d/network", w.port)
 	log.Printf("🌐 Opening application in system browser: %s", url)
-	
+
 	// Try to open in default browser on Windows
 	cmd := exec.Command("cmd", "/c", "start", url)
 	if err := cmd.Start(); err != nil {
 		log.Printf("Failed to open browser automatically: %v", err)
 		log.Printf("Please open your browser and navigate to: %s", url)
 	}
-	
+
 	// Keep the application running
 	log.Printf("💡 Application is running. Press Ctrl+C to stop.")
 	log.Printf("📱 Access the web interface at: %s", url)

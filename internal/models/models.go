@@ -221,20 +221,60 @@ type DocResponse struct {
 	Doc *Doc `json:"doc"`
 }
 
+// GalleriesRequest represents a P2P request for galleries list
+type GalleriesRequest struct {
+	// Currently no additional fields needed
+}
+
+// GalleriesResponse represents a P2P response with galleries list
+type GalleriesResponse struct {
+	Galleries []Gallery `json:"galleries"`
+	Count     int       `json:"count"`
+}
+
+// GalleryRequest represents a P2P request for a specific gallery
+type GalleryRequest struct {
+	GalleryName string `json:"gallery_name"`
+}
+
+// GalleryResponse represents a P2P response with gallery content
+type GalleryResponse struct {
+	Gallery *Gallery `json:"gallery"`
+}
+
+// GalleryImageRequest represents a P2P request for a specific image
+type GalleryImageRequest struct {
+	GalleryName string `json:"gallery_name"`
+	ImageName   string `json:"image_name"`
+}
+
+// GalleryImageResponse represents a P2P response with image data
+type GalleryImageResponse struct {
+	ImageData string `json:"image_data"` // base64 encoded image data
+	Filename  string `json:"filename"`
+	Size      int    `json:"size"`
+}
+
 // Constants for message types
 const (
-	MessageTypeGetInfo         = "getInfo"
-	MessageTypeGetInfoResp     = "getInfoResp"
-	MessageTypeDiscovery       = "discovery"
-	MessageTypeDiscoveryResp   = "discoveryResp"
-	MessageTypeGetPeerList     = "getPeerList"
-	MessageTypeGetPeerListResp = "getPeerListResp"
-	MessageTypeHolePunchAssist = "holePunchAssist"
-	MessageTypeHolePunchResp   = "holePunchResp"
-	MessageTypeGetDocs         = "getDocs"
-	MessageTypeGetDocsResp     = "getDocsResp"
-	MessageTypeGetDoc          = "getDoc"
-	MessageTypeGetDocResp      = "getDocResp"
-	MessageTypeGetFiles        = "getFiles"
-	MessageTypeGetFilesResp    = "getFilesResp"
+	MessageTypeGetInfo             = "getInfo"
+	MessageTypeGetInfoResp         = "getInfoResp"
+	MessageTypeDiscovery           = "discovery"
+	MessageTypeDiscoveryResp       = "discoveryResp"
+	MessageTypeGetPeerList         = "getPeerList"
+	MessageTypeGetPeerListResp     = "getPeerListResp"
+	MessageTypeHolePunchAssist     = "holePunchAssist"
+	MessageTypeHolePunchResp       = "holePunchResp"
+	MessageTypeGetDocs             = "getDocs"
+	MessageTypeGetDocsResp         = "getDocsResp"
+	MessageTypeGetDoc              = "getDoc"
+	MessageTypeGetDocResp          = "getDocResp"
+	MessageTypeGetFiles            = "getFiles"
+	MessageTypeGetFilesResp        = "getFilesResp"
+	MessageTypeGetGalleries        = "getGalleries"
+	MessageTypeGetGalleriesResp    = "getGalleriesResp"
+	MessageTypeGetGallery          = "getGallery"
+	MessageTypeGetGalleryResp      = "getGalleryResp"
+	MessageTypeGetGalleryImage     = "getGalleryImage"
+	MessageTypeGetGalleryImageResp = "getGalleryImageResp"
 )

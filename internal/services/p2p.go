@@ -692,6 +692,33 @@ func (p *P2PService) handleStream(stream network.Stream) {
 			Payload: filesResponse,
 		}
 
+	case models.MessageTypeGetGalleries:
+		// Handle galleries request
+		log.Printf("📷 Processing galleries request from %s", peerID)
+		galleriesResponse := p.handleGetGalleriesRequest()
+		response = models.P2PMessage{
+			Type:    models.MessageTypeGetGalleriesResp,
+			Payload: galleriesResponse,
+		}
+
+	case models.MessageTypeGetGallery:
+		// Handle specific gallery request
+		log.Printf("📷 Processing gallery request from %s", peerID)
+		galleryResponse := p.handleGetGalleryRequest(msg.Payload)
+		response = models.P2PMessage{
+			Type:    models.MessageTypeGetGalleryResp,
+			Payload: galleryResponse,
+		}
+
+	case models.MessageTypeGetGalleryImage:
+		// Handle gallery image request
+		log.Printf("📷 Processing gallery image request from %s", peerID)
+		imageResponse := p.handleGetGalleryImageRequest(msg.Payload)
+		response = models.P2PMessage{
+			Type:    models.MessageTypeGetGalleryImageResp,
+			Payload: imageResponse,
+		}
+
 	default:
 		log.Printf("Unknown message type: %s", msg.Type)
 		return
@@ -1895,6 +1922,298 @@ func (p *P2PService) RequestPeerDoc(peerID, filename string) (*models.DocRespons
 	}
 
 	return &docResponse, nil
+}
+
+// handleGetGalleriesRequest handles P2P request for galleries list
+func (p *P2PService) handleGetGalleriesRequest() *models.GalleriesResponse {
+	if p.container == nil || p.container.GetDirectoryService() == nil {
+		return &models.GalleriesResponse{
+			Galleries: []models.Gallery{},
+			Count:     0,
+		}
+	}
+
+	galleries, err := p.container.GetDirectoryService().GetGalleries()
+	if err != nil {
+		log.Printf("Failed to get galleries for P2P request: %v", err)
+		return &models.GalleriesResponse{
+			Galleries: []models.Gallery{},
+			Count:     0,
+		}
+	}
+
+	return &models.GalleriesResponse{
+		Galleries: galleries,
+		Count:     len(galleries),
+	}
+}
+
+// handleGetGalleryRequest handles P2P request for specific gallery
+func (p *P2PService) handleGetGalleryRequest(payload interface{}) *models.GalleryResponse {
+	if p.container == nil || p.container.GetDirectoryService() == nil {
+		return &models.GalleryResponse{
+			Gallery: nil,
+		}
+	}
+
+	// Parse the request payload
+	requestData, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("Failed to marshal gallery request payload: %v", err)
+		return &models.GalleryResponse{Gallery: nil}
+	}
+
+	var galleryRequest models.GalleryRequest
+	if err := json.Unmarshal(requestData, &galleryRequest); err != nil {
+		log.Printf("Failed to parse gallery request: %v", err)
+		return &models.GalleryResponse{Gallery: nil}
+	}
+
+	// Get gallery images
+	images, err := p.container.GetDirectoryService().GetGalleryImages(galleryRequest.GalleryName)
+	if err != nil {
+		log.Printf("Failed to get gallery %s for P2P request: %v", galleryRequest.GalleryName, err)
+		return &models.GalleryResponse{Gallery: nil}
+	}
+
+	gallery := &models.Gallery{
+		Name:       galleryRequest.GalleryName,
+		ImageCount: len(images),
+		Images:     images,
+	}
+
+	return &models.GalleryResponse{Gallery: gallery}
+}
+
+// handleGetGalleryImageRequest handles P2P request for specific gallery image
+func (p *P2PService) handleGetGalleryImageRequest(payload interface{}) *models.GalleryImageResponse {
+	if p.container == nil || p.container.GetDirectoryService() == nil {
+		return &models.GalleryImageResponse{
+			ImageData: "",
+			Filename:  "",
+			Size:      0,
+		}
+	}
+
+	// Parse the request payload
+	requestData, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("Failed to marshal gallery image request payload: %v", err)
+		return &models.GalleryImageResponse{ImageData: "", Filename: "", Size: 0}
+	}
+
+	var imageRequest models.GalleryImageRequest
+	if err := json.Unmarshal(requestData, &imageRequest); err != nil {
+		log.Printf("Failed to parse gallery image request: %v", err)
+		return &models.GalleryImageResponse{ImageData: "", Filename: "", Size: 0}
+	}
+
+	// Read the image file
+	imagesDir := p.container.GetDirectoryService().GetDirectoryPath()
+	imagePath := filepath.Join(imagesDir, "images", imageRequest.GalleryName, imageRequest.ImageName)
+
+	// Validate that the file exists and is within the gallery directory
+	galleryImages, err := p.container.GetDirectoryService().GetGalleryImages(imageRequest.GalleryName)
+	if err != nil {
+		log.Printf("Failed to get gallery images for validation: %v", err)
+		return &models.GalleryImageResponse{ImageData: "", Filename: "", Size: 0}
+	}
+
+	// Check if the requested image exists in the gallery
+	found := false
+	for _, img := range galleryImages {
+		if img == imageRequest.ImageName {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		log.Printf("Image %s not found in gallery %s", imageRequest.ImageName, imageRequest.GalleryName)
+		return &models.GalleryImageResponse{ImageData: "", Filename: "", Size: 0}
+	}
+
+	imageData, err := os.ReadFile(imagePath)
+	if err != nil {
+		log.Printf("Failed to read image file %s: %v", imagePath, err)
+		return &models.GalleryImageResponse{ImageData: "", Filename: "", Size: 0}
+	}
+
+	// Limit image size to 5MB for transmission
+	if len(imageData) > 5*1024*1024 {
+		log.Printf("Image %s too large (%d bytes), skipping", imageRequest.ImageName, len(imageData))
+		return &models.GalleryImageResponse{ImageData: "", Filename: "", Size: 0}
+	}
+
+	// Encode to base64
+	encodedData := base64.StdEncoding.EncodeToString(imageData)
+
+	return &models.GalleryImageResponse{
+		ImageData: encodedData,
+		Filename:  imageRequest.ImageName,
+		Size:      len(imageData),
+	}
+}
+
+// RequestPeerGalleries requests galleries list from a peer
+func (p *P2PService) RequestPeerGalleries(peerID string) (*models.GalleriesResponse, error) {
+	peer, err := peer.Decode(peerID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid peer ID: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(p.ctx, 10*time.Second)
+	defer cancel()
+
+	stream, err := p.host.NewStream(ctx, peer, protocol.ID(AppProtocol))
+	if err != nil {
+		return nil, fmt.Errorf("failed to open stream: %w", err)
+	}
+	defer stream.Close()
+
+	// Send galleries request
+	msg := models.P2PMessage{
+		Type:    models.MessageTypeGetGalleries,
+		Payload: models.GalleriesRequest{},
+	}
+
+	encoder := json.NewEncoder(stream)
+	if err := encoder.Encode(msg); err != nil {
+		return nil, fmt.Errorf("failed to send galleries request: %w", err)
+	}
+
+	// Read response
+	decoder := json.NewDecoder(stream)
+	var response models.P2PMessage
+	if err := decoder.Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if response.Type != models.MessageTypeGetGalleriesResp {
+		return nil, fmt.Errorf("unexpected response type: %s", response.Type)
+	}
+
+	// Parse response payload
+	responseData, err := json.Marshal(response.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal response payload: %w", err)
+	}
+
+	var galleriesResponse models.GalleriesResponse
+	if err := json.Unmarshal(responseData, &galleriesResponse); err != nil {
+		return nil, fmt.Errorf("failed to parse galleries response: %w", err)
+	}
+
+	return &galleriesResponse, nil
+}
+
+// RequestPeerGallery requests a specific gallery from a peer
+func (p *P2PService) RequestPeerGallery(peerID, galleryName string) (*models.GalleryResponse, error) {
+	peer, err := peer.Decode(peerID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid peer ID: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(p.ctx, 10*time.Second)
+	defer cancel()
+
+	stream, err := p.host.NewStream(ctx, peer, protocol.ID(AppProtocol))
+	if err != nil {
+		return nil, fmt.Errorf("failed to open stream: %w", err)
+	}
+	defer stream.Close()
+
+	// Send gallery request
+	msg := models.P2PMessage{
+		Type: models.MessageTypeGetGallery,
+		Payload: models.GalleryRequest{
+			GalleryName: galleryName,
+		},
+	}
+
+	encoder := json.NewEncoder(stream)
+	if err := encoder.Encode(msg); err != nil {
+		return nil, fmt.Errorf("failed to send gallery request: %w", err)
+	}
+
+	// Read response
+	decoder := json.NewDecoder(stream)
+	var response models.P2PMessage
+	if err := decoder.Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if response.Type != models.MessageTypeGetGalleryResp {
+		return nil, fmt.Errorf("unexpected response type: %s", response.Type)
+	}
+
+	// Parse response payload
+	responseData, err := json.Marshal(response.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal response payload: %w", err)
+	}
+
+	var galleryResponse models.GalleryResponse
+	if err := json.Unmarshal(responseData, &galleryResponse); err != nil {
+		return nil, fmt.Errorf("failed to parse gallery response: %w", err)
+	}
+
+	return &galleryResponse, nil
+}
+
+// RequestPeerGalleryImage requests a specific image from a peer's gallery
+func (p *P2PService) RequestPeerGalleryImage(peerID, galleryName, imageName string) (*models.GalleryImageResponse, error) {
+	peer, err := peer.Decode(peerID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid peer ID: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(p.ctx, 30*time.Second) // Longer timeout for image transfer
+	defer cancel()
+
+	stream, err := p.host.NewStream(ctx, peer, protocol.ID(AppProtocol))
+	if err != nil {
+		return nil, fmt.Errorf("failed to open stream: %w", err)
+	}
+	defer stream.Close()
+
+	// Send gallery image request
+	msg := models.P2PMessage{
+		Type: models.MessageTypeGetGalleryImage,
+		Payload: models.GalleryImageRequest{
+			GalleryName: galleryName,
+			ImageName:   imageName,
+		},
+	}
+
+	encoder := json.NewEncoder(stream)
+	if err := encoder.Encode(msg); err != nil {
+		return nil, fmt.Errorf("failed to send gallery image request: %w", err)
+	}
+
+	// Read response
+	decoder := json.NewDecoder(stream)
+	var response models.P2PMessage
+	if err := decoder.Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if response.Type != models.MessageTypeGetGalleryImageResp {
+		return nil, fmt.Errorf("unexpected response type: %s", response.Type)
+	}
+
+	// Parse response payload
+	responseData, err := json.Marshal(response.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal response payload: %w", err)
+	}
+
+	var imageResponse models.GalleryImageResponse
+	if err := json.Unmarshal(responseData, &imageResponse); err != nil {
+		return nil, fmt.Errorf("failed to parse gallery image response: %w", err)
+	}
+
+	return &imageResponse, nil
 }
 
 // getNodeInfo creates a NodeInfoResponse for P2P communication

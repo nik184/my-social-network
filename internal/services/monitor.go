@@ -12,15 +12,15 @@ import (
 
 // MonitorService handles file system monitoring for the space184 directory
 type MonitorService struct {
-	watcher           *fsnotify.Watcher
-	directoryService  DirectoryServiceInterface
-	appService        *AppService
-	ctx               context.Context
-	cancel            context.CancelFunc
-	lastScanTime      time.Time
-	debounceTimer     *time.Timer
-	debounceDuration  time.Duration
-	mu                sync.Mutex
+	watcher          *fsnotify.Watcher
+	directoryService DirectoryServiceInterface
+	appService       *AppService
+	ctx              context.Context
+	cancel           context.CancelFunc
+	lastScanTime     time.Time
+	debounceTimer    *time.Timer
+	debounceDuration time.Duration
+	mu               sync.Mutex
 }
 
 // NewMonitorService creates a new file system monitor
@@ -47,7 +47,7 @@ func NewMonitorService(directoryService DirectoryServiceInterface, appService *A
 // Start begins monitoring the space184 directory
 func (m *MonitorService) Start() error {
 	directoryPath := m.directoryService.GetDirectoryPath()
-	
+
 	// Perform initial scan
 	log.Printf("📁 Starting directory monitoring for: %s", directoryPath)
 	if err := m.performScan("Initial scan"); err != nil {
@@ -72,13 +72,13 @@ func (m *MonitorService) Stop() {
 	if m.watcher != nil {
 		m.watcher.Close()
 	}
-	
+
 	m.mu.Lock()
 	if m.debounceTimer != nil {
 		m.debounceTimer.Stop()
 	}
 	m.mu.Unlock()
-	
+
 	log.Printf("🛑 File system monitoring stopped")
 }
 
@@ -94,13 +94,13 @@ func (m *MonitorService) monitorLoop() {
 		select {
 		case <-m.ctx.Done():
 			return
-			
+
 		case event, ok := <-m.watcher.Events:
 			if !ok {
 				return
 			}
 			m.handleFileEvent(event)
-			
+
 		case err, ok := <-m.watcher.Errors:
 			if !ok {
 				return
@@ -140,17 +140,17 @@ func (m *MonitorService) handleFileEvent(event fsnotify.Event) {
 // shouldIgnoreEvent filters out events we don't want to process
 func (m *MonitorService) shouldIgnoreEvent(event fsnotify.Event) bool {
 	fileName := filepath.Base(event.Name)
-	
+
 	// Ignore hidden files and temporary files
 	if len(fileName) > 0 && fileName[0] == '.' {
 		return true
 	}
-	
+
 	// Ignore common temporary file patterns
 	tempPatterns := []string{
 		"~", ".tmp", ".swp", ".swo", "#", ".DS_Store",
 	}
-	
+
 	for _, pattern := range tempPatterns {
 		if len(fileName) > len(pattern) && fileName[len(fileName)-len(pattern):] == pattern {
 			return true
@@ -159,7 +159,7 @@ func (m *MonitorService) shouldIgnoreEvent(event fsnotify.Event) bool {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -194,7 +194,7 @@ func (m *MonitorService) performScan(reason string) error {
 	m.mu.Unlock()
 
 	log.Printf("🔍 Scanning directory: %s", reason)
-	
+
 	// Perform the scan
 	folderInfo, err := m.directoryService.ScanDirectory()
 	if err != nil {
@@ -203,23 +203,23 @@ func (m *MonitorService) performScan(reason string) error {
 
 	// Update app state
 	m.appService.SetFolderInfo(folderInfo)
-	
+
 	fileCount := len(folderInfo.Files)
 	if fileCount == 0 {
 		log.Printf("✅ Directory scan complete: Empty directory")
 	} else {
 		log.Printf("✅ Directory scan complete: %d files found", fileCount)
-		
+
 		// Log first few files for debugging
 		maxDisplay := 5
 		if fileCount < maxDisplay {
 			maxDisplay = fileCount
 		}
-		
+
 		for i := 0; i < maxDisplay; i++ {
 			log.Printf("   📄 %s", folderInfo.Files[i])
 		}
-		
+
 		if fileCount > maxDisplay {
 			log.Printf("   ... and %d more files", fileCount-maxDisplay)
 		}

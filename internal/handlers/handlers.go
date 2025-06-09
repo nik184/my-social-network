@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -1113,7 +1115,7 @@ func (h *Handler) HandleSyncFriendFiles(w http.ResponseWriter, r *http.Request) 
 
 	// Check if specific peer ID is provided
 	peerID := r.URL.Query().Get("peer_id")
-	
+
 	var err error
 	if peerID != "" {
 		// Sync specific friend
@@ -1135,6 +1137,331 @@ func (h *Handler) HandleSyncFriendFiles(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+// HandlePeerGalleries handles GET /api/peer-galleries/{peerID} and other peer gallery requests
+func (h *Handler) HandlePeerGalleries(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse URL path to extract peerID and optional gallery/image path
+	pathParts := strings.Split(r.URL.Path[len("/api/peer-galleries/"):], "/")
+	if len(pathParts) < 1 || pathParts[0] == "" {
+		http.Error(w, "Peer ID is required", http.StatusBadRequest)
+		return
+	}
+
+	peerID := pathParts[0]
+
+	// Route based on path length
+	switch len(pathParts) {
+	case 1:
+		// GET /api/peer-galleries/{peerID} - list galleries
+		h.handlePeerGalleriesList(w, r, peerID)
+	case 2:
+		// GET /api/peer-galleries/{peerID}/{galleryName} - get gallery details
+		galleryName := pathParts[1]
+		h.handlePeerGalleryDetails(w, r, peerID, galleryName)
+	case 3:
+		// GET /api/peer-galleries/{peerID}/{galleryName}/{imageName} - get/download image
+		galleryName := pathParts[1]
+		imageName := pathParts[2]
+		h.handlePeerGalleryImage(w, r, peerID, galleryName, imageName)
+	default:
+		http.Error(w, "Invalid request path", http.StatusBadRequest)
+	}
+}
+
+// handlePeerGalleriesList handles requests for a peer's galleries list
+func (h *Handler) handlePeerGalleriesList(w http.ResponseWriter, r *http.Request, peerID string) {
+	// Request galleries list from peer via P2P
+	galleriesResponse, err := h.appService.GetP2PService().RequestPeerGalleries(peerID)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to get galleries from peer: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(galleriesResponse)
+}
+
+// handlePeerGalleryDetails handles requests for a specific peer gallery
+func (h *Handler) handlePeerGalleryDetails(w http.ResponseWriter, r *http.Request, peerID, galleryName string) {
+	// Request specific gallery from peer via P2P
+	galleryResponse, err := h.appService.GetP2PService().RequestPeerGallery(peerID, galleryName)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to get gallery from peer: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	if galleryResponse.Gallery == nil {
+		http.Error(w, "Gallery not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(galleryResponse.Gallery)
+}
+
+// handlePeerGalleryImage handles requests for a specific image from a peer's gallery
+func (h *Handler) handlePeerGalleryImage(w http.ResponseWriter, r *http.Request, peerID, galleryName, imageName string) {
+	// Check if image is already cached locally
+	cachedPath := h.getCachedImagePath(peerID, galleryName, imageName)
+	if cachedPath != "" {
+		// Serve cached image
+		h.serveCachedImage(w, r, cachedPath, imageName)
+		return
+	}
+
+	// Request image from peer via P2P and cache it
+	imageResponse, err := h.appService.GetP2PService().RequestPeerGalleryImage(peerID, galleryName, imageName)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to get image from peer: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	if imageResponse.ImageData == "" {
+		http.Error(w, "Image not found", http.StatusNotFound)
+		return
+	}
+
+	// Decode base64 image data
+	imageData, err := base64.StdEncoding.DecodeString(imageResponse.ImageData)
+	if err != nil {
+		http.Error(w, "Failed to decode image data", http.StatusInternalServerError)
+		return
+	}
+
+	// Download and save the image locally
+	if err := h.downloadImage(peerID, galleryName, imageName, imageData); err != nil {
+		log.Printf("Warning: Failed to save downloaded image: %v", err)
+	}
+
+	// Set appropriate content type based on file extension
+	ext := filepath.Ext(imageName)
+	switch strings.ToLower(ext) {
+	case ".jpg", ".jpeg":
+		w.Header().Set("Content-Type", "image/jpeg")
+	case ".png":
+		w.Header().Set("Content-Type", "image/png")
+	case ".gif":
+		w.Header().Set("Content-Type", "image/gif")
+	case ".webp":
+		w.Header().Set("Content-Type", "image/webp")
+	case ".bmp":
+		w.Header().Set("Content-Type", "image/bmp")
+	case ".svg":
+		w.Header().Set("Content-Type", "image/svg+xml")
+	default:
+		w.Header().Set("Content-Type", "application/octet-stream")
+	}
+
+	// Serve the image
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(imageData)))
+	w.Write(imageData)
+}
+
+// getCachedImagePath checks if an image is already downloaded locally
+func (h *Handler) getCachedImagePath(peerID, galleryName, imageName string) string {
+	// Get path manager from service container
+	pathManager := h.appService.GetServiceContainer().GetPathManager()
+	if pathManager == nil {
+		return ""
+	}
+
+	// Create path for downloaded peer images in gallery structure
+	galleryDir := pathManager.GetPeerGalleryPath(peerID, galleryName)
+	imagePath := filepath.Join(galleryDir, imageName)
+
+	// Check if file exists
+	if _, err := os.Stat(imagePath); err == nil {
+		return imagePath
+	}
+
+	return ""
+}
+
+// serveCachedImage serves a cached image from local storage
+func (h *Handler) serveCachedImage(w http.ResponseWriter, r *http.Request, imagePath, imageName string) {
+	// Set appropriate content type based on file extension
+	ext := filepath.Ext(imageName)
+	switch strings.ToLower(ext) {
+	case ".jpg", ".jpeg":
+		w.Header().Set("Content-Type", "image/jpeg")
+	case ".png":
+		w.Header().Set("Content-Type", "image/png")
+	case ".gif":
+		w.Header().Set("Content-Type", "image/gif")
+	case ".webp":
+		w.Header().Set("Content-Type", "image/webp")
+	case ".bmp":
+		w.Header().Set("Content-Type", "image/bmp")
+	case ".svg":
+		w.Header().Set("Content-Type", "image/svg+xml")
+	default:
+		w.Header().Set("Content-Type", "application/octet-stream")
+	}
+
+	http.ServeFile(w, r, imagePath)
+}
+
+// downloadImage saves an image to the downloaded folder structure
+func (h *Handler) downloadImage(peerID, galleryName, imageName string, imageData []byte) error {
+	// Get path manager from service container
+	pathManager := h.appService.GetServiceContainer().GetPathManager()
+	if pathManager == nil {
+		return fmt.Errorf("path manager not available")
+	}
+
+	// Create gallery directory in downloaded structure
+	galleryDir := pathManager.GetPeerGalleryPath(peerID, galleryName)
+	if err := os.MkdirAll(galleryDir, 0755); err != nil {
+		return fmt.Errorf("failed to create gallery directory: %v", err)
+	}
+
+	// Save image to downloaded folder
+	imagePath := filepath.Join(galleryDir, imageName)
+	if err := os.WriteFile(imagePath, imageData, 0644); err != nil {
+		return fmt.Errorf("failed to write downloaded image: %v", err)
+	}
+
+	log.Printf("📷 Downloaded image %s for peer %s in gallery %s", imageName, peerID, galleryName)
+	return nil
+}
+
+// HandleDownloadedContent handles serving downloaded peer content
+func (h *Handler) HandleDownloadedContent(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse URL path: /api/downloaded/{peerID}/{type}/{gallery?}/{filename?}
+	pathParts := strings.Split(r.URL.Path[len("/api/downloaded/"):], "/")
+	if len(pathParts) < 2 {
+		http.Error(w, "Invalid path format. Expected: /api/downloaded/{peerID}/{type}/{gallery?}/{filename?}", http.StatusBadRequest)
+		return
+	}
+
+	peerID := pathParts[0]
+	contentType := pathParts[1] // "images" or "docs"
+
+	switch contentType {
+	case "images":
+		h.handleDownloadedImages(w, r, peerID, pathParts[2:])
+	case "docs":
+		h.handleDownloadedDocs(w, r, peerID, pathParts[2:])
+	default:
+		http.Error(w, "Invalid content type. Use 'images' or 'docs'", http.StatusBadRequest)
+	}
+}
+
+// handleDownloadedImages handles downloaded image requests
+func (h *Handler) handleDownloadedImages(w http.ResponseWriter, r *http.Request, peerID string, pathParts []string) {
+	switch len(pathParts) {
+	case 0:
+		// GET /api/downloaded/{peerID}/images - list galleries
+		galleries, err := h.appService.GetDirectoryService().GetPeerGalleries(peerID)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to get galleries: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		response := map[string]interface{}{
+			"galleries": galleries,
+			"count":     len(galleries),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+
+	case 1:
+		// GET /api/downloaded/{peerID}/images/{galleryName} - list gallery images
+		galleryName := pathParts[0]
+		images, err := h.appService.GetDirectoryService().GetPeerGalleryImages(peerID, galleryName)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to get gallery images: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		response := map[string]interface{}{
+			"gallery": galleryName,
+			"images":  images,
+			"count":   len(images),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+
+	case 2:
+		// GET /api/downloaded/{peerID}/images/{galleryName}/{imageName} - serve image
+		galleryName := pathParts[0]
+		imageName := pathParts[1]
+
+		// Get path manager from service container
+		pathManager := h.appService.GetServiceContainer().GetPathManager()
+		if pathManager == nil {
+			http.Error(w, "Path manager not available", http.StatusInternalServerError)
+			return
+		}
+
+		// Construct file path
+		imagePath := filepath.Join(pathManager.GetPeerGalleryPath(peerID, galleryName), imageName)
+
+		// Validate that file exists and is within the expected directory
+		images, err := h.appService.GetDirectoryService().GetPeerGalleryImages(peerID, galleryName)
+		if err != nil {
+			http.Error(w, "Gallery not found", http.StatusNotFound)
+			return
+		}
+
+		// Check if requested image exists in the gallery
+		found := false
+		for _, img := range images {
+			if img == imageName {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			http.Error(w, "Image not found in gallery", http.StatusNotFound)
+			return
+		}
+
+		// Set appropriate content type based on file extension
+		ext := filepath.Ext(imageName)
+		switch strings.ToLower(ext) {
+		case ".jpg", ".jpeg":
+			w.Header().Set("Content-Type", "image/jpeg")
+		case ".png":
+			w.Header().Set("Content-Type", "image/png")
+		case ".gif":
+			w.Header().Set("Content-Type", "image/gif")
+		case ".webp":
+			w.Header().Set("Content-Type", "image/webp")
+		case ".bmp":
+			w.Header().Set("Content-Type", "image/bmp")
+		case ".svg":
+			w.Header().Set("Content-Type", "image/svg+xml")
+		default:
+			w.Header().Set("Content-Type", "application/octet-stream")
+		}
+
+		// Serve the file
+		http.ServeFile(w, r, imagePath)
+
+	default:
+		http.Error(w, "Invalid path format", http.StatusBadRequest)
+	}
+}
+
+// handleDownloadedDocs handles downloaded document requests
+func (h *Handler) handleDownloadedDocs(w http.ResponseWriter, r *http.Request, peerID string, pathParts []string) {
+	// For now, just return a placeholder - docs download logic can be implemented later
+	http.Error(w, "Downloaded docs serving not implemented yet", http.StatusNotImplemented)
 }
 
 // RegisterRoutes registers all HTTP routes
@@ -1171,7 +1498,13 @@ func (h *Handler) RegisterRoutes() {
 	// Upload routes
 	http.HandleFunc("/api/upload/docs", h.HandleUploadDocs)
 	http.HandleFunc("/api/upload/photos", h.HandleUploadPhotos)
-	
+
 	// Files sync routes
 	http.HandleFunc("/api/sync-friend-files", h.HandleSyncFriendFiles)
+
+	// Peer galleries routes
+	http.HandleFunc("/api/peer-galleries/", h.HandlePeerGalleries)
+
+	// Downloaded content routes
+	http.HandleFunc("/api/downloaded/", h.HandleDownloadedContent)
 }

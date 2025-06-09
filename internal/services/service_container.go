@@ -15,13 +15,13 @@ type ServiceContainer struct {
 	database interfaces.DatabaseService
 
 	// Core services
-	directoryService   DirectoryServiceInterface
-	fileSystemService  interfaces.FileSystemService
-	templateService    *TemplateService
-	friendService      *FriendService
+	directoryService  DirectoryServiceInterface
+	fileSystemService interfaces.FileSystemService
+	templateService   *TemplateService
+	friendService     *FriendService
 	// portsService       *PortsService  // Commented out - not essential
-	monitorService     *MonitorService
-	p2pService         *P2PService
+	monitorService *MonitorService
+	p2pService     *P2PService
 
 	// Utilities
 	pathManager *utils.PathManager
@@ -115,7 +115,7 @@ func (sc *ServiceContainer) PerformStartupTasks() error {
 	// Attempt to reconnect to friends
 	if sc.friendService != nil {
 		sc.friendService.AttemptReconnectToAllFriends()
-		
+
 		// Sync friends' files metadata after reconnection
 		log.Printf("📁 Starting friend files metadata sync...")
 		if err := sc.friendService.SyncFriendFilesMetadata(); err != nil {
@@ -179,7 +179,6 @@ func (sc *ServiceContainer) GetPathManager() *utils.PathManager {
 // func (sc *ServiceContainer) GetPortsService() *PortsService {
 //	return sc.portsService
 // }
-
 
 // Close shuts down all services
 func (sc *ServiceContainer) Close() error {
