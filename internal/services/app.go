@@ -181,3 +181,8 @@ func (a *AppService) GetMonitorService() *MonitorService {
 func (a *AppService) GetDatabaseService() interfaces.DatabaseService {
 	return a.container.GetDatabase()
 }
+
+// GetFriendService returns the friend service
+func (a *AppService) GetFriendService() *FriendService {
+	return a.container.GetFriendService()
+}

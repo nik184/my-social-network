@@ -18,6 +18,7 @@ type ServiceContainer struct {
 	directoryService   DirectoryServiceInterface
 	fileSystemService  interfaces.FileSystemService
 	templateService    *TemplateService
+	friendService      *FriendService
 	// portsService       *PortsService  // Commented out - not essential
 	monitorService     *MonitorService
 	p2pService         *P2PService
@@ -69,6 +70,9 @@ func (sc *ServiceContainer) initializeServices() error {
 		return fmt.Errorf("failed to create P2P service: %w", err)
 	}
 
+	// Initialize Friend service
+	sc.friendService = NewFriendService(database, sc.p2pService)
+
 	// Monitor service will be initialized later when AppService is available
 
 	return nil
@@ -96,6 +100,11 @@ func (sc *ServiceContainer) PerformStartupTasks() error {
 	// Perform initial file scan
 	if err := sc.fileSystemService.ScanFiles(); err != nil {
 		log.Printf("⚠️ Warning: failed to perform initial file scan: %v", err)
+	}
+
+	// Attempt to reconnect to friends
+	if sc.friendService != nil {
+		sc.friendService.AttemptReconnectToAllFriends()
 	}
 
 	log.Printf("✅ Startup tasks completed")
@@ -140,6 +149,11 @@ func (sc *ServiceContainer) GetTemplateService() *TemplateService {
 	return sc.templateService
 }
 
+// GetFriendService returns the friend service
+func (sc *ServiceContainer) GetFriendService() *FriendService {
+	return sc.friendService
+}
+
 // GetPathManager returns the path manager
 func (sc *ServiceContainer) GetPathManager() *utils.PathManager {
 	return sc.pathManager
@@ -149,6 +163,7 @@ func (sc *ServiceContainer) GetPathManager() *utils.PathManager {
 // func (sc *ServiceContainer) GetPortsService() *PortsService {
 //	return sc.portsService
 // }
+
 
 // Close shuts down all services
 func (sc *ServiceContainer) Close() error {
