@@ -35,6 +35,7 @@ type PeerInfoResponse struct {
 	LastSeen       time.Time `json:"last_seen"`
 	IsValidated    bool      `json:"is_validated"`
 	ConnectionType string    `json:"connection_type"`
+	HasAvatar      bool      `json:"has_avatar"`
 }
 
 // SecondDegreePeerResponse represents a second-degree peer in API responses
@@ -283,6 +284,9 @@ func getNodePeerInfo(ctx context.Context, container testcontainers.Container) ([
 	}
 
 	var peers []PeerInfoResponse
+	fmt.Println("---------------")
+	fmt.Println(resp.Body)
+	fmt.Println("---------------")
 	if err := json.NewDecoder(resp.Body).Decode(&peers); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}

@@ -31,6 +31,12 @@ func (h *Handler) HandleGetInfo(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(h.appService.GetNodeInfo())
 }
 
+// HandleGetPeerInfo handles GET /api/peer-info requests
+func (h *Handler) HandleGetPeerInfo(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(h.appService.GetP2PService().GetConnectedPeerInfo())
+}
+
 // HandleScan handles POST /api/scan requests
 func (h *Handler) HandleScan(w http.ResponseWriter, r *http.Request) {
 	// Use the monitor service for manual scan if available
@@ -49,7 +55,7 @@ func (h *Handler) HandleScan(w http.ResponseWriter, r *http.Request) {
 		}
 		h.appService.SetFolderInfo(folderInfo)
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(models.StatusResponse{Status: "success"})
 }
@@ -60,7 +66,7 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(models.StatusResponse{Status: "directory created"})
 }
@@ -71,19 +77,19 @@ func (h *Handler) HandleDiscover(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	var req models.DiscoveryRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	
+
 	nodeInfo, err := h.appService.GetP2PService().DiscoverPeer(req.PeerID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(nodeInfo)
 }
@@ -92,20 +98,20 @@ func (h *Handler) HandleDiscover(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandlePeers(w http.ResponseWriter, r *http.Request) {
 	validatedPeers := h.appService.GetP2PService().GetConnectedPeers()
 	allPeers := h.appService.GetP2PService().GetAllConnectedPeers()
-	
+
 	// Convert peer IDs to strings for JSON
 	validatedPeerStrings := make([]string, len(validatedPeers))
 	for i, peer := range validatedPeers {
 		validatedPeerStrings[i] = peer.String()
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"validatedPeers":      validatedPeerStrings,
 		"validatedCount":      len(validatedPeerStrings),
 		"totalConnectedCount": len(allPeers),
-		"applicationPeers":    validatedPeerStrings, // For backward compatibility
-		"peers":               validatedPeerStrings, // For backward compatibility
+		"applicationPeers":    validatedPeerStrings,      // For backward compatibility
+		"peers":               validatedPeerStrings,      // For backward compatibility
 		"count":               len(validatedPeerStrings), // For backward compatibility
 	})
 }
@@ -115,11 +121,11 @@ func (h *Handler) HandleMonitorStatus(w http.ResponseWriter, r *http.Request) {
 	status := map[string]interface{}{
 		"monitoring": h.appService.GetMonitorService() != nil,
 	}
-	
+
 	if h.appService.GetMonitorService() != nil {
 		status["lastScan"] = h.appService.GetMonitorService().GetLastScanTime()
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(status)
 }
@@ -130,19 +136,19 @@ func (h *Handler) HandleConnectByIP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	var req models.IPConnectionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	
+
 	nodeInfo, err := h.appService.GetP2PService().ConnectByIP(req.IP, req.Port, req.PeerID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(nodeInfo)
 }
@@ -160,13 +166,13 @@ func (h *Handler) HandleConnectionHistory(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	history, err := h.appService.GetConnectionHistory()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(history)
 }
@@ -177,13 +183,13 @@ func (h *Handler) HandleSecondDegreePeers(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	secondDegreePeers, err := h.appService.GetSecondDegreeConnections()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(secondDegreePeers)
 }
@@ -194,19 +200,19 @@ func (h *Handler) HandleConnectSecondDegree(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	var req models.SecondDegreeConnectionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	
+
 	nodeInfo, err := h.appService.ConnectToSecondDegreePeer(req.TargetPeerID, req.ViaPeerID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(nodeInfo)
 }
@@ -275,7 +281,7 @@ func (h *Handler) HandleAvatarImage(w http.ResponseWriter, r *http.Request) {
 	// Serve the file
 	avatarDir := h.appService.GetDirectoryService().GetAvatarDirectory()
 	filePath := filepath.Join(avatarDir, filename)
-	
+
 	// Set appropriate content type based on file extension
 	ext := filepath.Ext(filename)
 	switch ext {
@@ -385,7 +391,7 @@ func (h *Handler) HandlePeerAvatar(w http.ResponseWriter, r *http.Request) {
 		// Serve the file
 		peerAvatarDir := h.appService.GetDirectoryService().GetPeerAvatarDirectory(peerID)
 		filePath := filepath.Join(peerAvatarDir, filename)
-		
+
 		// Set appropriate content type based on file extension
 		ext := filepath.Ext(filename)
 		switch ext {
@@ -690,7 +696,7 @@ func (h *Handler) HandleGalleryImage(w http.ResponseWriter, r *http.Request) {
 	// Serve the file
 	galleryDir := filepath.Join(h.appService.GetDirectoryService().GetDirectoryPath(), "images", galleryName)
 	filePath := filepath.Join(galleryDir, filename)
-	
+
 	// Set appropriate content type based on file extension
 	ext := filepath.Ext(filename)
 	switch ext {
@@ -752,9 +758,10 @@ func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/profile", h.HandleProfilePage)
 	http.HandleFunc("/friends", h.HandleFriendsPage)
 	http.HandleFunc("/friend-profile", h.HandleFriendProfilePage)
-	
+
 	// API routes
 	http.HandleFunc("/api/info", h.HandleGetInfo)
+	http.HandleFunc("/api/peer-info", h.HandleGetPeerInfo)
 	http.HandleFunc("/api/scan", h.HandleScan)
 	http.HandleFunc("/api/create", h.HandleCreate)
 	http.HandleFunc("/api/discover", h.HandleDiscover)
