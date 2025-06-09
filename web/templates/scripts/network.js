@@ -100,48 +100,6 @@ async function getNodeInfo() {
     }
 }
 
-async function connectByString() {
-    const connectionString = document.getElementById('connectionStringInput').value;
-    
-    if (!connectionString) {
-        sharedApp.showStatus('discoveryStatus', 'Please enter a connection string', true);
-        return;
-    }
-
-    // Parse connection string (format: IP:PORT:PEER_ID)
-    const parts = connectionString.split(':');
-    if (parts.length < 3) {
-        sharedApp.showStatus('discoveryStatus', 'Invalid connection string format. Use IP:PORT:PEER_ID', true);
-        return;
-    }
-
-    const ip = parts[0];
-    const port = parts[1];
-    const peerId = parts.slice(2).join(':'); // In case peer ID contains colons
-
-    try {
-        const response = await fetch('/api/connect-ip', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                ip: ip,
-                port: parseInt(port),
-                peerId: peerId 
-            })
-        });
-        
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
-        
-        const data = await response.json();
-        sharedApp.showStatus('discoveryStatus', 'Successfully connected using connection string!');
-        sharedApp.showResult('discoveryResult', data);
-    } catch (error) {
-        sharedApp.showStatus('discoveryStatus', 'Error connecting by string: ' + error.message, true);
-        document.getElementById('discoveryResult').textContent = '';
-    }
-}
 
 async function getConnectionInfo() {
     try {
@@ -191,11 +149,6 @@ async function getConnectionInfo() {
                 : '⚠️ Node behind NAT - direct connections not possible', 
             !data.isPublicNode);
         sharedApp.showResult('discoveryResult', connectionInfo);
-        
-        // Auto-select connection string for easy copying
-        if (connectionString && document.getElementById('connectionStringInput')) {
-            document.getElementById('connectionStringInput').value = connectionString;
-        }
         
     } catch (error) {
         sharedApp.showStatus('discoveryStatus', 'Error getting connection info: ' + error.message, true);

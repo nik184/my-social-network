@@ -19,7 +19,8 @@
       "Bash(pkill:*)",
       "Bash(./distributed-app)",
       "Bash(find:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(./build.sh)"
     ],
     "deny": []
   },

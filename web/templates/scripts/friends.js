@@ -1,6 +1,9 @@
 // Load initial data when page loads
 document.addEventListener('DOMContentLoaded', function() {
     loadFriends();
+    // Show connection status initially
+    sharedApp.showStatus('connectionStatus', '', false);
+    sharedApp.hideStatus('connectionStatus');
 });
 
 // Load friends from the server
@@ -122,4 +125,75 @@ async function removeFriend(peerID, friendName) {
 // Navigate to friend profile page
 function viewFriendProfile(peerID) {
     window.location.href = `/friend-profile?peer_id=${encodeURIComponent(peerID)}`;
+}
+
+// Connect to a peer using connection string and add to friends
+async function connectAndAddFriend() {
+    const connectionString = document.getElementById('connectionStringInput').value;
+    
+    if (!connectionString) {
+        sharedApp.showStatus('connectionStatus', 'Please enter a connection string', true);
+        return;
+    }
+
+    // Parse connection string (format: IP:PORT:PEER_ID)
+    const parts = connectionString.split(':');
+    if (parts.length < 3) {
+        sharedApp.showStatus('connectionStatus', 'Invalid connection string format. Use IP:PORT:PEER_ID', true);
+        return;
+    }
+
+    const ip = parts[0];
+    const port = parts[1];
+    const peerId = parts.slice(2).join(':'); // In case peer ID contains colons
+
+    try {
+        sharedApp.showStatus('connectionStatus', 'Connecting to peer...', false);
+        
+        const response = await fetch('/api/connect-ip', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                ip: ip,
+                port: parseInt(port),
+                peerId: peerId 
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        
+        const connectionData = await response.json();
+        sharedApp.showStatus('connectionStatus', 'Successfully connected! Adding to friends...', false);
+        
+        // Now add the peer to friends
+        const friendResponse = await fetch('/api/friends', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                peer_id: peerId,
+                peer_name: connectionData.peer_name || 'Unknown'
+            })
+        });
+        
+        if (!friendResponse.ok) {
+            throw new Error('Failed to add to friends');
+        }
+        
+        const friendData = await friendResponse.json();
+        sharedApp.showStatus('connectionStatus', `✅ Successfully connected and added ${connectionData.peer_name || 'peer'} to friends!`, false);
+        
+        // Clear the input field
+        document.getElementById('connectionStringInput').value = '';
+        
+        // Reload friends list to show the new friend
+        setTimeout(() => {
+            loadFriends();
+            sharedApp.hideStatus('connectionStatus');
+        }, 2000);
+        
+    } catch (error) {
+        sharedApp.showStatus('connectionStatus', 'Error connecting or adding friend: ' + error.message, true);
+    }
 }

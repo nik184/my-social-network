@@ -5,6 +5,17 @@
     <p>Manage your friends and view their profiles</p>
 </div>
 
+<!-- Add New Friend Section -->
+<div class="section">
+    <h3>➕ Add New Friend</h3>
+    <div style="margin-bottom: 15px;">
+        <h4>📋 Connection String</h4>
+        <input type="text" id="connectionStringInput" class="input" placeholder="Paste connection string (IP:PORT:PEER_ID)" style="width: 500px;">
+        <button class="button" onclick="connectAndAddFriend()">Connect & Add to Friends</button>
+    </div>
+    <div id="connectionStatus" class="status" style="display: none;"></div>
+</div>
+
 <!-- Friends Section -->
 <div class="section">
     <h3>Friends List</h3>
