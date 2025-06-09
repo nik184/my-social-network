@@ -1,0 +1,80 @@
+package utils
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+)
+
+// PathManager handles common path operations
+type PathManager struct {
+	homeDir string
+}
+
+// NewPathManager creates a new path manager
+func NewPathManager() (*PathManager, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user home directory: %w", err)
+	}
+	
+	return &PathManager{homeDir: homeDir}, nil
+}
+
+// GetSpace184Path returns the space184 directory path
+func (pm *PathManager) GetSpace184Path() string {
+	return filepath.Join(pm.homeDir, "space184")
+}
+
+// GetNotesPath returns the notes directory path
+func (pm *PathManager) GetNotesPath() string {
+	return filepath.Join(pm.GetSpace184Path(), "notes")
+}
+
+// GetImagesPath returns the images directory path
+func (pm *PathManager) GetImagesPath() string {
+	return filepath.Join(pm.GetSpace184Path(), "images")
+}
+
+// GetAvatarPath returns the avatar directory path
+func (pm *PathManager) GetAvatarPath() string {
+	return filepath.Join(pm.GetImagesPath(), "avatar")
+}
+
+// GetPeerAvatarPath returns the avatar directory for a specific peer
+func (pm *PathManager) GetPeerAvatarPath(peerID string) string {
+	return filepath.Join(pm.GetSpace184Path(), "downloaded", peerID, "images")
+}
+
+// GetDatabasePath returns the database file path
+func (pm *PathManager) GetDatabasePath() string {
+	return filepath.Join(pm.GetSpace184Path(), "node.db")
+}
+
+// GetRelativePath computes relative path from home directory
+func (pm *PathManager) GetRelativePath(absolutePath string) (string, error) {
+	relPath, err := filepath.Rel(pm.homeDir, absolutePath)
+	if err != nil {
+		return absolutePath, err // Fall back to absolute path
+	}
+	return relPath, nil
+}
+
+// EnsureDir creates a directory if it doesn't exist
+func EnsureDir(dir string) error {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return os.MkdirAll(dir, 0755)
+	}
+	return nil
+}
+
+// DefaultPathManager singleton
+var DefaultPathManager *PathManager
+
+func init() {
+	var err error
+	DefaultPathManager, err = NewPathManager()
+	if err != nil {
+		panic(fmt.Sprintf("Failed to initialize default path manager: %v", err))
+	}
+}

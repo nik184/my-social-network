@@ -17,6 +17,34 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
+// ConnectionInfoResponse represents the API response for connection info
+type ConnectionInfoResponse struct {
+	PeerID         string   `json:"peerId"`
+	PublicAddress  string   `json:"publicAddress,omitempty"`
+	Port           int      `json:"port,omitempty"`
+	LocalAddresses []string `json:"localAddresses"`
+	IsPublicNode   bool     `json:"isPublicNode"`
+}
+
+// PeerInfoResponse represents peer information in API responses
+type PeerInfoResponse struct {
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	Addresses      []string  `json:"addresses"`
+	FirstSeen      time.Time `json:"first_seen"`
+	LastSeen       time.Time `json:"last_seen"`
+	IsValidated    bool      `json:"is_validated"`
+	ConnectionType string    `json:"connection_type"`
+}
+
+// SecondDegreePeerResponse represents a second-degree peer in API responses
+type SecondDegreePeerResponse struct {
+	PeerID      string `json:"peer_id"`
+	PeerName    string `json:"peer_name"`
+	ViaPeerID   string `json:"via_peer_id"`
+	ViaPeerName string `json:"via_peer_name"`
+}
+
 // TestTwoIsolatedNodesConnection tests the ability of two isolated nodes to start and establish a connection
 // This test verifies:
 // 1. Two separate containers can be started simulating isolated nodes
@@ -294,4 +322,30 @@ func buildAPIURL(ctx context.Context, container testcontainers.Container, endpoi
 	}
 
 	return fmt.Sprintf("http://%s:%s%s", host, port.Port(), endpoint), nil
+}
+
+// findProjectRoot finds the project root directory by looking for go.mod
+func findProjectRoot() (string, error) {
+	// Start from current working directory
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	// Walk up the directory tree looking for go.mod
+	for {
+		goModPath := filepath.Join(dir, "go.mod")
+		if _, err := os.Stat(goModPath); err == nil {
+			return dir, nil
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			// Reached the root directory
+			break
+		}
+		dir = parent
+	}
+
+	return "", fmt.Errorf("could not find go.mod file in directory tree")
 }

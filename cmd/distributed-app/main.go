@@ -17,7 +17,7 @@ import (
 
 // showConnectionString displays the connection string for sharing
 func showConnectionString(appService *services.AppService) {
-	connectionInfo := appService.P2PService.GetConnectionInfo()
+	connectionInfo := appService.GetP2PService().GetConnectionInfo()
 	
 	fmt.Println("\n" + strings.Repeat("=", 60))
 	fmt.Println("📋 CONNECTION STRING FOR SHARING")

@@ -31,6 +31,29 @@ type Gallery struct {
 	Images     []string `json:"images"`
 }
 
+// ConnectionRecord represents a connection history record
+type ConnectionRecord struct {
+	ID             int       `json:"id"`
+	PeerID         string    `json:"peer_id"`
+	Address        string    `json:"address"`
+	FirstConnected time.Time `json:"first_connected"`
+	LastConnected  time.Time `json:"last_connected"`
+	ConnectionType string    `json:"connection_type"`
+	IsValidated    bool      `json:"is_validated"`
+	PeerName       string    `json:"peer_name"`
+}
+
+// FileRecord represents a file metadata record
+type FileRecord struct {
+	ID        int       `json:"id"`
+	FilePath  string    `json:"filepath"`
+	Hash      string    `json:"hash"`
+	Size      int64     `json:"size"`
+	Extension string    `json:"extension"`
+	Type      string    `json:"type"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 // NetworkNode represents a node in the distributed network
 type NetworkNode struct {
 	ID        peer.ID             `json:"id"`

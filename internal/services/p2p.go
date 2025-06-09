@@ -24,6 +24,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	"github.com/multiformats/go-multiaddr"
 
+	"my-social-network/internal/interfaces"
 	"my-social-network/internal/models"
 )
 
@@ -72,8 +73,8 @@ type P2PService struct {
 	dht            *dht.IpfsDHT
 	ctx            context.Context
 	cancel         context.CancelFunc
-	appService     *AppService
-	dbService      *DatabaseService
+	container      *ServiceContainer
+	dbService      interfaces.DatabaseService
 	validatedPeers map[peer.ID]bool
 	peersMutex     sync.RWMutex
 
@@ -85,7 +86,7 @@ type P2PService struct {
 }
 
 // NewP2PService creates a new P2P service
-func NewP2PService(appService *AppService, dbService *DatabaseService) (*P2PService, error) {
+func NewP2PService(container *ServiceContainer, dbService interfaces.DatabaseService) (*P2PService, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Get persistent private key from database
@@ -151,7 +152,7 @@ func NewP2PService(appService *AppService, dbService *DatabaseService) (*P2PServ
 		host:           h,
 		ctx:            ctx,
 		cancel:         cancel,
-		appService:     appService,
+		container:      container,
 		dbService:      dbService,
 		validatedPeers: make(map[peer.ID]bool),
 		connectedPeers: make(map[peer.ID]*PeerInfo),
@@ -229,19 +230,19 @@ func (p *P2PService) setupRelayDiscovery() {
 
 // prepareAvatarData reads the primary avatar image and encodes it for transmission
 func (p *P2PService) prepareAvatarData() *AvatarData {
-	if p.appService == nil || p.appService.DirectoryService == nil {
+	if p.container == nil || p.container.GetDirectoryService() == nil {
 		return nil
 	}
 
 	// Get avatar images
-	avatarImages, err := p.appService.DirectoryService.GetAvatarImages()
+	avatarImages, err := p.container.GetDirectoryService().GetAvatarImages()
 	if err != nil || len(avatarImages) == 0 {
 		return nil
 	}
 
 	// Use the first image as the primary avatar
 	primaryAvatar := avatarImages[0]
-	avatarDir := p.appService.DirectoryService.GetAvatarDirectory()
+	avatarDir := p.container.GetDirectoryService().GetAvatarDirectory()
 	avatarPath := filepath.Join(avatarDir, primaryAvatar)
 
 	// Read the image file
@@ -269,7 +270,7 @@ func (p *P2PService) prepareAvatarData() *AvatarData {
 
 // saveReceivedAvatar saves avatar data received from a peer
 func (p *P2PService) saveReceivedAvatar(peerID peer.ID, avatarData *AvatarData) error {
-	if p.appService == nil || p.appService.DirectoryService == nil || avatarData == nil {
+	if p.container == nil || p.container.GetDirectoryService() == nil || avatarData == nil {
 		return fmt.Errorf("invalid service or avatar data")
 	}
 
@@ -285,7 +286,7 @@ func (p *P2PService) saveReceivedAvatar(peerID peer.ID, avatarData *AvatarData) 
 	}
 
 	// Save using DirectoryService
-	err = p.appService.DirectoryService.SavePeerAvatar(peerID.String(), avatarData.Filename, imageData)
+	err = p.container.GetDirectoryService().SavePeerAvatar(peerID.String(), avatarData.Filename, imageData)
 	if err != nil {
 		return fmt.Errorf("failed to save peer avatar: %w", err)
 	}
@@ -503,11 +504,11 @@ func (p *P2PService) markPeerValidation(peerID peer.ID, isValid bool) {
 
 // checkPeerHasAvatar checks if a peer has avatar images available
 func (p *P2PService) checkPeerHasAvatar(peerID peer.ID) bool {
-	if p.appService == nil || p.appService.DirectoryService == nil {
+	if p.container == nil || p.container.GetDirectoryService() == nil {
 		return false
 	}
 
-	avatarImages, err := p.appService.DirectoryService.GetPeerAvatarImages(peerID.String())
+	avatarImages, err := p.container.GetDirectoryService().GetPeerAvatarImages(peerID.String())
 	if err != nil {
 		return false
 	}
@@ -636,14 +637,14 @@ func (p *P2PService) handleStream(stream network.Stream) {
 		// Return node and folder information
 		response = models.P2PMessage{
 			Type:    models.MessageTypeGetInfoResp,
-			Payload: p.appService.GetNodeInfo(),
+			Payload: p.getNodeInfo(),
 		}
 
 	case models.MessageTypeDiscovery:
 		// Handle discovery request
 		response = models.P2PMessage{
 			Type:    models.MessageTypeDiscoveryResp,
-			Payload: p.appService.GetNodeInfo(),
+			Payload: p.getNodeInfo(),
 		}
 
 	case models.MessageTypeGetPeerList:
@@ -1641,14 +1642,14 @@ func (p *P2PService) ConnectToSecondDegreePeer(targetPeerID, viaPeerID string) (
 
 // handleGetNotesRequest handles P2P request for notes list
 func (p *P2PService) handleGetNotesRequest() *models.NotesResponse {
-	if p.appService == nil || p.appService.DirectoryService == nil {
+	if p.container == nil || p.container.GetDirectoryService() == nil {
 		return &models.NotesResponse{
 			Notes: []models.Note{},
 			Count: 0,
 		}
 	}
 
-	notes, err := p.appService.DirectoryService.GetNotes()
+	notes, err := p.container.GetDirectoryService().GetNotes()
 	if err != nil {
 		log.Printf("Failed to get notes for P2P request: %v", err)
 		return &models.NotesResponse{
@@ -1665,7 +1666,7 @@ func (p *P2PService) handleGetNotesRequest() *models.NotesResponse {
 
 // handleGetNoteRequest handles P2P request for specific note
 func (p *P2PService) handleGetNoteRequest(payload interface{}) *models.NoteResponse {
-	if p.appService == nil || p.appService.DirectoryService == nil {
+	if p.container == nil || p.container.GetDirectoryService() == nil {
 		return &models.NoteResponse{
 			Note: nil,
 		}
@@ -1684,7 +1685,7 @@ func (p *P2PService) handleGetNoteRequest(payload interface{}) *models.NoteRespo
 		return &models.NoteResponse{Note: nil}
 	}
 
-	note, err := p.appService.DirectoryService.GetNote(noteRequest.Filename)
+	note, err := p.container.GetDirectoryService().GetNote(noteRequest.Filename)
 	if err != nil {
 		log.Printf("Failed to get note %s for P2P request: %v", noteRequest.Filename, err)
 		return &models.NoteResponse{Note: nil}
@@ -1797,6 +1798,34 @@ func (p *P2PService) RequestPeerNote(peerID, filename string) (*models.NoteRespo
 	}
 
 	return &noteResponse, nil
+}
+
+// getNodeInfo creates a NodeInfoResponse for P2P communication
+func (p *P2PService) getNodeInfo() *models.NodeInfoResponse {
+	response := &models.NodeInfoResponse{
+		Node:         p.GetNode(),
+		IsPublicNode: p.IsPublicNode(),
+	}
+
+	// Add peer information if available
+	peerInfo := p.GetConnectedPeerInfo()
+	if len(peerInfo) > 0 {
+		response.ConnectedPeerInfo = make(map[string]*models.PeerInfoJSON)
+		for peerID, info := range peerInfo {
+			response.ConnectedPeerInfo[peerID.String()] = &models.PeerInfoJSON{
+				ID:             info.ID.String(),
+				Addresses:      info.Addresses,
+				FirstSeen:      info.FirstSeen,
+				LastSeen:       info.LastSeen,
+				IsValidated:    info.IsValidated,
+				ConnectionType: info.ConnectionType,
+				Name:           info.Name,
+				HasAvatar:      info.HasAvatar,
+			}
+		}
+	}
+
+	return response
 }
 
 // Close shuts down the P2P service

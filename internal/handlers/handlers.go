@@ -34,15 +34,15 @@ func (h *Handler) HandleGetInfo(w http.ResponseWriter, r *http.Request) {
 // HandleScan handles POST /api/scan requests
 func (h *Handler) HandleScan(w http.ResponseWriter, r *http.Request) {
 	// Use the monitor service for manual scan if available
-	if h.appService.MonitorService != nil {
-		err := h.appService.MonitorService.TriggerManualScan()
+	if h.appService.GetMonitorService() != nil {
+		err := h.appService.GetMonitorService().TriggerManualScan()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	} else {
 		// Fallback to direct scan
-		folderInfo, err := h.appService.DirectoryService.ScanDirectory()
+		folderInfo, err := h.appService.GetDirectoryService().ScanDirectory()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -56,7 +56,7 @@ func (h *Handler) HandleScan(w http.ResponseWriter, r *http.Request) {
 
 // HandleCreate handles POST /api/create requests
 func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
-	if err := h.appService.DirectoryService.CreateDirectory(); err != nil {
+	if err := h.appService.GetDirectoryService().CreateDirectory(); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -78,7 +78,7 @@ func (h *Handler) HandleDiscover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	nodeInfo, err := h.appService.P2PService.DiscoverPeer(req.PeerID)
+	nodeInfo, err := h.appService.GetP2PService().DiscoverPeer(req.PeerID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -90,8 +90,8 @@ func (h *Handler) HandleDiscover(w http.ResponseWriter, r *http.Request) {
 
 // HandlePeers handles GET /api/peers requests
 func (h *Handler) HandlePeers(w http.ResponseWriter, r *http.Request) {
-	validatedPeers := h.appService.P2PService.GetConnectedPeers()
-	allPeers := h.appService.P2PService.GetAllConnectedPeers()
+	validatedPeers := h.appService.GetP2PService().GetConnectedPeers()
+	allPeers := h.appService.GetP2PService().GetAllConnectedPeers()
 	
 	// Convert peer IDs to strings for JSON
 	validatedPeerStrings := make([]string, len(validatedPeers))
@@ -113,11 +113,11 @@ func (h *Handler) HandlePeers(w http.ResponseWriter, r *http.Request) {
 // HandleMonitorStatus handles GET /api/monitor requests
 func (h *Handler) HandleMonitorStatus(w http.ResponseWriter, r *http.Request) {
 	status := map[string]interface{}{
-		"monitoring": h.appService.MonitorService != nil,
+		"monitoring": h.appService.GetMonitorService() != nil,
 	}
 	
-	if h.appService.MonitorService != nil {
-		status["lastScan"] = h.appService.MonitorService.GetLastScanTime()
+	if h.appService.GetMonitorService() != nil {
+		status["lastScan"] = h.appService.GetMonitorService().GetLastScanTime()
 	}
 	
 	w.Header().Set("Content-Type", "application/json")
@@ -137,7 +137,7 @@ func (h *Handler) HandleConnectByIP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	nodeInfo, err := h.appService.P2PService.ConnectByIP(req.IP, req.Port, req.PeerID)
+	nodeInfo, err := h.appService.GetP2PService().ConnectByIP(req.IP, req.Port, req.PeerID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -149,7 +149,7 @@ func (h *Handler) HandleConnectByIP(w http.ResponseWriter, r *http.Request) {
 
 // HandleConnectionInfo handles GET /api/connection-info requests
 func (h *Handler) HandleConnectionInfo(w http.ResponseWriter, r *http.Request) {
-	connectionInfo := h.appService.P2PService.GetConnectionInfo()
+	connectionInfo := h.appService.GetP2PService().GetConnectionInfo()
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(connectionInfo)
 }
@@ -218,7 +218,7 @@ func (h *Handler) HandleAvatarList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	images, err := h.appService.DirectoryService.GetAvatarImages()
+	images, err := h.appService.GetDirectoryService().GetAvatarImages()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -252,7 +252,7 @@ func (h *Handler) HandleAvatarImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get avatar images list to verify the file exists
-	images, err := h.appService.DirectoryService.GetAvatarImages()
+	images, err := h.appService.GetDirectoryService().GetAvatarImages()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -273,7 +273,7 @@ func (h *Handler) HandleAvatarImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Serve the file
-	avatarDir := h.appService.DirectoryService.GetAvatarDirectory()
+	avatarDir := h.appService.GetDirectoryService().GetAvatarDirectory()
 	filePath := filepath.Join(avatarDir, filename)
 	
 	// Set appropriate content type based on file extension
@@ -336,7 +336,7 @@ func (h *Handler) HandlePeerAvatar(w http.ResponseWriter, r *http.Request) {
 
 	// If only peer ID is provided, return avatar list
 	if len(pathParts) == 1 {
-		images, err := h.appService.DirectoryService.GetPeerAvatarImages(peerID)
+		images, err := h.appService.GetDirectoryService().GetPeerAvatarImages(peerID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -362,7 +362,7 @@ func (h *Handler) HandlePeerAvatar(w http.ResponseWriter, r *http.Request) {
 		filename := pathParts[1]
 
 		// Get peer avatar images list to verify the file exists
-		images, err := h.appService.DirectoryService.GetPeerAvatarImages(peerID)
+		images, err := h.appService.GetDirectoryService().GetPeerAvatarImages(peerID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -383,7 +383,7 @@ func (h *Handler) HandlePeerAvatar(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Serve the file
-		peerAvatarDir := h.appService.DirectoryService.GetPeerAvatarDirectory(peerID)
+		peerAvatarDir := h.appService.GetDirectoryService().GetPeerAvatarDirectory(peerID)
 		filePath := filepath.Join(peerAvatarDir, filename)
 		
 		// Set appropriate content type based on file extension
@@ -417,7 +417,7 @@ func (h *Handler) HandleNotes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	notes, err := h.appService.DirectoryService.GetNotes()
+	notes, err := h.appService.GetDirectoryService().GetNotes()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -444,7 +444,7 @@ func (h *Handler) HandleNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	note, err := h.appService.DirectoryService.GetNote(filename)
+	note, err := h.appService.GetDirectoryService().GetNote(filename)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -458,7 +458,7 @@ func (h *Handler) HandleNote(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleFriends(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		friends, err := h.appService.DatabaseService.GetFriends()
+		friends, err := h.appService.GetDatabaseService().GetFriends()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -484,7 +484,7 @@ func (h *Handler) HandleFriends(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err := h.appService.DatabaseService.AddFriend(req.PeerID, req.PeerName)
+		err := h.appService.GetDatabaseService().AddFriend(req.PeerID, req.PeerName)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -510,7 +510,7 @@ func (h *Handler) HandleFriend(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		// Get specific friend info
-		friends, err := h.appService.DatabaseService.GetFriends()
+		friends, err := h.appService.GetDatabaseService().GetFriends()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -529,7 +529,7 @@ func (h *Handler) HandleFriend(w http.ResponseWriter, r *http.Request) {
 
 	case http.MethodDelete:
 		// Remove friend
-		err := h.appService.DatabaseService.RemoveFriend(peerID)
+		err := h.appService.GetDatabaseService().RemoveFriend(peerID)
 		if err != nil {
 			if err.Error() == "friend not found" {
 				http.Error(w, err.Error(), http.StatusNotFound)
@@ -566,7 +566,7 @@ func (h *Handler) HandlePeerNotes(w http.ResponseWriter, r *http.Request) {
 	// If no filename provided, return notes list
 	if len(pathParts) == 1 {
 		// Request notes list from peer via P2P
-		notesResponse, err := h.appService.P2PService.RequestPeerNotes(peerID)
+		notesResponse, err := h.appService.GetP2PService().RequestPeerNotes(peerID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Failed to get notes from peer: %v", err), http.StatusInternalServerError)
 			return
@@ -585,7 +585,7 @@ func (h *Handler) HandlePeerNotes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Request specific note from peer via P2P
-	noteResponse, err := h.appService.P2PService.RequestPeerNote(peerID, filename)
+	noteResponse, err := h.appService.GetP2PService().RequestPeerNote(peerID, filename)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to get note from peer: %v", err), http.StatusInternalServerError)
 		return
@@ -607,7 +607,7 @@ func (h *Handler) HandleGalleries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	galleries, err := h.appService.DirectoryService.GetGalleries()
+	galleries, err := h.appService.GetDirectoryService().GetGalleries()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -638,7 +638,7 @@ func (h *Handler) HandleGalleryImage(w http.ResponseWriter, r *http.Request) {
 
 	// If only gallery name is provided, return images list
 	if len(pathParts) == 1 {
-		images, err := h.appService.DirectoryService.GetGalleryImages(galleryName)
+		images, err := h.appService.GetDirectoryService().GetGalleryImages(galleryName)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -667,7 +667,7 @@ func (h *Handler) HandleGalleryImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get gallery images list to verify the file exists
-	images, err := h.appService.DirectoryService.GetGalleryImages(galleryName)
+	images, err := h.appService.GetDirectoryService().GetGalleryImages(galleryName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -688,7 +688,7 @@ func (h *Handler) HandleGalleryImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Serve the file
-	galleryDir := filepath.Join(h.appService.DirectoryService.GetDirectoryPath(), "images", galleryName)
+	galleryDir := filepath.Join(h.appService.GetDirectoryService().GetDirectoryPath(), "images", galleryName)
 	filePath := filepath.Join(galleryDir, filename)
 	
 	// Set appropriate content type based on file extension

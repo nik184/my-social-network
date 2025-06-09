@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"my-social-network/internal/models"
+	"my-social-network/internal/utils"
 )
 
 // DirectoryServiceInterface defines the interface for directory operations
@@ -32,27 +33,26 @@ type DirectoryServiceInterface interface {
 
 // DirectoryService handles directory operations
 type DirectoryService struct {
-	directoryPath string
+	pathManager   *utils.PathManager
+	pathValidator *utils.PathValidator
 }
 
 // NewDirectoryService creates a new directory service
 func NewDirectoryService() *DirectoryService {
-	homeDir, _ := os.UserHomeDir()
-	dirPath := filepath.Join(homeDir, "space184")
-
 	return &DirectoryService{
-		directoryPath: dirPath,
+		pathManager:   utils.DefaultPathManager,
+		pathValidator: utils.DefaultPathValidator,
 	}
 }
 
 // GetDirectoryPath returns the directory path
 func (d *DirectoryService) GetDirectoryPath() string {
-	return d.directoryPath
+	return d.pathManager.GetSpace184Path()
 }
 
 // CreateDirectory creates the space184 directory if it doesn't exist
 func (d *DirectoryService) CreateDirectory() error {
-	err := os.MkdirAll(d.directoryPath, 0755)
+	err := utils.EnsureDir(d.pathManager.GetSpace184Path())
 	if err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
@@ -67,7 +67,8 @@ func (d *DirectoryService) CreateDirectory() error {
 
 // ScanDirectory scans the directory and returns folder information
 func (d *DirectoryService) ScanDirectory() (*models.FolderInfo, error) {
-	files, err := os.ReadDir(d.directoryPath)
+	space184Path := d.pathManager.GetSpace184Path()
+	files, err := os.ReadDir(space184Path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory: %w", err)
 	}
@@ -78,7 +79,7 @@ func (d *DirectoryService) ScanDirectory() (*models.FolderInfo, error) {
 	}
 
 	return &models.FolderInfo{
-		Path:     d.directoryPath,
+		Path:     space184Path,
 		Files:    fileNames,
 		LastScan: time.Now(),
 	}, nil
@@ -86,13 +87,13 @@ func (d *DirectoryService) ScanDirectory() (*models.FolderInfo, error) {
 
 // GetAvatarDirectory returns the path to the avatar images directory
 func (d *DirectoryService) GetAvatarDirectory() string {
-	return filepath.Join(d.directoryPath, "images", "avatar")
+	return d.pathManager.GetAvatarPath()
 }
 
 // CreateAvatarDirectory creates the avatar images directory if it doesn't exist
 func (d *DirectoryService) CreateAvatarDirectory() error {
 	avatarDir := d.GetAvatarDirectory()
-	err := os.MkdirAll(avatarDir, 0755)
+	err := utils.EnsureDir(avatarDir)
 	if err != nil {
 		return fmt.Errorf("failed to create avatar directory: %w", err)
 	}
@@ -114,22 +115,13 @@ func (d *DirectoryService) GetAvatarImages() ([]string, error) {
 	}
 
 	var imageFiles []string
-	validExtensions := map[string]bool{
-		".jpg":  true,
-		".jpeg": true,
-		".png":  true,
-		".gif":  true,
-		".bmp":  true,
-		".webp": true,
-	}
 
 	for _, file := range files {
 		if file.IsDir() {
 			continue
 		}
 		
-		ext := strings.ToLower(filepath.Ext(file.Name()))
-		if validExtensions[ext] {
+		if utils.IsImageFile(file.Name()) {
 			imageFiles = append(imageFiles, file.Name())
 		}
 	}
@@ -139,13 +131,13 @@ func (d *DirectoryService) GetAvatarImages() ([]string, error) {
 
 // GetPeerAvatarDirectory returns the path to a specific peer's avatar directory
 func (d *DirectoryService) GetPeerAvatarDirectory(peerID string) string {
-	return filepath.Join(d.directoryPath, "downloaded", peerID, "images")
+	return d.pathManager.GetPeerAvatarPath(peerID)
 }
 
 // CreatePeerAvatarDirectory creates the avatar directory for a specific peer
 func (d *DirectoryService) CreatePeerAvatarDirectory(peerID string) error {
 	peerAvatarDir := d.GetPeerAvatarDirectory(peerID)
-	err := os.MkdirAll(peerAvatarDir, 0755)
+	err := utils.EnsureDir(peerAvatarDir)
 	if err != nil {
 		return fmt.Errorf("failed to create peer avatar directory: %w", err)
 	}
@@ -160,8 +152,8 @@ func (d *DirectoryService) SavePeerAvatar(peerID string, filename string, data [
 	}
 
 	// Validate filename to prevent directory traversal
-	if strings.Contains(filename, "..") || strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
-		return fmt.Errorf("invalid filename: %s", filename)
+	if err := d.pathValidator.ValidateFilename(filename); err != nil {
+		return fmt.Errorf("invalid filename: %s - %w", filename, err)
 	}
 
 	peerAvatarDir := d.GetPeerAvatarDirectory(peerID)
@@ -190,22 +182,13 @@ func (d *DirectoryService) GetPeerAvatarImages(peerID string) ([]string, error) 
 	}
 
 	var imageFiles []string
-	validExtensions := map[string]bool{
-		".jpg":  true,
-		".jpeg": true,
-		".png":  true,
-		".gif":  true,
-		".bmp":  true,
-		".webp": true,
-	}
 
 	for _, file := range files {
 		if file.IsDir() {
 			continue
 		}
 		
-		ext := strings.ToLower(filepath.Ext(file.Name()))
-		if validExtensions[ext] {
+		if utils.IsImageFile(file.Name()) {
 			imageFiles = append(imageFiles, file.Name())
 		}
 	}
@@ -215,13 +198,13 @@ func (d *DirectoryService) GetPeerAvatarImages(peerID string) ([]string, error) 
 
 // GetNotesDirectory returns the path to the notes directory
 func (d *DirectoryService) GetNotesDirectory() string {
-	return filepath.Join(d.directoryPath, "notes")
+	return d.pathManager.GetNotesPath()
 }
 
 // CreateNotesDirectory creates the notes directory if it doesn't exist
 func (d *DirectoryService) CreateNotesDirectory() error {
 	notesDir := d.GetNotesDirectory()
-	err := os.MkdirAll(notesDir, 0755)
+	err := utils.EnsureDir(notesDir)
 	if err != nil {
 		return fmt.Errorf("failed to create notes directory: %w", err)
 	}
@@ -274,8 +257,8 @@ func (d *DirectoryService) GetNotes() ([]models.Note, error) {
 // GetNote returns a specific note by filename
 func (d *DirectoryService) GetNote(filename string) (*models.Note, error) {
 	// Validate filename to prevent directory traversal
-	if strings.Contains(filename, "..") || strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
-		return nil, fmt.Errorf("invalid filename: %s", filename)
+	if err := d.pathValidator.ValidateFilename(filename); err != nil {
+		return nil, fmt.Errorf("invalid filename: %s - %w", filename, err)
 	}
 
 	notesDir := d.GetNotesDirectory()
@@ -327,7 +310,7 @@ func (d *DirectoryService) loadNoteFile(filename string, fileInfo os.FileInfo) (
 
 // GetGalleries returns a list of all photo galleries (subdirectories in space184/images/)
 func (d *DirectoryService) GetGalleries() ([]models.Gallery, error) {
-	imagesDir := filepath.Join(d.directoryPath, "images")
+	imagesDir := d.pathManager.GetImagesPath()
 	
 	// Check if images directory exists
 	if _, err := os.Stat(imagesDir); os.IsNotExist(err) {
@@ -340,14 +323,6 @@ func (d *DirectoryService) GetGalleries() ([]models.Gallery, error) {
 	}
 
 	var galleries []models.Gallery
-	validExtensions := map[string]bool{
-		".jpg":  true,
-		".jpeg": true,
-		".png":  true,
-		".gif":  true,
-		".bmp":  true,
-		".webp": true,
-	}
 
 	for _, file := range files {
 		if !file.IsDir() {
@@ -366,8 +341,7 @@ func (d *DirectoryService) GetGalleries() ([]models.Gallery, error) {
 				continue
 			}
 			
-			ext := strings.ToLower(filepath.Ext(galleryFile.Name()))
-			if validExtensions[ext] {
+			if utils.IsImageFile(galleryFile.Name()) {
 				images = append(images, galleryFile.Name())
 			}
 		}
@@ -387,11 +361,11 @@ func (d *DirectoryService) GetGalleries() ([]models.Gallery, error) {
 // GetGalleryImages returns a list of image files in a specific gallery
 func (d *DirectoryService) GetGalleryImages(galleryName string) ([]string, error) {
 	// Validate gallery name to prevent directory traversal
-	if strings.Contains(galleryName, "..") || strings.Contains(galleryName, "/") || strings.Contains(galleryName, "\\") {
-		return nil, fmt.Errorf("invalid gallery name: %s", galleryName)
+	if err := d.pathValidator.ValidateGalleryName(galleryName); err != nil {
+		return nil, fmt.Errorf("invalid gallery name: %s - %w", galleryName, err)
 	}
 
-	galleryDir := filepath.Join(d.directoryPath, "images", galleryName)
+	galleryDir := filepath.Join(d.pathManager.GetImagesPath(), galleryName)
 	
 	// Check if directory exists
 	if _, err := os.Stat(galleryDir); os.IsNotExist(err) {
@@ -404,22 +378,13 @@ func (d *DirectoryService) GetGalleryImages(galleryName string) ([]string, error
 	}
 
 	var imageFiles []string
-	validExtensions := map[string]bool{
-		".jpg":  true,
-		".jpeg": true,
-		".png":  true,
-		".gif":  true,
-		".bmp":  true,
-		".webp": true,
-	}
 
 	for _, file := range files {
 		if file.IsDir() {
 			continue
 		}
 		
-		ext := strings.ToLower(filepath.Ext(file.Name()))
-		if validExtensions[ext] {
+		if utils.IsImageFile(file.Name()) {
 			imageFiles = append(imageFiles, file.Name())
 		}
 	}

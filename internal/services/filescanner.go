@@ -2,71 +2,40 @@ package services
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"lukechampine.com/blake3"
+	"my-social-network/internal/interfaces"
+	"my-social-network/internal/utils"
 )
 
 // FileScannerService handles file system scanning and hash computation
 type FileScannerService struct {
-	dbService *DatabaseService
+	filesRepo   interfaces.FilesRepository
+	hashService *utils.HashService
+	pathManager *utils.PathManager
 }
 
 // NewFileScannerService creates a new file scanner service
-func NewFileScannerService(dbService *DatabaseService) *FileScannerService {
+func NewFileScannerService(filesRepo interfaces.FilesRepository) *FileScannerService {
 	return &FileScannerService{
-		dbService: dbService,
+		filesRepo:   filesRepo,
+		hashService: utils.DefaultHashService,
+		pathManager: utils.DefaultPathManager,
 	}
 }
 
-// computeFileHash computes BLAKE3 hash of a file
-func computeFileHash(filePath string) (string, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to open file: %w", err)
-	}
-	defer file.Close()
-
-	hasher := blake3.New(32, nil)
-	_, err = io.Copy(hasher, file)
-	if err != nil {
-		return "", fmt.Errorf("failed to hash file: %w", err)
-	}
-
-	return fmt.Sprintf("%x", hasher.Sum(nil)), nil
-}
-
-// getFileType determines if a file is a note or image based on extension
-func getFileType(extension string) string {
-	imageExts := map[string]bool{
-		".jpg": true, ".jpeg": true, ".png": true, ".gif": true,
-		".bmp": true, ".tiff": true, ".webp": true,
-	}
-
-	if imageExts[strings.ToLower(extension)] {
-		return "image"
-	}
-	return "note"
-}
 
 // ScanFiles scans the space184/notes and space184/images directories and updates the files table
 func (fs *FileScannerService) ScanFiles() error {
 	log.Printf("🔍 Starting file scan...")
 
-	// Get user home directory for proper path resolution
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("failed to get user home directory: %w", err)
-	}
-
-	// Define directories to scan with full paths
+	// Define directories to scan using path manager
 	scanDirs := []string{
-		filepath.Join(homeDir, "space184", "notes"),
-		filepath.Join(homeDir, "space184", "images"),
+		fs.pathManager.GetNotesPath(),
+		fs.pathManager.GetImagesPath(),
 	}
 
 	for _, dir := range scanDirs {
@@ -88,88 +57,86 @@ func (fs *FileScannerService) scanDirectory(dirPath string) error {
 		return nil
 	}
 
-	return filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			log.Printf("⚠️ Error accessing path %s: %v", path, err)
-			return nil // Continue walking even if there's an error with one file
-		}
+	return filepath.Walk(dirPath, fs.processFile)
+}
 
-		// Skip directories
-		if info.IsDir() {
-			return nil
-		}
+// processFile processes a single file during directory walking
+func (fs *FileScannerService) processFile(path string, info os.FileInfo, err error) error {
+	if err != nil {
+		log.Printf("⚠️ Error accessing path %s: %v", path, err)
+		return nil // Continue walking even if there's an error with one file
+	}
 
-		// Get file extension
-		extension := strings.ToLower(filepath.Ext(path))
-		if extension == "" {
-			return nil // Skip files without extensions
-		}
-
-		// Compute relative path from user home directory
-		var relPath string
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			relPath = path // Fall back to absolute path if home dir fails
-		} else {
-			relPath, err = filepath.Rel(homeDir, path)
-			if err != nil {
-				relPath = path // Fall back to absolute path if relative fails
-			}
-		}
-
-		// Check if file already exists in database
-		exists, currentHash, err := fs.dbService.fileExistsInDB(relPath)
-		if err != nil {
-			log.Printf("⚠️ Error checking file in database %s: %v", relPath, err)
-			return nil
-		}
-
-		// Compute file hash
-		hash, err := computeFileHash(path)
-		if err != nil {
-			log.Printf("⚠️ Error computing hash for %s: %v", relPath, err)
-			return nil
-		}
-
-		// If file exists and hash hasn't changed, skip
-		if exists && currentHash == hash {
-			return nil
-		}
-
-		// Determine file type
-		fileType := getFileType(extension)
-
-		// Insert or update file record
-		if err := fs.dbService.upsertFileRecord(relPath, hash, info.Size(), extension, fileType); err != nil {
-			log.Printf("⚠️ Error upserting file record for %s: %v", relPath, err)
-			return nil
-		}
-
-		if exists {
-			log.Printf("📝 Updated file: %s", relPath)
-		} else {
-			log.Printf("📄 Added file: %s (%s)", relPath, fileType)
-		}
-
+	// Skip directories
+	if info.IsDir() {
 		return nil
-	})
+	}
+
+	// Get file extension
+	extension := strings.ToLower(filepath.Ext(path))
+	if extension == "" {
+		return nil // Skip files without extensions
+	}
+
+	// Compute relative path using path manager
+	relPath, err := fs.pathManager.GetRelativePath(path)
+	if err != nil {
+		log.Printf("⚠️ Error computing relative path for %s: %v", path, err)
+		relPath = path // Fall back to absolute path
+	}
+
+	// Check if file already exists in database
+	exists, currentHash, err := fs.filesRepo.FileExists(relPath)
+	if err != nil {
+		log.Printf("⚠️ Error checking file in database %s: %v", relPath, err)
+		return nil
+	}
+
+	// Compute file hash using hash service
+	hash, err := fs.hashService.ComputeFileHash(path)
+	if err != nil {
+		log.Printf("⚠️ Error computing hash for %s: %v", relPath, err)
+		return nil
+	}
+
+	// If file exists and hash hasn't changed, skip
+	if exists && currentHash == hash {
+		return nil
+	}
+
+	// Determine file type using utility
+	fileType := utils.GetFileType(extension)
+
+	// Insert or update file record
+	if err := fs.filesRepo.UpsertFileRecord(relPath, hash, info.Size(), extension, fileType); err != nil {
+		log.Printf("⚠️ Error upserting file record for %s: %v", relPath, err)
+		return nil
+	}
+
+	if exists {
+		log.Printf("📝 Updated file: %s", relPath)
+	} else {
+		log.Printf("📄 Added file: %s (%s)", relPath, fileType)
+	}
+
+	return nil
 }
 
 // CleanupDeletedFiles removes file records for files that no longer exist on disk
 func (fs *FileScannerService) CleanupDeletedFiles() error {
-	files, err := fs.dbService.GetFiles()
+	files, err := fs.filesRepo.GetFiles()
 	if err != nil {
 		return fmt.Errorf("failed to get files for cleanup: %w", err)
 	}
 
 	deletedCount := 0
 	for _, file := range files {
-		homeDir, _ := os.UserHomeDir()
-		var relPath = filepath.Join(homeDir, file.FilePath)
+		// Construct full path using path manager
+		fullPath := filepath.Join(fs.pathManager.GetSpace184Path(), file.FilePath)
 
-		if _, err := os.Stat(relPath); os.IsNotExist(err) {
+		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 			// File no longer exists, remove from database
-			if err := fs.dbService.DeleteFileRecord(file.ID); err != nil {
+			if err := fs.filesRepo.DeleteFileRecord(file.ID); err != nil {
 				log.Printf("⚠️ Failed to delete file record for %s: %v", file.FilePath, err)
 				continue
 			}
@@ -184,3 +151,6 @@ func (fs *FileScannerService) CleanupDeletedFiles() error {
 
 	return nil
 }
+
+// Ensure FileScannerService implements the FileSystemService interface
+var _ interfaces.FileSystemService = (*FileScannerService)(nil)
