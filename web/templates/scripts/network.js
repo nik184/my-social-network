@@ -10,9 +10,9 @@ async function createDirectory() {
     try {
         const response = await fetch('/api/create', { method: 'POST' });
         const data = await response.json();
-        sharedApp.sharedApp.showStatus('directoryStatus', 'Directory created successfully!');
+        sharedApp.showStatus('directoryStatus', 'Directory created successfully!');
     } catch (error) {
-        sharedApp.sharedApp.showStatus('directoryStatus', 'Error creating directory: ' + error.message, true);
+        sharedApp.showStatus('directoryStatus', 'Error creating directory: ' + error.message, true);
     }
 }
 
@@ -20,10 +20,10 @@ async function scanDirectory() {
     try {
         const response = await fetch('/api/scan', { method: 'POST' });
         const data = await response.json();
-        sharedApp.sharedApp.showStatus('directoryStatus', 'Manual scan completed successfully!');
+        sharedApp.showStatus('directoryStatus', 'Manual scan completed successfully!');
         getNodeInfo(); // Refresh the info
     } catch (error) {
-        sharedApp.sharedApp.showStatus('directoryStatus', 'Error scanning directory: ' + error.message, true);
+        sharedApp.showStatus('directoryStatus', 'Error scanning directory: ' + error.message, true);
     }
 }
 
@@ -34,19 +34,19 @@ async function getMonitorStatus() {
         
         if (data.monitoring) {
             const lastScan = data.lastScan ? new Date(data.lastScan).toLocaleTimeString() : 'Never';
-            sharedApp.sharedApp.showStatus('monitorStatus', `📡 Auto-monitoring active | Last scan: ${lastScan}`, false);
+            sharedApp.showStatus('monitorStatus', `📡 Auto-monitoring active | Last scan: ${lastScan}`, false);
         } else {
-            sharedApp.sharedApp.showStatus('monitorStatus', '❌ Auto-monitoring inactive', true);
+            sharedApp.showStatus('monitorStatus', '❌ Auto-monitoring inactive', true);
         }
     } catch (error) {
-        sharedApp.sharedApp.showStatus('monitorStatus', 'Error getting monitor status: ' + error.message, true);
+        sharedApp.showStatus('monitorStatus', 'Error getting monitor status: ' + error.message, true);
     }
 }
 
 async function discoverPeer() {
     const peerId = document.getElementById('peerIdInput').value;
     if (!peerId) {
-        sharedApp.sharedApp.showStatus('discoveryStatus', 'Please enter a Peer ID', true);
+        sharedApp.showStatus('discoveryStatus', 'Please enter a Peer ID', true);
         return;
     }
 
@@ -62,10 +62,10 @@ async function discoverPeer() {
         }
         
         const data = await response.json();
-        sharedApp.sharedApp.showStatus('discoveryStatus', 'Peer discovered successfully!');
+        sharedApp.showStatus('discoveryStatus', 'Peer discovered successfully!');
         sharedApp.showResult('discoveryResult', data);
     } catch (error) {
-        sharedApp.sharedApp.showStatus('discoveryStatus', 'Error discovering peer: ' + error.message, true);
+        sharedApp.showStatus('discoveryStatus', 'Error discovering peer: ' + error.message, true);
         document.getElementById('discoveryResult').textContent = '';
     }
 }
@@ -79,9 +79,9 @@ async function getConnectedPeers() {
         const totalCount = data.totalConnectedCount || 0;
         
         if (totalCount > validatedCount) {
-            sharedApp.sharedApp.showStatus('discoveryStatus', `✅ ${validatedCount} app peers | 🔗 ${totalCount} total connections`, false);
+            sharedApp.showStatus('discoveryStatus', `✅ ${validatedCount} app peers | 🔗 ${totalCount} total connections`, false);
         } else {
-            sharedApp.sharedApp.showStatus('discoveryStatus', `✅ Connected to ${validatedCount} app peers`, false);
+            sharedApp.showStatus('discoveryStatus', `✅ Connected to ${validatedCount} app peers`, false);
         }
         
         // Show detailed information
@@ -94,7 +94,7 @@ async function getConnectedPeers() {
         
         sharedApp.showResult('discoveryResult', peerInfo);
     } catch (error) {
-        sharedApp.sharedApp.showStatus('discoveryStatus', 'Error getting peers: ' + error.message, true);
+        sharedApp.showStatus('discoveryStatus', 'Error getting peers: ' + error.message, true);
     }
 }
 
@@ -108,7 +108,7 @@ async function getNodeInfo() {
             const natStatusMsg = data.isPublicNode 
                 ? '🌐 PUBLIC NODE - Can assist with NAT traversal' 
                 : '🏠 NAT\'d NODE - Seeks assistance for connections';
-            sharedApp.sharedApp.showStatus('natStatus', natStatusMsg, !data.isPublicNode);
+            sharedApp.showStatus('natStatus', natStatusMsg, !data.isPublicNode);
         }
         
         // Create a clean display object
@@ -123,7 +123,7 @@ async function getNodeInfo() {
         
         sharedApp.showResult('nodeInfo', displayData);
     } catch (error) {
-        sharedApp.sharedApp.showStatus('nodeInfo', 'Error getting node info: ' + error.message, true);
+        sharedApp.showStatus('nodeInfo', 'Error getting node info: ' + error.message, true);
     }
 }
 
@@ -133,7 +133,7 @@ async function connectByIP() {
     const peerId = document.getElementById('targetPeerIdInput').value;
     
     if (!ip || !port || !peerId) {
-        sharedApp.sharedApp.showStatus('discoveryStatus', 'Please enter IP address, port, and peer ID', true);
+        sharedApp.showStatus('discoveryStatus', 'Please enter IP address, port, and peer ID', true);
         return;
     }
 
@@ -153,10 +153,10 @@ async function connectByIP() {
         }
         
         const data = await response.json();
-        sharedApp.sharedApp.showStatus('discoveryStatus', 'Successfully connected via IP address!');
+        sharedApp.showStatus('discoveryStatus', 'Successfully connected via IP address!');
         sharedApp.showResult('discoveryResult', data);
     } catch (error) {
-        sharedApp.sharedApp.showStatus('discoveryStatus', 'Error connecting by IP: ' + error.message, true);
+        sharedApp.showStatus('discoveryStatus', 'Error connecting by IP: ' + error.message, true);
         document.getElementById('discoveryResult').textContent = '';
     }
 }
@@ -165,14 +165,14 @@ async function connectByString() {
     const connectionString = document.getElementById('connectionStringInput').value;
     
     if (!connectionString) {
-        sharedApp.sharedApp.showStatus('discoveryStatus', 'Please enter a connection string', true);
+        sharedApp.showStatus('discoveryStatus', 'Please enter a connection string', true);
         return;
     }
 
     // Parse connection string (format: IP:PORT:PEER_ID)
     const parts = connectionString.split(':');
     if (parts.length < 3) {
-        sharedApp.sharedApp.showStatus('discoveryStatus', 'Invalid connection string format. Use IP:PORT:PEER_ID', true);
+        sharedApp.showStatus('discoveryStatus', 'Invalid connection string format. Use IP:PORT:PEER_ID', true);
         return;
     }
 
@@ -196,10 +196,10 @@ async function connectByString() {
         }
         
         const data = await response.json();
-        sharedApp.sharedApp.showStatus('discoveryStatus', 'Successfully connected using connection string!');
+        sharedApp.showStatus('discoveryStatus', 'Successfully connected using connection string!');
         sharedApp.showResult('discoveryResult', data);
     } catch (error) {
-        sharedApp.sharedApp.showStatus('discoveryStatus', 'Error connecting by string: ' + error.message, true);
+        sharedApp.showStatus('discoveryStatus', 'Error connecting by string: ' + error.message, true);
         document.getElementById('discoveryResult').textContent = '';
     }
 }
@@ -246,7 +246,7 @@ async function getConnectionInfo() {
             'Important': 'Use P2P port for connections, NOT the web interface port!'
         };
         
-        sharedApp.sharedApp.showStatus('discoveryStatus', 
+        sharedApp.showStatus('discoveryStatus', 
             data.isPublicNode 
                 ? '✅ Connection info ready for sharing' 
                 : '⚠️ Node behind NAT - direct connections not possible', 
@@ -259,7 +259,7 @@ async function getConnectionInfo() {
         }
         
     } catch (error) {
-        sharedApp.sharedApp.showStatus('discoveryStatus', 'Error getting connection info: ' + error.message, true);
+        sharedApp.showStatus('discoveryStatus', 'Error getting connection info: ' + error.message, true);
     }
 }
 
@@ -329,7 +329,7 @@ async function getConnectionHistory() {
                 const isCurrentlyConnected = conn.currently_connected || false;
                 const lastSeen = new Date(conn.last_connected).toLocaleString();
                 const avatarInfo = avatars[index];
-                const avatarHtml = sharedApp.sharedApp.createPeerAvatarElement(peerId, avatarInfo, '40px');
+                const avatarHtml = sharedApp.createPeerAvatarElement(peerId, avatarInfo, '40px');
                 
                 historyHtml += `
                     <div style="border: 1px solid #ddd; border-radius: 5px; padding: 10px; background: ${isCurrentlyConnected ? '#d4edda' : '#f8f9fa'};">
