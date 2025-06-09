@@ -46,6 +46,21 @@ func (pm *PathManager) GetPeerAvatarPath(peerID string) string {
 	return filepath.Join(pm.GetSpace184Path(), "downloaded", peerID, "images")
 }
 
+// GetPeerDownloadPath returns the download directory for a specific peer
+func (pm *PathManager) GetPeerDownloadPath(peerID string) string {
+	return filepath.Join(pm.GetSpace184Path(), "downloaded", peerID)
+}
+
+// GetPeerDocsPath returns the docs directory for a specific peer
+func (pm *PathManager) GetPeerDocsPath(peerID string) string {
+	return filepath.Join(pm.GetSpace184Path(), "downloaded", peerID, "docs")
+}
+
+// GetPeerImagesPath returns the images directory for a specific peer
+func (pm *PathManager) GetPeerImagesPath(peerID string) string {
+	return filepath.Join(pm.GetSpace184Path(), "downloaded", peerID, "images")
+}
+
 // GetDatabasePath returns the database file path
 func (pm *PathManager) GetDatabasePath() string {
 	return filepath.Join(pm.GetSpace184Path(), "node.db")

@@ -16,8 +16,14 @@
 
 <!-- Friend Docs Section -->
 <div class="section">
-    <h3>📝 Docs</h3>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h3>📝 Docs</h3>
+        <button class="button" id="downloadContentBtn" onclick="downloadAllContent()" style="background-color: #28a745;">
+            📥 Download All Content
+        </button>
+    </div>
     <div id="docsStatus" class="status" style="display: none;"></div>
+    <div id="downloadStatus" class="status" style="display: none;"></div>
     <div id="docsContent">
         <div class="empty-state">
             <div class="empty-state-icon">📝</div>

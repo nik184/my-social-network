@@ -177,3 +177,65 @@ function setCurrentFriend(friend) {
         updatePageTitle(friend.peer_name);
     }
 }
+
+// Download all content from the current friend
+async function downloadAllContent() {
+    if (!currentFriend) {
+        alert('No friend profile loaded');
+        return;
+    }
+
+    const peerID = currentFriend.peer_id;
+    const downloadBtn = document.getElementById('downloadContentBtn');
+    
+    try {
+        // Disable button and show loading state
+        downloadBtn.disabled = true;
+        downloadBtn.textContent = '📥 Downloading...';
+        sharedApp.showStatus('downloadStatus', 'Starting download of all content...', false);
+        
+        const response = await fetch(`/api/peer-docs/${peerID}/download`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const result = await response.json();
+        
+        // Show download results
+        const docsCount = result.docs_downloaded || 0;
+        const imagesCount = result.images_downloaded || 0;
+        const totalFiles = docsCount + imagesCount;
+        const errors = result.errors || [];
+        
+        let statusMessage = `✅ Download completed! ${totalFiles} files saved (${docsCount} docs, ${imagesCount} images)`;
+        
+        if (errors.length > 0) {
+            statusMessage += ` | ${errors.length} errors occurred`;
+            console.warn('Download errors:', errors);
+        }
+        
+        sharedApp.showStatus('downloadStatus', statusMessage, errors.length > 0);
+        
+        // Show details in console for debugging
+        console.log('Download result:', result);
+        
+        // Hide status after 5 seconds if successful
+        if (errors.length === 0) {
+            setTimeout(() => {
+                sharedApp.hideStatus('downloadStatus');
+            }, 5000);
+        }
+        
+    } catch (error) {
+        console.error('Error downloading content:', error);
+        sharedApp.showStatus('downloadStatus', 'Error downloading content: ' + error.message, true);
+    } finally {
+        // Re-enable button
+        downloadBtn.disabled = false;
+        downloadBtn.textContent = '📥 Download All Content';
+    }
+}

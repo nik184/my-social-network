@@ -433,27 +433,12 @@ async function connectToSecondDegreePeer(targetPeerId, viaPeerId, displayName) {
     }
 }
 
-// Auto-refresh node info and monitor status
-function startAutoRefresh() {
+// Load initial data
+window.onload = function() {
     loadAvatarImages();
     getNodeInfo();
     getMonitorStatus();
     getDetailedPeerInfo();
     getConnectionHistory();
     getSecondDegreeConnections();
-    
-    // Auto-refresh every 5 seconds
-    setInterval(() => {
-        loadAvatarImages();
-        getNodeInfo();
-        getMonitorStatus();
-        getDetailedPeerInfo();
-        getConnectionHistory();
-        getSecondDegreeConnections();
-    }, 5000);
-}
-
-// Load initial data
-window.onload = function() {
-    startAutoRefresh();
 };

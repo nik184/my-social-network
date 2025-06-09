@@ -140,6 +140,11 @@ func (sc *ServiceContainer) GetTemplateService() *TemplateService {
 	return sc.templateService
 }
 
+// GetPathManager returns the path manager
+func (sc *ServiceContainer) GetPathManager() *utils.PathManager {
+	return sc.pathManager
+}
+
 // GetPortsService returns the ports service
 // func (sc *ServiceContainer) GetPortsService() *PortsService {
 //	return sc.portsService

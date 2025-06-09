@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -547,8 +548,14 @@ func (h *Handler) HandleFriend(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// HandlePeerDocs handles GET /api/peer-docs/{peerID} and /api/peer-docs/{peerID}/{filename} requests
+// HandlePeerDocs handles GET/POST /api/peer-docs/{peerID} and /api/peer-docs/{peerID}/{filename} requests
 func (h *Handler) HandlePeerDocs(w http.ResponseWriter, r *http.Request) {
+	// Handle POST requests for downloads
+	if r.Method == http.MethodPost {
+		h.HandleDownloadPeerContent(w, r)
+		return
+	}
+	
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -598,6 +605,149 @@ func (h *Handler) HandlePeerDocs(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(docResponse.Doc)
+}
+
+// HandleDownloadPeerContent handles POST /api/peer-docs/{peerID}/download requests
+func (h *Handler) HandleDownloadPeerContent(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse URL path to extract peerID
+	pathParts := strings.Split(r.URL.Path[len("/api/peer-docs/"):], "/")
+	if len(pathParts) < 2 || pathParts[0] == "" || pathParts[1] != "download" {
+		http.Error(w, "Invalid URL format. Use /api/peer-docs/{peerID}/download", http.StatusBadRequest)
+		return
+	}
+
+	peerID := pathParts[0]
+
+	// Request docs list from peer
+	docsResponse, err := h.appService.GetP2PService().RequestPeerDocs(peerID)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to get docs from peer: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	if docsResponse.Docs == nil {
+		http.Error(w, "No docs found for peer", http.StatusNotFound)
+		return
+	}
+
+	// Download and save all docs and images
+	downloadResult, err := h.downloadAndSavePeerContent(peerID, docsResponse.Docs)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to download content: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(downloadResult)
+}
+
+// downloadAndSavePeerContent downloads and saves all content from a peer
+func (h *Handler) downloadAndSavePeerContent(peerID string, docs []models.Doc) (map[string]interface{}, error) {
+	// Get path manager from service container
+	pathManager := h.appService.GetServiceContainer().GetPathManager()
+	if pathManager == nil {
+		return nil, fmt.Errorf("path manager not available")
+	}
+
+	// Create directories
+	docsDir := pathManager.GetPeerDocsPath(peerID)
+	imagesDir := pathManager.GetPeerImagesPath(peerID)
+	
+	// Import utils package for EnsureDir function
+	if err := h.ensureDirectories(docsDir, imagesDir); err != nil {
+		return nil, fmt.Errorf("failed to create directories: %v", err)
+	}
+
+	downloadStats := map[string]interface{}{
+		"peer_id":           peerID,
+		"docs_downloaded":   0,
+		"images_downloaded": 0,
+		"errors":           []string{},
+		"successful_files": []string{},
+	}
+
+	// Download each document
+	for _, doc := range docs {
+		// Get full document content
+		docResponse, err := h.appService.GetP2PService().RequestPeerDoc(peerID, doc.Filename)
+		if err != nil {
+			errorMsg := fmt.Sprintf("Failed to download %s: %v", doc.Filename, err)
+			downloadStats["errors"] = append(downloadStats["errors"].([]string), errorMsg)
+			continue
+		}
+
+		if docResponse.Doc == nil {
+			errorMsg := fmt.Sprintf("Doc content not found for %s", doc.Filename)
+			downloadStats["errors"] = append(downloadStats["errors"].([]string), errorMsg)
+			continue
+		}
+
+		// Determine file type and save to appropriate directory
+		var saveDir string
+		var statKey string
+		
+		if h.isImageFile(doc.Filename) {
+			saveDir = imagesDir
+			statKey = "images_downloaded"
+		} else {
+			saveDir = docsDir
+			statKey = "docs_downloaded"
+		}
+
+		// Save file
+		filePath := filepath.Join(saveDir, doc.Filename)
+		err = h.saveContentToFile(filePath, docResponse.Doc.Content)
+		if err != nil {
+			errorMsg := fmt.Sprintf("Failed to save %s: %v", doc.Filename, err)
+			downloadStats["errors"] = append(downloadStats["errors"].([]string), errorMsg)
+			continue
+		}
+
+		// Update stats
+		downloadStats[statKey] = downloadStats[statKey].(int) + 1
+		downloadStats["successful_files"] = append(downloadStats["successful_files"].([]string), doc.Filename)
+	}
+
+	return downloadStats, nil
+}
+
+// ensureDirectories creates the necessary directories
+func (h *Handler) ensureDirectories(dirs ...string) error {
+	for _, dir := range dirs {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// isImageFile determines if a file is an image based on its extension
+func (h *Handler) isImageFile(filename string) bool {
+	ext := strings.ToLower(filepath.Ext(filename))
+	imageExts := []string{".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg", ".ico"}
+	for _, imgExt := range imageExts {
+		if ext == imgExt {
+			return true
+		}
+	}
+	return false
+}
+
+// saveContentToFile saves content to a file
+func (h *Handler) saveContentToFile(filePath, content string) error {
+	file, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	_, err = file.WriteString(content)
+	return err
 }
 
 // HandleGalleries handles GET /api/galleries requests
