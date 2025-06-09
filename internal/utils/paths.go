@@ -53,7 +53,7 @@ func (pm *PathManager) GetDatabasePath() string {
 
 // GetRelativePath computes relative path from home directory
 func (pm *PathManager) GetRelativePath(absolutePath string) (string, error) {
-	relPath, err := filepath.Rel(pm.homeDir, absolutePath)
+	relPath, err := filepath.Rel(pm.GetSpace184Path(), absolutePath)
 	if err != nil {
 		return absolutePath, err // Fall back to absolute path
 	}

@@ -43,33 +43,6 @@ async function getMonitorStatus() {
     }
 }
 
-async function discoverPeer() {
-    const peerId = document.getElementById('peerIdInput').value;
-    if (!peerId) {
-        sharedApp.showStatus('discoveryStatus', 'Please enter a Peer ID', true);
-        return;
-    }
-
-    try {
-        const response = await fetch('/api/discover', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ peerId: peerId })
-        });
-        
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
-        
-        const data = await response.json();
-        sharedApp.showStatus('discoveryStatus', 'Peer discovered successfully!');
-        sharedApp.showResult('discoveryResult', data);
-    } catch (error) {
-        sharedApp.showStatus('discoveryStatus', 'Error discovering peer: ' + error.message, true);
-        document.getElementById('discoveryResult').textContent = '';
-    }
-}
-
 async function getConnectedPeers() {
     try {
         const response = await fetch('/api/peers');
@@ -124,40 +97,6 @@ async function getNodeInfo() {
         sharedApp.showResult('nodeInfo', displayData);
     } catch (error) {
         sharedApp.showStatus('nodeInfo', 'Error getting node info: ' + error.message, true);
-    }
-}
-
-async function connectByIP() {
-    const ip = document.getElementById('ipInput').value;
-    const port = document.getElementById('portInput').value;
-    const peerId = document.getElementById('targetPeerIdInput').value;
-    
-    if (!ip || !port || !peerId) {
-        sharedApp.showStatus('discoveryStatus', 'Please enter IP address, port, and peer ID', true);
-        return;
-    }
-
-    try {
-        const response = await fetch('/api/connect-ip', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                ip: ip,
-                port: parseInt(port),
-                peerId: peerId 
-            })
-        });
-        
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
-        
-        const data = await response.json();
-        sharedApp.showStatus('discoveryStatus', 'Successfully connected via IP address!');
-        sharedApp.showResult('discoveryResult', data);
-    } catch (error) {
-        sharedApp.showStatus('discoveryStatus', 'Error connecting by IP: ' + error.message, true);
-        document.getElementById('discoveryResult').textContent = '';
     }
 }
 
