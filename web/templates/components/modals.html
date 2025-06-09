@@ -32,4 +32,96 @@
         </div>
     </div>
 </div>
+
+<!-- Upload Modal for Documents -->
+<div id="uploadDocsModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title">📝 Upload Documents</div>
+            <span class="close" onclick="closeUploadModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="uploadDocsForm" enctype="multipart/form-data">
+                <div style="margin-bottom: 15px;">
+                    <label for="docsFiles" style="display: block; font-weight: bold; margin-bottom: 5px;">
+                        Select Documents:
+                    </label>
+                    <input type="file" id="docsFiles" name="files" multiple 
+                           accept=".md,.pdf,.txt,.html,.djvu,.doc,.docx" 
+                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    <small style="color: #666;">Supported formats: MD, PDF, TXT, HTML, DJVU, DOC, DOCX</small>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label for="docsSubdirectory" style="display: block; font-weight: bold; margin-bottom: 5px;">
+                        Subdirectory (optional):
+                    </label>
+                    <input type="text" id="docsSubdirectory" name="subdirectory" 
+                           placeholder="Leave empty for main docs folder or enter subdirectory name"
+                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    <small style="color: #666;">Examples: "work", "personal", "projects/web"</small>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <div id="uploadDocsStatus" class="status" style="display: none;"></div>
+                </div>
+                
+                <div style="text-align: right;">
+                    <button type="button" onclick="closeUploadModal()" class="button" style="margin-right: 10px;">
+                        Cancel
+                    </button>
+                    <button type="submit" class="button" style="background-color: #007bff;">
+                        📤 Upload Documents
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Modal for Photos -->
+<div id="uploadPhotosModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title">📷 Upload Photos</div>
+            <span class="close" onclick="closeUploadModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="uploadPhotosForm" enctype="multipart/form-data">
+                <div style="margin-bottom: 15px;">
+                    <label for="photosFiles" style="display: block; font-weight: bold; margin-bottom: 5px;">
+                        Select Photos:
+                    </label>
+                    <input type="file" id="photosFiles" name="files" multiple 
+                           accept="image/*" 
+                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    <small style="color: #666;">Supported formats: JPG, PNG, GIF, WebP, BMP, SVG</small>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label for="photosSubdirectory" style="display: block; font-weight: bold; margin-bottom: 5px;">
+                        Gallery Name (optional):
+                    </label>
+                    <input type="text" id="photosSubdirectory" name="subdirectory" 
+                           placeholder="Leave empty for main images folder or enter gallery name"
+                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    <small style="color: #666;">Examples: "vacation", "family", "events/wedding"</small>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <div id="uploadPhotosStatus" class="status" style="display: none;"></div>
+                </div>
+                
+                <div style="text-align: right;">
+                    <button type="button" onclick="closeUploadModal()" class="button" style="margin-right: 10px;">
+                        Cancel
+                    </button>
+                    <button type="submit" class="button" style="background-color: #28a745;">
+                        📤 Upload Photos
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {{end}}

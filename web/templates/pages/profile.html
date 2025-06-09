@@ -32,6 +32,12 @@
 
     <!-- Docs Tab Content -->
     <div id="docsTab" class="tab-content active">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3>📝 Documents</h3>
+            <button id="addDocsBtn" class="button" onclick="openUploadModal('docs')" style="background-color: #007bff; display: none;">
+                ➕ Add Documents
+            </button>
+        </div>
         <div id="docsStatus" class="status" style="display: none;"></div>
         <div id="docsContent">
             <div class="empty-state">
@@ -43,6 +49,12 @@
 
     <!-- Photos Tab Content (only for own profile) -->
     <div id="photosTab" class="tab-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3>📷 Photo Galleries</h3>
+            <button id="addPhotosBtn" class="button" onclick="openUploadModal('photos')" style="background-color: #28a745; display: none;">
+                ➕ Add Photos
+            </button>
+        </div>
         <div id="photosStatus" class="status" style="display: none;"></div>
         <div id="photosContent">
             <div class="empty-state">

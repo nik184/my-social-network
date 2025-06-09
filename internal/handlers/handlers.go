@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -894,6 +895,232 @@ func (h *Handler) HandleFriendProfilePage(w http.ResponseWriter, r *http.Request
 	h.templateService.RenderPage(w, "profile", data)
 }
 
+// HandleUploadDocs handles POST /api/upload/docs requests
+func (h *Handler) HandleUploadDocs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse multipart form with 32MB max memory
+	err := r.ParseMultipartForm(32 << 20)
+	if err != nil {
+		http.Error(w, "Failed to parse form: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Get uploaded files
+	files := r.MultipartForm.File["files"]
+	if len(files) == 0 {
+		http.Error(w, "No files uploaded", http.StatusBadRequest)
+		return
+	}
+
+	// Get subdirectory (optional)
+	subdirectory := r.FormValue("subdirectory")
+	subdirectory = strings.TrimSpace(subdirectory)
+
+	// Validate and sanitize subdirectory path
+	if subdirectory != "" {
+		subdirectory = filepath.Clean(subdirectory)
+		if strings.Contains(subdirectory, "..") || strings.HasPrefix(subdirectory, "/") {
+			http.Error(w, "Invalid subdirectory path", http.StatusBadRequest)
+			return
+		}
+	}
+
+	// Get base docs directory
+	baseDocsDir := filepath.Join(h.appService.GetDirectoryService().GetDirectoryPath(), "docs")
+	
+	// Create target directory
+	targetDir := baseDocsDir
+	if subdirectory != "" {
+		targetDir = filepath.Join(baseDocsDir, subdirectory)
+	}
+
+	// Ensure target directory exists
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		http.Error(w, "Failed to create directory: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Process each uploaded file
+	var uploadedFiles []string
+	var errors []string
+
+	for _, fileHeader := range files {
+		// Validate file extension
+		if !h.isValidDocumentFile(fileHeader.Filename) {
+			errors = append(errors, fmt.Sprintf("Invalid file type: %s", fileHeader.Filename))
+			continue
+		}
+
+		// Open uploaded file
+		file, err := fileHeader.Open()
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("Failed to open %s: %v", fileHeader.Filename, err))
+			continue
+		}
+		defer file.Close()
+
+		// Create destination file
+		destPath := filepath.Join(targetDir, fileHeader.Filename)
+		destFile, err := os.Create(destPath)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("Failed to create %s: %v", fileHeader.Filename, err))
+			continue
+		}
+		defer destFile.Close()
+
+		// Copy file content
+		_, err = io.Copy(destFile, file)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("Failed to save %s: %v", fileHeader.Filename, err))
+			os.Remove(destPath) // Clean up partial file
+			continue
+		}
+
+		uploadedFiles = append(uploadedFiles, fileHeader.Filename)
+	}
+
+	// Return response
+	response := map[string]interface{}{
+		"success":        len(uploadedFiles) > 0,
+		"uploaded_files": uploadedFiles,
+		"uploaded_count": len(uploadedFiles),
+		"errors":         errors,
+		"target_dir":     targetDir,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// HandleUploadPhotos handles POST /api/upload/photos requests
+func (h *Handler) HandleUploadPhotos(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse multipart form with 32MB max memory
+	err := r.ParseMultipartForm(32 << 20)
+	if err != nil {
+		http.Error(w, "Failed to parse form: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Get uploaded files
+	files := r.MultipartForm.File["files"]
+	if len(files) == 0 {
+		http.Error(w, "No files uploaded", http.StatusBadRequest)
+		return
+	}
+
+	// Get subdirectory (optional)
+	subdirectory := r.FormValue("subdirectory")
+	subdirectory = strings.TrimSpace(subdirectory)
+
+	// Validate and sanitize subdirectory path
+	if subdirectory != "" {
+		subdirectory = filepath.Clean(subdirectory)
+		if strings.Contains(subdirectory, "..") || strings.HasPrefix(subdirectory, "/") {
+			http.Error(w, "Invalid subdirectory path", http.StatusBadRequest)
+			return
+		}
+	}
+
+	// Get base images directory
+	baseImagesDir := filepath.Join(h.appService.GetDirectoryService().GetDirectoryPath(), "images")
+	
+	// Create target directory
+	targetDir := baseImagesDir
+	if subdirectory != "" {
+		targetDir = filepath.Join(baseImagesDir, subdirectory)
+	}
+
+	// Ensure target directory exists
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		http.Error(w, "Failed to create directory: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Process each uploaded file
+	var uploadedFiles []string
+	var errors []string
+
+	for _, fileHeader := range files {
+		// Validate file extension
+		if !h.isValidImageFile(fileHeader.Filename) {
+			errors = append(errors, fmt.Sprintf("Invalid file type: %s", fileHeader.Filename))
+			continue
+		}
+
+		// Open uploaded file
+		file, err := fileHeader.Open()
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("Failed to open %s: %v", fileHeader.Filename, err))
+			continue
+		}
+		defer file.Close()
+
+		// Create destination file
+		destPath := filepath.Join(targetDir, fileHeader.Filename)
+		destFile, err := os.Create(destPath)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("Failed to create %s: %v", fileHeader.Filename, err))
+			continue
+		}
+		defer destFile.Close()
+
+		// Copy file content
+		_, err = io.Copy(destFile, file)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("Failed to save %s: %v", fileHeader.Filename, err))
+			os.Remove(destPath) // Clean up partial file
+			continue
+		}
+
+		uploadedFiles = append(uploadedFiles, fileHeader.Filename)
+	}
+
+	// Return response
+	response := map[string]interface{}{
+		"success":        len(uploadedFiles) > 0,
+		"uploaded_files": uploadedFiles,
+		"uploaded_count": len(uploadedFiles),
+		"errors":         errors,
+		"target_dir":     targetDir,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// isValidDocumentFile checks if a file is a valid document type
+func (h *Handler) isValidDocumentFile(filename string) bool {
+	ext := strings.ToLower(filepath.Ext(filename))
+	validExts := []string{".md", ".pdf", ".txt", ".html", ".djvu", ".doc", ".docx"}
+	for _, validExt := range validExts {
+		if ext == validExt {
+			return true
+		}
+	}
+	return false
+}
+
+// isValidImageFile checks if a file is a valid image type
+func (h *Handler) isValidImageFile(filename string) bool {
+	ext := strings.ToLower(filepath.Ext(filename))
+	validExts := []string{".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg"}
+	for _, validExt := range validExts {
+		if ext == validExt {
+			return true
+		}
+	}
+	return false
+}
+
 // RegisterRoutes registers all HTTP routes
 func (h *Handler) RegisterRoutes() {
 	// Page routes
@@ -925,4 +1152,8 @@ func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/api/peer-docs/", h.HandlePeerDocs)
 	http.HandleFunc("/api/galleries", h.HandleGalleries)
 	http.HandleFunc("/api/galleries/", h.HandleGalleryImage)
+	
+	// Upload routes
+	http.HandleFunc("/api/upload/docs", h.HandleUploadDocs)
+	http.HandleFunc("/api/upload/photos", h.HandleUploadPhotos)
 }

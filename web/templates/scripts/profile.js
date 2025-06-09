@@ -63,6 +63,10 @@ async function loadFriendProfile() {
         document.getElementById('downloadSection').style.display = 'block';
         document.getElementById('tabNavigation').style.display = 'none';
         document.getElementById('photosTab').style.display = 'none';
+        
+        // Hide upload buttons for friend profiles
+        document.getElementById('addDocsBtn').style.display = 'none';
+        document.getElementById('addPhotosBtn').style.display = 'none';
 
         // Load friend's docs
         await loadFriendDocs(peerID);
@@ -108,6 +112,10 @@ async function loadUserInfo() {
 
         // Load avatar
         await loadAvatar();
+        
+        // Show upload buttons for own profile
+        document.getElementById('addDocsBtn').style.display = 'inline-block';
+        document.getElementById('addPhotosBtn').style.display = 'inline-block';
     } catch (error) {
         console.error('Error loading user info:', error);
         document.getElementById('profileName').textContent = 'Error loading profile';
@@ -497,5 +505,149 @@ async function downloadAllContent() {
     } finally {
         downloadBtn.disabled = false;
         downloadBtn.textContent = '📥 Download All Content';
+    }
+}
+
+// Upload Modal Functions
+function openUploadModal(type) {
+    if (type === 'docs') {
+        document.getElementById('uploadDocsModal').style.display = 'block';
+    } else if (type === 'photos') {
+        document.getElementById('uploadPhotosModal').style.display = 'block';
+    }
+}
+
+function closeUploadModal() {
+    document.getElementById('uploadDocsModal').style.display = 'none';
+    document.getElementById('uploadPhotosModal').style.display = 'none';
+    
+    // Reset forms
+    document.getElementById('uploadDocsForm').reset();
+    document.getElementById('uploadPhotosForm').reset();
+    
+    // Hide status messages
+    sharedApp.hideStatus('uploadDocsStatus');
+    sharedApp.hideStatus('uploadPhotosStatus');
+}
+
+// Handle document upload form submission
+document.addEventListener('DOMContentLoaded', function() {
+    const uploadDocsForm = document.getElementById('uploadDocsForm');
+    if (uploadDocsForm) {
+        uploadDocsForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            await handleFileUpload('docs');
+        });
+    }
+    
+    const uploadPhotosForm = document.getElementById('uploadPhotosForm');
+    if (uploadPhotosForm) {
+        uploadPhotosForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            await handleFileUpload('photos');
+        });
+    }
+});
+
+// Handle file upload for both docs and photos
+async function handleFileUpload(type) {
+    const isPhotos = type === 'photos';
+    const formId = isPhotos ? 'uploadPhotosForm' : 'uploadDocsForm';
+    const filesInputId = isPhotos ? 'photosFiles' : 'docsFiles';
+    const subdirInputId = isPhotos ? 'photosSubdirectory' : 'docsSubdirectory';
+    const statusId = isPhotos ? 'uploadPhotosStatus' : 'uploadDocsStatus';
+    
+    const form = document.getElementById(formId);
+    const filesInput = document.getElementById(filesInputId);
+    const subdirInput = document.getElementById(subdirInputId);
+    
+    // Validate files are selected
+    if (!filesInput.files || filesInput.files.length === 0) {
+        sharedApp.showStatus(statusId, 'Please select at least one file to upload', true);
+        return;
+    }
+    
+    // Validate file types
+    const allowedExtensions = isPhotos 
+        ? ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg']
+        : ['md', 'pdf', 'txt', 'html', 'djvu', 'doc', 'docx'];
+    
+    for (let file of filesInput.files) {
+        const extension = file.name.split('.').pop().toLowerCase();
+        if (!allowedExtensions.includes(extension)) {
+            sharedApp.showStatus(statusId, `Invalid file type: ${file.name}. Allowed: ${allowedExtensions.join(', ')}`, true);
+            return;
+        }
+    }
+    
+    // Create FormData
+    const formData = new FormData();
+    for (let file of filesInput.files) {
+        formData.append('files', file);
+    }
+    
+    const subdirectory = subdirInput.value.trim();
+    if (subdirectory) {
+        formData.append('subdirectory', subdirectory);
+    }
+    
+    try {
+        // Show loading status
+        const uploadType = isPhotos ? 'photos' : 'documents';
+        sharedApp.showStatus(statusId, `📤 Uploading ${uploadType}...`, false);
+        
+        // Disable form submit button
+        const submitBtn = form.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.textContent = '📤 Uploading...';
+        
+        // Make upload request
+        const endpoint = isPhotos ? '/api/upload/photos' : '/api/upload/docs';
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Upload failed: ${errorText}`);
+        }
+        
+        const result = await response.json();
+        
+        // Show success message
+        const fileCount = filesInput.files.length;
+        const successMsg = `✅ Successfully uploaded ${fileCount} ${uploadType}!`;
+        sharedApp.showStatus(statusId, successMsg, false);
+        
+        // Close modal after a delay
+        setTimeout(() => {
+            closeUploadModal();
+            // Refresh the appropriate tab content
+            if (isPhotos) {
+                loadPhotos();
+            } else {
+                loadDocs();
+            }
+        }, 2000);
+        
+    } catch (error) {
+        console.error('Upload error:', error);
+        sharedApp.showStatus(statusId, `❌ Upload failed: ${error.message}`, true);
+    } finally {
+        // Re-enable form submit button
+        const submitBtn = form.querySelector('button[type="submit"]');
+        submitBtn.disabled = false;
+        submitBtn.textContent = isPhotos ? '📤 Upload Photos' : '📤 Upload Documents';
+    }
+}
+
+// Close modal when clicking outside of it
+window.onclick = function(event) {
+    const docsModal = document.getElementById('uploadDocsModal');
+    const photosModal = document.getElementById('uploadPhotosModal');
+    
+    if (event.target === docsModal || event.target === photosModal) {
+        closeUploadModal();
     }
 }
