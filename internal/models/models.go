@@ -16,12 +16,13 @@ type FolderInfo struct {
 
 // Doc represents a text doc from the docs directory
 type Doc struct {
-	Filename   string    `json:"filename"`
-	Title      string    `json:"title"`
-	Content    string    `json:"content"`
-	Preview    string    `json:"preview"`
-	ModifiedAt time.Time `json:"modified_at"`
-	Size       int64     `json:"size"`
+	Filename    string    `json:"filename"`
+	Title       string    `json:"title"`
+	Content     string    `json:"content"`
+	Preview     string    `json:"preview"`
+	ModifiedAt  time.Time `json:"modified_at"`
+	Size        int64     `json:"size"`
+	ContentType string    `json:"content_type"` // "text" for .txt files, "html" for .md files (converted to HTML)
 }
 
 // Gallery represents a photo gallery (subdirectory in images/)

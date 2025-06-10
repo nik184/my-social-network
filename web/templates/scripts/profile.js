@@ -291,9 +291,17 @@ async function openDoc(filename) {
         document.getElementById('docModalMeta').innerHTML = `
             <strong>Filename:</strong> ${sharedApp.escapeHtml(doc.filename)}<br>
             <strong>Modified:</strong> ${new Date(doc.modified_at).toLocaleString()}<br>
-            <strong>Size:</strong> ${Math.round(doc.size / 1024 * 100) / 100} KB
+            <strong>Size:</strong> ${Math.round(doc.size / 1024 * 100) / 100} KB<br>
+            <strong>Type:</strong> ${doc.content_type === 'html' ? 'Markdown' : 'Text'}
         `;
-        document.getElementById('docModalContent').textContent = doc.content;
+        
+        // Render content based on type
+        const contentElement = document.getElementById('docModalContent');
+        if (doc.content_type === 'html') {
+            contentElement.innerHTML = doc.content;
+        } else {
+            contentElement.textContent = doc.content;
+        }
         
         // Set current doc filename and show kebab menu for own docs
         sharedApp.setCurrentDocFilename(filename);
@@ -315,9 +323,17 @@ async function openFriendDoc(peerID, filename) {
             <strong>From:</strong> ${sharedApp.escapeHtml(currentFriend.peer_name)}<br>
             <strong>Filename:</strong> ${sharedApp.escapeHtml(doc.filename)}<br>
             <strong>Modified:</strong> ${new Date(doc.modified_at).toLocaleString()}<br>
-            <strong>Size:</strong> ${Math.round(doc.size / 1024 * 100) / 100} KB
+            <strong>Size:</strong> ${Math.round(doc.size / 1024 * 100) / 100} KB<br>
+            <strong>Type:</strong> ${doc.content_type === 'html' ? 'Markdown' : 'Text'}
         `;
-        document.getElementById('docModalContent').textContent = doc.content;
+        
+        // Render content based on type
+        const contentElement = document.getElementById('docModalContent');
+        if (doc.content_type === 'html') {
+            contentElement.innerHTML = doc.content;
+        } else {
+            contentElement.textContent = doc.content;
+        }
         
         // No kebab menu for friend docs - set empty filename
         sharedApp.setCurrentDocFilename('');

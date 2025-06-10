@@ -1,12 +1,14 @@
 package services
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/yuin/goldmark"
 	"my-social-network/internal/models"
 	"my-social-network/internal/utils"
 )
@@ -319,8 +321,9 @@ func (d *DirectoryService) GetDocs() ([]models.Doc, error) {
 			continue
 		}
 
-		// Only process .txt files
-		if !strings.HasSuffix(strings.ToLower(file.Name()), ".txt") {
+		// Only process .txt and .md files
+		ext := strings.ToLower(filepath.Ext(file.Name()))
+		if ext != ".txt" && ext != ".md" {
 			continue
 		}
 
@@ -371,26 +374,53 @@ func (d *DirectoryService) loadDocFile(filename string, fileInfo os.FileInfo) (*
 	}
 
 	contentStr := string(content)
+	ext := strings.ToLower(filepath.Ext(filename))
 
-	// Create title from filename (remove .txt extension)
+	// Create title from filename (remove extension)
 	title := filename
-	if strings.HasSuffix(title, ".txt") {
-		title = title[:len(title)-4]
+	if strings.HasSuffix(title, ext) {
+		title = title[:len(title)-len(ext)]
 	}
 
-	// Create preview (first 150 characters)
-	preview := contentStr
-	if len(preview) > 150 {
-		preview = preview[:150] + "..."
+	// Handle content based on file type
+	var processedContent string
+	var contentType string
+	var preview string
+
+	if ext == ".md" {
+		// Convert Markdown to HTML
+		var buf bytes.Buffer
+		if err := goldmark.Convert(content, &buf); err != nil {
+			return nil, fmt.Errorf("failed to convert markdown to HTML: %w", err)
+		}
+		processedContent = buf.String()
+		contentType = "html"
+
+		// Create preview from original markdown (first 150 characters)
+		preview = contentStr
+		if len(preview) > 150 {
+			preview = preview[:150] + "..."
+		}
+	} else {
+		// Plain text file
+		processedContent = contentStr
+		contentType = "text"
+
+		// Create preview (first 150 characters)
+		preview = contentStr
+		if len(preview) > 150 {
+			preview = preview[:150] + "..."
+		}
 	}
 
 	doc := &models.Doc{
-		Filename:   filename,
-		Title:      title,
-		Content:    contentStr,
-		Preview:    preview,
-		ModifiedAt: fileInfo.ModTime(),
-		Size:       fileInfo.Size(),
+		Filename:    filename,
+		Title:       title,
+		Content:     processedContent,
+		Preview:     preview,
+		ModifiedAt:  fileInfo.ModTime(),
+		Size:        fileInfo.Size(),
+		ContentType: contentType,
 	}
 
 	return doc, nil
