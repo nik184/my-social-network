@@ -299,8 +299,10 @@ async function openDoc(filename) {
         const contentElement = document.getElementById('docModalContent');
         if (doc.content_type === 'html') {
             contentElement.innerHTML = doc.content;
+            contentElement.className = 'doc-content html-content';
         } else {
             contentElement.textContent = doc.content;
+            contentElement.className = 'doc-content text-content';
         }
         
         // Set current doc filename and show kebab menu for own docs
@@ -331,8 +333,10 @@ async function openFriendDoc(peerID, filename) {
         const contentElement = document.getElementById('docModalContent');
         if (doc.content_type === 'html') {
             contentElement.innerHTML = doc.content;
+            contentElement.className = 'doc-content html-content';
         } else {
             contentElement.textContent = doc.content;
+            contentElement.className = 'doc-content text-content';
         }
         
         // No kebab menu for friend docs - set empty filename

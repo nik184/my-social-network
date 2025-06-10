@@ -441,7 +441,16 @@ body {
 .doc-content {
     line-height: 1.6;
     color: #333;
+}
+
+/* Text content (for .txt files) - preserve whitespace and line breaks */
+.doc-content.text-content {
     white-space: pre-wrap;
+}
+
+/* HTML content (for .md files) - normal flow */
+.doc-content.html-content {
+    white-space: normal;
 }
 
 /* Markdown content styling */
@@ -475,14 +484,12 @@ body {
 
 .doc-content p {
     margin-bottom: 1em;
-    white-space: normal;
 }
 
 .doc-content ul,
 .doc-content ol {
     margin-bottom: 1em;
     padding-left: 2em;
-    white-space: normal;
 }
 
 .doc-content li {
