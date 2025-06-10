@@ -685,11 +685,13 @@ async function downloadAllContent() {
 }
 
 // Upload Modal Functions
-function openUploadModal(type) {
+async function openUploadModal(type) {
     if (type === 'docs') {
         document.getElementById('uploadDocsModal').style.display = 'block';
+        await populateDocsSubdirectories();
     } else if (type === 'photos') {
         document.getElementById('uploadPhotosModal').style.display = 'block';
+        await populateImageGalleries();
     }
 }
 
@@ -815,6 +817,54 @@ async function handleFileUpload(type) {
         const submitBtn = form.querySelector('button[type="submit"]');
         submitBtn.disabled = false;
         submitBtn.textContent = isPhotos ? '📤 Upload Photos' : '📤 Upload Documents';
+    }
+}
+
+// Populate docs subdirectories for dropdown suggestions
+async function populateDocsSubdirectories() {
+    try {
+        const response = await sharedApp.fetchAPI('/api/subdirectories/docs');
+        const subdirectories = response.subdirectories || [];
+        
+        const datalist = document.getElementById('docsSubdirectoryList');
+        if (datalist) {
+            // Clear existing options
+            datalist.innerHTML = '';
+            
+            // Add options for each existing subdirectory
+            subdirectories.forEach(subdir => {
+                const option = document.createElement('option');
+                option.value = subdir;
+                datalist.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading docs subdirectories:', error);
+        // Continue silently - not critical for upload functionality
+    }
+}
+
+// Populate image galleries for dropdown suggestions
+async function populateImageGalleries() {
+    try {
+        const response = await sharedApp.fetchAPI('/api/subdirectories/images');
+        const galleries = response.galleries || [];
+        
+        const datalist = document.getElementById('photosSubdirectoryList');
+        if (datalist) {
+            // Clear existing options
+            datalist.innerHTML = '';
+            
+            // Add options for each existing gallery
+            galleries.forEach(gallery => {
+                const option = document.createElement('option');
+                option.value = gallery;
+                datalist.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading image galleries:', error);
+        // Continue silently - not critical for upload functionality
     }
 }
 

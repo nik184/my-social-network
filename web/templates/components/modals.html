@@ -68,9 +68,12 @@
                     <label for="docsSubdirectory" style="display: block; font-weight: bold; margin-bottom: 5px;">
                         Subdirectory (optional):
                     </label>
-                    <input type="text" id="docsSubdirectory" name="subdirectory" 
+                    <input type="text" id="docsSubdirectory" name="subdirectory" list="docsSubdirectoryList"
                            placeholder="Leave empty for main docs folder or enter subdirectory name"
                            style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    <datalist id="docsSubdirectoryList">
+                        <!-- Options will be populated by JavaScript -->
+                    </datalist>
                     <small style="color: #666;">Examples: "work", "personal", "projects/web"</small>
                 </div>
                 
@@ -114,9 +117,12 @@
                     <label for="photosSubdirectory" style="display: block; font-weight: bold; margin-bottom: 5px;">
                         Gallery Name (optional):
                     </label>
-                    <input type="text" id="photosSubdirectory" name="subdirectory" 
+                    <input type="text" id="photosSubdirectory" name="subdirectory" list="photosSubdirectoryList"
                            placeholder="Leave empty for main images folder or enter gallery name"
                            style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    <datalist id="photosSubdirectoryList">
+                        <!-- Options will be populated by JavaScript -->
+                    </datalist>
                     <small style="color: #666;">Examples: "vacation", "family", "events/wedding"</small>
                 </div>
                 

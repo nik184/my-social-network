@@ -1576,6 +1576,46 @@ func (h *Handler) HandleDeleteImage(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// HandleDocsSubdirectories handles GET /api/subdirectories/docs requests
+func (h *Handler) HandleDocsSubdirectories(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	subdirs, err := h.appService.GetDirectoryService().GetDocsSubdirectories()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to get docs subdirectories: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"subdirectories": subdirs,
+		"count":          len(subdirs),
+	})
+}
+
+// HandleImageGalleries handles GET /api/subdirectories/images requests
+func (h *Handler) HandleImageGalleries(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	galleries, err := h.appService.GetDirectoryService().GetImageGalleryNames()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to get image galleries: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"galleries": galleries,
+		"count":     len(galleries),
+	})
+}
+
 // RegisterRoutes registers all HTTP routes
 func (h *Handler) RegisterRoutes() {
 	// Page routes
@@ -1623,4 +1663,8 @@ func (h *Handler) RegisterRoutes() {
 	// Delete routes
 	http.HandleFunc("/api/delete/docs/", h.HandleDeleteDoc)
 	http.HandleFunc("/api/delete/images/", h.HandleDeleteImage)
+
+	// Subdirectory suggestion routes
+	http.HandleFunc("/api/subdirectories/docs", h.HandleDocsSubdirectories)
+	http.HandleFunc("/api/subdirectories/images", h.HandleImageGalleries)
 }

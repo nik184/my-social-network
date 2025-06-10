@@ -31,6 +31,8 @@ type DirectoryServiceInterface interface {
 	GetGalleryImages(galleryName string) ([]string, error)
 	GetPeerGalleries(peerID string) ([]models.Gallery, error)
 	GetPeerGalleryImages(peerID, galleryName string) ([]string, error)
+	GetDocsSubdirectories() ([]string, error)
+	GetImageGalleryNames() ([]string, error)
 }
 
 // DirectoryService handles directory operations
