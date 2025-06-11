@@ -21,7 +21,8 @@
       "Bash(find:*)",
       "Bash(grep:*)",
       "Bash(./build.sh)",
-      "Bash(go fmt:*)"
+      "Bash(go fmt:*)",
+      "Bash(cat:*)"
     ],
     "deny": []
   },

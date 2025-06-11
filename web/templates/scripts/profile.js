@@ -693,7 +693,7 @@ async function loadFriendAudio(peerID) {
     }
 }
 
-// Display audio galleries
+// Display audio galleries as playlists
 function displayAudioGalleries(audioGalleries) {
     const audioContent = document.getElementById('audioContent');
     
@@ -702,42 +702,296 @@ function displayAudioGalleries(audioGalleries) {
         return;
     }
 
-    const galleriesGrid = document.createElement('div');
-    galleriesGrid.className = 'galleries-grid';
+    const audioContainer = document.createElement('div');
+    audioContainer.className = 'audio-container';
 
     audioGalleries.forEach(gallery => {
-        const galleryCard = document.createElement('div');
-        galleryCard.className = 'gallery-card';
-        galleryCard.onclick = () => openAudioGallery(gallery.name);
-
         // Display user-friendly name for root gallery
         const displayName = gallery.name === 'root_audio' ? '🎶 Root Playlist' : gallery.name;
-
-        galleryCard.innerHTML = `
-            <div class="gallery-preview">
-                <div class="gallery-placeholder">🎵</div>
+        
+        const playlistSection = document.createElement('div');
+        playlistSection.className = 'playlist-section';
+        
+        playlistSection.innerHTML = `
+            <div class="playlist-header">
+                <div class="playlist-title">
+                    🎵 ${sharedApp.escapeHtml(displayName)}
+                </div>
+                <div class="playlist-count">${gallery.audio_count} tracks</div>
             </div>
-            <div class="gallery-info">
-                <div class="gallery-name">${sharedApp.escapeHtml(displayName)}</div>
-                <div class="gallery-count">${gallery.audio_count} audio files</div>
+            <div class="playlist-tracks" id="tracks-${gallery.name}">
+                <div style="text-align: center; padding: 20px; color: #666;">
+                    Loading tracks...
+                </div>
             </div>
         `;
-
-        galleriesGrid.appendChild(galleryCard);
+        
+        audioContainer.appendChild(playlistSection);
+        
+        // Load tracks for this playlist
+        loadPlaylistTracks(gallery.name, displayName);
     });
 
     audioContent.innerHTML = '';
-    audioContent.appendChild(galleriesGrid);
+    audioContent.appendChild(audioContainer);
+}
+
+// Load tracks for a specific playlist
+async function loadPlaylistTracks(galleryName, displayName) {
+    try {
+        const data = await sharedApp.fetchAPI(`/api/audio-galleries/${encodeURIComponent(galleryName)}`);
+        const audioFiles = data.audio_files || [];
+        
+        const tracksContainer = document.getElementById(`tracks-${galleryName}`);
+        if (!tracksContainer) return;
+        
+        if (audioFiles.length === 0) {
+            tracksContainer.innerHTML = `
+                <div style="text-align: center; padding: 20px; color: #666;">
+                    No tracks found in this playlist
+                </div>
+            `;
+            return;
+        }
+        
+        tracksContainer.innerHTML = '';
+        
+        audioFiles.forEach((fileName, index) => {
+            const trackItem = document.createElement('div');
+            trackItem.className = 'track-item';
+            
+            // Remove file extension for display name
+            const trackName = fileName.replace(/\.[^/.]+$/, '');
+            
+            trackItem.innerHTML = `
+                <div class="track-number">${index + 1}</div>
+                <div class="track-info">
+                    <div class="track-name">${sharedApp.escapeHtml(trackName)}</div>
+                    <div class="track-duration">Audio File</div>
+                </div>
+                <button class="track-play-btn" onclick="playTrack('${galleryName}', ${index}, '${sharedApp.escapeHtml(fileName)}')">
+                    ▶
+                </button>
+            `;
+            
+            // Store track data for playlist navigation
+            trackItem.dataset.galleryName = galleryName;
+            trackItem.dataset.trackIndex = index;
+            trackItem.dataset.fileName = fileName;
+            
+            tracksContainer.appendChild(trackItem);
+        });
+        
+    } catch (error) {
+        console.error('Error loading playlist tracks:', error);
+        const tracksContainer = document.getElementById(`tracks-${galleryName}`);
+        if (tracksContainer) {
+            tracksContainer.innerHTML = `
+                <div style="text-align: center; padding: 20px; color: #e74c3c;">
+                    Error loading tracks: ${error.message}
+                </div>
+            `;
+        }
+    }
+}
+
+// Store current global playlist data
+window.globalPlaylistData = {
+    currentGallery: null,
+    files: [],
+    currentIndex: -1,
+    isPlaying: false
+};
+
+// Play a specific track in the global player
+function playTrack(galleryName, trackIndex, fileName) {
+    // Load all files for the gallery to enable navigation
+    sharedApp.fetchAPI(`/api/audio-galleries/${encodeURIComponent(galleryName)}`)
+        .then(data => {
+            const audioFiles = data.audio_files || [];
+            if (audioFiles.length > 0) {
+                // Store playlist data globally
+                window.globalPlaylistData = {
+                    currentGallery: galleryName,
+                    files: audioFiles,
+                    currentIndex: trackIndex,
+                    isPlaying: false
+                };
+                
+                // Play the track in the global player
+                playTrackInGlobalPlayer(galleryName, trackIndex, fileName);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading audio files:', error);
+            alert('Error playing track: ' + error.message);
+        });
+}
+
+// Play track in the global player
+function playTrackInGlobalPlayer(galleryName, trackIndex, fileName) {
+    // Get global player elements
+    const globalPlayer = document.getElementById('globalAudioPlayer');
+    const globalAudio = document.getElementById('globalAudio');
+    const globalTitle = document.getElementById('globalPlayerTitle');
+    const globalPlaylist = document.getElementById('globalPlayerPlaylist');
+    const globalPlayPauseBtn = document.getElementById('globalPlayPauseBtn');
+    const globalPrevBtn = document.getElementById('globalPrevBtn');
+    const globalNextBtn = document.getElementById('globalNextBtn');
+    
+    if (!globalPlayer || !globalAudio || !globalTitle) return;
+    
+    // Show the global player
+    globalPlayer.classList.add('active');
+    
+    // Update track highlighting
+    updateTrackHighlighting(galleryName, trackIndex);
+    
+    // Set audio source
+    const trackUrl = `/api/audio-galleries/${encodeURIComponent(galleryName)}/${encodeURIComponent(fileName)}`;
+    globalAudio.src = trackUrl;
+    
+    // Update title and playlist info
+    const trackName = fileName.replace(/\.[^/.]+$/, '');
+    const displayName = galleryName === 'root_audio' ? '🎶 Root Playlist' : galleryName;
+    globalTitle.textContent = trackName;
+    globalPlaylist.textContent = displayName;
+    
+    // Enable controls
+    globalPlayPauseBtn.disabled = false;
+    updateGlobalNavigationButtons();
+    
+    // Auto-play the track
+    globalAudio.play().catch(error => {
+        console.log('Auto-play prevented:', error);
+    });
+    
+    // Update play/pause button when audio state changes
+    globalAudio.onplay = () => {
+        globalPlayPauseBtn.textContent = '⏸';
+        window.globalPlaylistData.isPlaying = true;
+    };
+    
+    globalAudio.onpause = () => {
+        globalPlayPauseBtn.textContent = '▶';
+        window.globalPlaylistData.isPlaying = false;
+    };
+    
+    // Auto-advance to next track when current track ends
+    globalAudio.onended = () => {
+        globalNextTrack();
+    };
+}
+
+// Update track highlighting
+function updateTrackHighlighting(galleryName, currentIndex) {
+    // Remove highlighting from all tracks in all playlists
+    const allTracks = document.querySelectorAll('.track-item.playing');
+    allTracks.forEach(track => {
+        track.classList.remove('playing');
+    });
+    
+    // Highlight current track in the specific gallery
+    const tracksContainer = document.getElementById(`tracks-${galleryName}`);
+    if (!tracksContainer) return;
+    
+    const galleryTracks = tracksContainer.querySelectorAll('.track-item');
+    const currentTrack = galleryTracks[currentIndex];
+    if (currentTrack) {
+        currentTrack.classList.add('playing');
+    }
+}
+
+// Update global navigation button states
+function updateGlobalNavigationButtons() {
+    const playlistData = window.globalPlaylistData;
+    if (!playlistData || !playlistData.files) return;
+    
+    const globalPrevBtn = document.getElementById('globalPrevBtn');
+    const globalNextBtn = document.getElementById('globalNextBtn');
+    
+    if (globalPrevBtn) {
+        globalPrevBtn.disabled = playlistData.currentIndex <= 0;
+    }
+    
+    if (globalNextBtn) {
+        globalNextBtn.disabled = playlistData.currentIndex >= playlistData.files.length - 1;
+    }
+}
+
+// Toggle play/pause for global player
+function globalTogglePlayPause() {
+    const globalAudio = document.getElementById('globalAudio');
+    if (!globalAudio) return;
+    
+    if (globalAudio.paused) {
+        globalAudio.play();
+    } else {
+        globalAudio.pause();
+    }
+}
+
+// Play previous track in global player
+function globalPreviousTrack() {
+    const playlistData = window.globalPlaylistData;
+    if (!playlistData || !playlistData.currentGallery || playlistData.currentIndex <= 0) return;
+    
+    const newIndex = playlistData.currentIndex - 1;
+    const fileName = playlistData.files[newIndex];
+    
+    playlistData.currentIndex = newIndex;
+    playTrackInGlobalPlayer(playlistData.currentGallery, newIndex, fileName);
+}
+
+// Play next track in global player
+function globalNextTrack() {
+    const playlistData = window.globalPlaylistData;
+    if (!playlistData || !playlistData.currentGallery || playlistData.currentIndex >= playlistData.files.length - 1) return;
+    
+    const newIndex = playlistData.currentIndex + 1;
+    const fileName = playlistData.files[newIndex];
+    
+    playlistData.currentIndex = newIndex;
+    playTrackInGlobalPlayer(playlistData.currentGallery, newIndex, fileName);
+}
+
+// Hide global player
+function hideGlobalPlayer() {
+    const globalPlayer = document.getElementById('globalAudioPlayer');
+    const globalAudio = document.getElementById('globalAudio');
+    
+    if (globalPlayer) {
+        globalPlayer.classList.remove('active');
+    }
+    
+    if (globalAudio) {
+        globalAudio.pause();
+        globalAudio.src = '';
+    }
+    
+    // Clear highlighting from all tracks
+    const allTracks = document.querySelectorAll('.track-item.playing');
+    allTracks.forEach(track => {
+        track.classList.remove('playing');
+    });
+    
+    // Reset global playlist data
+    window.globalPlaylistData = {
+        currentGallery: null,
+        files: [],
+        currentIndex: -1,
+        isPlaying: false
+    };
 }
 
 // Display empty state for audio
 function displayAudioEmptyState(message) {
     const audioContent = document.getElementById('audioContent');
     audioContent.innerHTML = `
-        <div class="empty-state">
-            <div class="empty-state-icon">🎵</div>
-            <div>${message}</div>
-            <div class="create-doc-hint">
+        <div class="audio-empty-state">
+            <div class="audio-empty-state-icon">🎵</div>
+            <div style="font-size: 18px; margin-bottom: 10px;">${message}</div>
+            <div style="font-size: 14px;">
                 💡 To add audio collections, create subdirectories in your space184/audio directory and add audio files to them
             </div>
         </div>
@@ -758,118 +1012,6 @@ function displayFriendAudioEmptyState(message) {
     `;
 }
 
-// Open audio gallery
-async function openAudioGallery(galleryName) {
-    try {
-        const data = await sharedApp.fetchAPI(`/api/audio-galleries/${encodeURIComponent(galleryName)}`);
-        const audioFiles = data.audio_files || [];
-        
-        if (audioFiles.length > 0) {
-            // Open audio player modal
-            openAudioPlayer(audioFiles, galleryName);
-        } else {
-            alert('No audio files found in this collection');
-        }
-    } catch (error) {
-        console.error('Error loading audio gallery:', error);
-        alert('Error loading audio gallery: ' + error.message);
-    }
-}
-
-// Open audio player modal
-function openAudioPlayer(audioFiles, galleryName) {
-    // Create audio player modal
-    const modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.style.display = 'block';
-    
-    // Display user-friendly name for root gallery
-    const displayName = galleryName === 'root_audio' ? '🎶 Root Playlist' : galleryName;
-    
-    modal.innerHTML = `
-        <div class="modal-content">
-            <div class="modal-header">
-                <div class="modal-title">🎵 ${sharedApp.escapeHtml(displayName)} Collection</div>
-                <span class="close" onclick="this.closest('.modal').remove()">&times;</span>
-            </div>
-            <div class="modal-body" style="text-align: center;">
-                <div id="audioPlayerContent">
-                    <h4 id="currentAudioTitle">${sharedApp.escapeHtml(audioFiles[0])}</h4>
-                    <audio controls style="width: 100%; margin: 20px 0;">
-                        <source src="/api/audio-galleries/${encodeURIComponent(galleryName)}/${encodeURIComponent(audioFiles[0])}" type="audio/mpeg">
-                        Your browser does not support the audio element.
-                    </audio>
-                    <div style="margin-top: 20px;">
-                        <button onclick="previousAudio()" class="read-more-btn" style="margin-right: 10px;">← Previous</button>
-                        <span id="audioCounter">1 of ${audioFiles.length}</span>
-                        <button onclick="nextAudio()" class="read-more-btn" style="margin-left: 10px;">Next →</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    // Store audio data in window for navigation
-    window.currentAudioData = {
-        files: audioFiles,
-        galleryName: galleryName,
-        currentIndex: 0,
-        modal: modal
-    };
-    
-    // Close modal when clicking outside
-    modal.onclick = function(event) {
-        if (event.target === modal) {
-            modal.remove();
-            window.currentAudioData = null;
-        }
-    };
-}
-
-// Audio navigation functions
-function nextAudio() {
-    if (!window.currentAudioData) return;
-    
-    const data = window.currentAudioData;
-    data.currentIndex = (data.currentIndex + 1) % data.files.length;
-    updateAudioPlayer();
-}
-
-function previousAudio() {
-    if (!window.currentAudioData) return;
-    
-    const data = window.currentAudioData;
-    data.currentIndex = (data.currentIndex - 1 + data.files.length) % data.files.length;
-    updateAudioPlayer();
-}
-
-function updateAudioPlayer() {
-    if (!window.currentAudioData) return;
-    
-    const data = window.currentAudioData;
-    const currentFile = data.files[data.currentIndex];
-    
-    // Update title
-    const titleElement = data.modal.querySelector('#currentAudioTitle');
-    if (titleElement) {
-        titleElement.textContent = currentFile;
-    }
-    
-    // Update audio source
-    const audioElement = data.modal.querySelector('audio');
-    if (audioElement) {
-        audioElement.src = `/api/audio-galleries/${encodeURIComponent(data.galleryName)}/${encodeURIComponent(currentFile)}`;
-        audioElement.load();
-    }
-    
-    // Update counter
-    const counterElement = data.modal.querySelector('#audioCounter');
-    if (counterElement) {
-        counterElement.textContent = `${data.currentIndex + 1} of ${data.files.length}`;
-    }
-}
 
 // Load video galleries
 async function loadVideo() {
