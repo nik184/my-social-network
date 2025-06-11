@@ -194,16 +194,20 @@ function displayDocs(docs) {
         const sizeKB = Math.round(doc.size / 1024 * 100) / 100;
 
         docCard.innerHTML = `
-            <div class="doc-title">${sharedApp.escapeHtml(doc.title)}</div>
-            <div class="doc-meta">
-                <span>📅 ${modifiedDate}</span>
-                <span>📄 ${sizeKB} KB</span>
+            <div class="doc-header">
+                <div class="doc-title">${sharedApp.escapeHtml(doc.title)}</div>
             </div>
-            <div class="doc-preview">${sharedApp.escapeHtml(doc.preview)}</div>
-            <div class="doc-actions">
-                <button class="read-more-btn" onclick="openDoc('${sharedApp.escapeHtml(doc.filename)}')">
-                    Read more
-                </button>
+            <div class="doc-body">
+                <div class="doc-preview">${sharedApp.escapeHtml(doc.preview)}</div>
+                <div class="doc-meta">
+                    <span>📅 ${modifiedDate}</span>
+                    <span>📄 ${sizeKB} KB</span>
+                </div>
+                <div class="doc-actions">
+                    <button class="read-more-btn" onclick="openDoc('${sharedApp.escapeHtml(doc.filename)}')">
+                        Read more
+                    </button>
+                </div>
             </div>
         `;
 
@@ -248,16 +252,20 @@ function displayFriendDocs(docs) {
         const sizeKB = Math.round(doc.size / 1024 * 100) / 100;
 
         docCard.innerHTML = `
-            <div class="doc-title">${sharedApp.escapeHtml(doc.title)}</div>
-            <div class="doc-meta">
-                <span>📅 ${modifiedDate}</span>
-                <span>📄 ${sizeKB} KB</span>
+            <div class="doc-header">
+                <div class="doc-title">${sharedApp.escapeHtml(doc.title)}</div>
             </div>
-            <div class="doc-preview">${sharedApp.escapeHtml(doc.preview)}</div>
-            <div class="doc-actions">
-                <button class="read-more-btn" onclick="openFriendDoc('${currentFriend.peer_id}', '${sharedApp.escapeHtml(doc.filename)}')">
-                    Read more
-                </button>
+            <div class="doc-body">
+                <div class="doc-preview">${sharedApp.escapeHtml(doc.preview)}</div>
+                <div class="doc-meta">
+                    <span>📅 ${modifiedDate}</span>
+                    <span>📄 ${sizeKB} KB</span>
+                </div>
+                <div class="doc-actions">
+                    <button class="read-more-btn" onclick="openFriendDoc('${currentFriend.peer_id}', '${sharedApp.escapeHtml(doc.filename)}')">
+                        Read more
+                    </button>
+                </div>
             </div>
         `;
 
