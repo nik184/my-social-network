@@ -28,6 +28,8 @@
     <div id="tabNavigation" class="tab-navigation">
         <button class="tab-button active" onclick="switchTab('docs')">📝 Docs</button>
         <button class="tab-button" onclick="switchTab('photos')">📷 Photos</button>
+        <button class="tab-button" onclick="switchTab('audio')">🎵 Audio</button>
+        <button class="tab-button" onclick="switchTab('video')">🎬 Video</button>
     </div>
 
     <!-- Docs Tab Content -->
@@ -60,6 +62,40 @@
             <div class="empty-state">
                 <div class="empty-state-icon">📷</div>
                 <div>Loading galleries...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audio Tab Content -->
+    <div id="audioTab" class="tab-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3>🎵 Audio Collections</h3>
+            <button id="addAudioBtn" class="button" onclick="openUploadModal('audio')" style="background-color: #6f42c1; display: none;">
+                ➕ Add Audio
+            </button>
+        </div>
+        <div id="audioStatus" class="status" style="display: none;"></div>
+        <div id="audioContent">
+            <div class="empty-state">
+                <div class="empty-state-icon">🎵</div>
+                <div>Loading audio collections...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Video Tab Content -->
+    <div id="videoTab" class="tab-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3>🎬 Video Collections</h3>
+            <button id="addVideoBtn" class="button" onclick="openUploadModal('video')" style="background-color: #dc3545; display: none;">
+                ➕ Add Video
+            </button>
+        </div>
+        <div id="videoStatus" class="status" style="display: none;"></div>
+        <div id="videoContent">
+            <div class="empty-state">
+                <div class="empty-state-icon">🎬</div>
+                <div>Loading video collections...</div>
             </div>
         </div>
     </div>

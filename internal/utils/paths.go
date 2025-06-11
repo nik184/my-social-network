@@ -66,6 +66,36 @@ func (pm *PathManager) GetPeerGalleryPath(peerID, galleryName string) string {
 	return filepath.Join(pm.GetSpace184Path(), "downloaded", peerID, "images", galleryName)
 }
 
+// GetAudioPath returns the audio directory path
+func (pm *PathManager) GetAudioPath() string {
+	return filepath.Join(pm.GetSpace184Path(), "audio")
+}
+
+// GetVideoPath returns the video directory path
+func (pm *PathManager) GetVideoPath() string {
+	return filepath.Join(pm.GetSpace184Path(), "video")
+}
+
+// GetPeerAudioPath returns the audio directory for a specific peer
+func (pm *PathManager) GetPeerAudioPath(peerID string) string {
+	return filepath.Join(pm.GetSpace184Path(), "downloaded", peerID, "audio")
+}
+
+// GetPeerVideoPath returns the video directory for a specific peer
+func (pm *PathManager) GetPeerVideoPath(peerID string) string {
+	return filepath.Join(pm.GetSpace184Path(), "downloaded", peerID, "video")
+}
+
+// GetPeerAudioGalleryPath returns the audio gallery directory for a specific peer and gallery
+func (pm *PathManager) GetPeerAudioGalleryPath(peerID, galleryName string) string {
+	return filepath.Join(pm.GetSpace184Path(), "downloaded", peerID, "audio", galleryName)
+}
+
+// GetPeerVideoGalleryPath returns the video gallery directory for a specific peer and gallery
+func (pm *PathManager) GetPeerVideoGalleryPath(peerID, galleryName string) string {
+	return filepath.Join(pm.GetSpace184Path(), "downloaded", peerID, "video", galleryName)
+}
+
 // GetDatabasePath returns the database file path
 func (pm *PathManager) GetDatabasePath() string {
 	return filepath.Join(pm.GetSpace184Path(), "node.db")

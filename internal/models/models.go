@@ -32,6 +32,20 @@ type Gallery struct {
 	Images     []string `json:"images"`
 }
 
+// AudioGallery represents an audio collection (subdirectory in audio/)
+type AudioGallery struct {
+	Name       string   `json:"name"`
+	AudioCount int      `json:"audio_count"`
+	AudioFiles []string `json:"audio_files"`
+}
+
+// VideoGallery represents a video collection (subdirectory in video/)
+type VideoGallery struct {
+	Name       string   `json:"name"`
+	VideoCount int      `json:"video_count"`
+	VideoFiles []string `json:"video_files"`
+}
+
 // ConnectionRecord represents a connection history record
 type ConnectionRecord struct {
 	ID             int       `json:"id"`
@@ -256,6 +270,74 @@ type GalleryImageResponse struct {
 	Size      int    `json:"size"`
 }
 
+// AudioGalleriesRequest represents a P2P request for audio galleries list
+type AudioGalleriesRequest struct {
+	// Currently no additional fields needed
+}
+
+// AudioGalleriesResponse represents a P2P response with audio galleries list
+type AudioGalleriesResponse struct {
+	AudioGalleries []AudioGallery `json:"audio_galleries"`
+	Count          int            `json:"count"`
+}
+
+// AudioGalleryRequest represents a P2P request for a specific audio gallery
+type AudioGalleryRequest struct {
+	GalleryName string `json:"gallery_name"`
+}
+
+// AudioGalleryResponse represents a P2P response with audio gallery content
+type AudioGalleryResponse struct {
+	AudioGallery *AudioGallery `json:"audio_gallery"`
+}
+
+// AudioFileRequest represents a P2P request for a specific audio file
+type AudioFileRequest struct {
+	GalleryName string `json:"gallery_name"`
+	AudioName   string `json:"audio_name"`
+}
+
+// AudioFileResponse represents a P2P response with audio file data
+type AudioFileResponse struct {
+	AudioData string `json:"audio_data"` // base64 encoded audio data
+	Filename  string `json:"filename"`
+	Size      int    `json:"size"`
+}
+
+// VideoGalleriesRequest represents a P2P request for video galleries list
+type VideoGalleriesRequest struct {
+	// Currently no additional fields needed
+}
+
+// VideoGalleriesResponse represents a P2P response with video galleries list
+type VideoGalleriesResponse struct {
+	VideoGalleries []VideoGallery `json:"video_galleries"`
+	Count          int            `json:"count"`
+}
+
+// VideoGalleryRequest represents a P2P request for a specific video gallery
+type VideoGalleryRequest struct {
+	GalleryName string `json:"gallery_name"`
+}
+
+// VideoGalleryResponse represents a P2P response with video gallery content
+type VideoGalleryResponse struct {
+	VideoGallery *VideoGallery `json:"video_gallery"`
+}
+
+// VideoFileRequest represents a P2P request for a specific video file
+type VideoFileRequest struct {
+	GalleryName string `json:"gallery_name"`
+	VideoName   string `json:"video_name"`
+}
+
+// VideoFileResponse represents a P2P response with video file data
+type VideoFileResponse struct {
+	VideoData string `json:"video_data"` // base64 encoded video data
+	Filename  string `json:"filename"`
+	Size      int    `json:"size"`
+}
+
 // Constants for message types
 const (
 	MessageTypeGetInfo             = "getInfo"
@@ -276,6 +358,18 @@ const (
 	MessageTypeGetGalleriesResp    = "getGalleriesResp"
 	MessageTypeGetGallery          = "getGallery"
 	MessageTypeGetGalleryResp      = "getGalleryResp"
-	MessageTypeGetGalleryImage     = "getGalleryImage"
-	MessageTypeGetGalleryImageResp = "getGalleryImageResp"
+	MessageTypeGetGalleryImage      = "getGalleryImage"
+	MessageTypeGetGalleryImageResp  = "getGalleryImageResp"
+	MessageTypeGetAudioGalleries    = "getAudioGalleries"
+	MessageTypeGetAudioGalleriesResp = "getAudioGalleriesResp"
+	MessageTypeGetAudioGallery      = "getAudioGallery"
+	MessageTypeGetAudioGalleryResp  = "getAudioGalleryResp"
+	MessageTypeGetAudioFile         = "getAudioFile"
+	MessageTypeGetAudioFileResp     = "getAudioFileResp"
+	MessageTypeGetVideoGalleries    = "getVideoGalleries"
+	MessageTypeGetVideoGalleriesResp = "getVideoGalleriesResp"
+	MessageTypeGetVideoGallery      = "getVideoGallery"
+	MessageTypeGetVideoGalleryResp  = "getVideoGalleryResp"
+	MessageTypeGetVideoFile         = "getVideoFile"
+	MessageTypeGetVideoFileResp     = "getVideoFileResp"
 )

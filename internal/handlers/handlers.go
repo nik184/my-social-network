@@ -13,6 +13,7 @@ import (
 
 	"my-social-network/internal/models"
 	"my-social-network/internal/services"
+	"my-social-network/internal/utils"
 )
 
 // Handler manages HTTP requests
@@ -817,9 +818,17 @@ func (h *Handler) HandleGalleryImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Serve the file
-	galleryDir := filepath.Join(h.appService.GetDirectoryService().GetDirectoryPath(), "images", galleryName)
-	filePath := filepath.Join(galleryDir, filename)
+	// Serve the file - handle special root gallery
+	var filePath string
+	if galleryName == "root_images" {
+		// Files are directly in the images folder
+		imagesDir := filepath.Join(h.appService.GetDirectoryService().GetDirectoryPath(), "images")
+		filePath = filepath.Join(imagesDir, filename)
+	} else {
+		// Files are in a subdirectory
+		galleryDir := filepath.Join(h.appService.GetDirectoryService().GetDirectoryPath(), "images", galleryName)
+		filePath = filepath.Join(galleryDir, filename)
+	}
 
 	// Set appropriate content type based on file extension
 	ext := filepath.Ext(filename)
@@ -1667,4 +1676,382 @@ func (h *Handler) RegisterRoutes() {
 	// Subdirectory suggestion routes
 	http.HandleFunc("/api/subdirectories/docs", h.HandleDocsSubdirectories)
 	http.HandleFunc("/api/subdirectories/images", h.HandleImageGalleries)
+	http.HandleFunc("/api/subdirectories/audio", h.HandleAudioGalleryNames)
+	http.HandleFunc("/api/subdirectories/video", h.HandleVideoGalleryNames)
+
+	// Audio and video routes
+	http.HandleFunc("/api/audio-galleries", h.HandleAudioGalleries)
+	http.HandleFunc("/api/audio-galleries/", h.HandleAudioGallery)
+	http.HandleFunc("/api/video-galleries", h.HandleVideoGalleries)
+	http.HandleFunc("/api/video-galleries/", h.HandleVideoGallery)
+
+	// Audio and video upload routes
+	http.HandleFunc("/api/upload/audio", h.HandleUploadAudio)
+	http.HandleFunc("/api/upload/video", h.HandleUploadVideo)
+}
+
+// HandleAudioGalleries handles GET /api/audio-galleries requests
+func (h *Handler) HandleAudioGalleries(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	audioGalleries, err := h.appService.GetDirectoryService().GetAudioGalleries()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to get audio galleries: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"audio_galleries": audioGalleries,
+		"count":           len(audioGalleries),
+	})
+}
+
+// HandleAudioGallery handles GET /api/audio-galleries/{galleryName} and /api/audio-galleries/{galleryName}/{fileName} requests
+func (h *Handler) HandleAudioGallery(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	pathParts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/audio-galleries/"), "/")
+	if len(pathParts) < 1 || pathParts[0] == "" {
+		http.Error(w, "Gallery name required", http.StatusBadRequest)
+		return
+	}
+
+	galleryName := pathParts[0]
+
+	if len(pathParts) == 1 {
+		// Return list of audio files in gallery
+		var audioFiles []string
+		var err error
+		
+		if galleryName == "root_audio" {
+			// Get files directly from audio root directory
+			audioDir := filepath.Join(h.appService.GetDirectoryService().GetDirectoryPath(), "audio")
+			files, readErr := os.ReadDir(audioDir)
+			if readErr != nil {
+				http.Error(w, fmt.Sprintf("Failed to read audio directory: %v", readErr), http.StatusInternalServerError)
+				return
+			}
+			
+			for _, file := range files {
+				if !file.IsDir() && utils.IsAudioFile(file.Name()) {
+					audioFiles = append(audioFiles, file.Name())
+				}
+			}
+		} else {
+			audioFiles, err = h.appService.GetDirectoryService().GetAudioGalleryFiles(galleryName)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("Failed to get audio files: %v", err), http.StatusInternalServerError)
+				return
+			}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"audio_files": audioFiles,
+			"count":       len(audioFiles),
+		})
+	} else if len(pathParts) == 2 {
+		// Serve specific audio file
+		fileName := pathParts[1]
+
+		if !utils.IsAudioFile(fileName) {
+			http.Error(w, "Invalid audio file", http.StatusBadRequest)
+			return
+		}
+
+		var audioPath string
+		if galleryName == "root_audio" {
+			// Files are directly in the audio folder
+			audioPath = filepath.Join(h.appService.GetDirectoryService().GetDirectoryPath(), "audio", fileName)
+		} else {
+			// Files are in a subdirectory
+			audioPath = filepath.Join(h.appService.GetDirectoryService().GetDirectoryPath(), "audio", galleryName, fileName)
+		}
+
+		http.ServeFile(w, r, audioPath)
+	} else {
+		http.Error(w, "Invalid path", http.StatusBadRequest)
+	}
+}
+
+// HandleVideoGalleries handles GET /api/video-galleries requests
+func (h *Handler) HandleVideoGalleries(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	videoGalleries, err := h.appService.GetDirectoryService().GetVideoGalleries()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to get video galleries: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"video_galleries": videoGalleries,
+		"count":           len(videoGalleries),
+	})
+}
+
+// HandleVideoGallery handles GET /api/video-galleries/{galleryName} and /api/video-galleries/{galleryName}/{fileName} requests
+func (h *Handler) HandleVideoGallery(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	pathParts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/video-galleries/"), "/")
+	if len(pathParts) < 1 || pathParts[0] == "" {
+		http.Error(w, "Gallery name required", http.StatusBadRequest)
+		return
+	}
+
+	galleryName := pathParts[0]
+
+	if len(pathParts) == 1 {
+		// Return list of video files in gallery
+		var videoFiles []string
+		var err error
+		
+		if galleryName == "root_video" {
+			// Get files directly from video root directory
+			videoDir := filepath.Join(h.appService.GetDirectoryService().GetDirectoryPath(), "video")
+			files, readErr := os.ReadDir(videoDir)
+			if readErr != nil {
+				http.Error(w, fmt.Sprintf("Failed to read video directory: %v", readErr), http.StatusInternalServerError)
+				return
+			}
+			
+			for _, file := range files {
+				if !file.IsDir() && utils.IsVideoFile(file.Name()) {
+					videoFiles = append(videoFiles, file.Name())
+				}
+			}
+		} else {
+			videoFiles, err = h.appService.GetDirectoryService().GetVideoGalleryFiles(galleryName)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("Failed to get video files: %v", err), http.StatusInternalServerError)
+				return
+			}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"video_files": videoFiles,
+			"count":       len(videoFiles),
+		})
+	} else if len(pathParts) == 2 {
+		// Serve specific video file
+		fileName := pathParts[1]
+
+		if !utils.IsVideoFile(fileName) {
+			http.Error(w, "Invalid video file", http.StatusBadRequest)
+			return
+		}
+
+		var videoPath string
+		if galleryName == "root_video" {
+			// Files are directly in the video folder
+			videoPath = filepath.Join(h.appService.GetDirectoryService().GetDirectoryPath(), "video", fileName)
+		} else {
+			// Files are in a subdirectory
+			videoPath = filepath.Join(h.appService.GetDirectoryService().GetDirectoryPath(), "video", galleryName, fileName)
+		}
+
+		http.ServeFile(w, r, videoPath)
+	} else {
+		http.Error(w, "Invalid path", http.StatusBadRequest)
+	}
+}
+
+// HandleUploadAudio handles POST /api/upload/audio requests
+func (h *Handler) HandleUploadAudio(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse multipart form
+	err := r.ParseMultipartForm(100 << 20) // 100MB max
+	if err != nil {
+		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		return
+	}
+
+	files := r.MultipartForm.File["files"]
+	if len(files) == 0 {
+		http.Error(w, "No files provided", http.StatusBadRequest)
+		return
+	}
+
+	subdirectory := r.FormValue("subdirectory")
+
+	audioDir := h.appService.GetDirectoryService().GetDirectoryPath() + "/audio"
+	if subdirectory != "" {
+		audioDir = filepath.Join(audioDir, subdirectory)
+	}
+
+	// Ensure audio directory exists
+	if err := os.MkdirAll(audioDir, 0755); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create audio directory: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	uploadedFiles := []string{}
+
+	for _, fileHeader := range files {
+		if !utils.IsAudioFile(fileHeader.Filename) {
+			continue // Skip non-audio files
+		}
+
+		file, err := fileHeader.Open()
+		if err != nil {
+			log.Printf("Failed to open uploaded file: %v", err)
+			continue
+		}
+		defer file.Close()
+
+		destPath := filepath.Join(audioDir, fileHeader.Filename)
+		destFile, err := os.Create(destPath)
+		if err != nil {
+			log.Printf("Failed to create destination file: %v", err)
+			continue
+		}
+		defer destFile.Close()
+
+		_, err = io.Copy(destFile, file)
+		if err != nil {
+			log.Printf("Failed to copy file: %v", err)
+			continue
+		}
+
+		uploadedFiles = append(uploadedFiles, fileHeader.Filename)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message": "Audio files uploaded successfully",
+		"files":   uploadedFiles,
+		"count":   len(uploadedFiles),
+	})
+}
+
+// HandleUploadVideo handles POST /api/upload/video requests
+func (h *Handler) HandleUploadVideo(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse multipart form
+	err := r.ParseMultipartForm(500 << 20) // 500MB max for videos
+	if err != nil {
+		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		return
+	}
+
+	files := r.MultipartForm.File["files"]
+	if len(files) == 0 {
+		http.Error(w, "No files provided", http.StatusBadRequest)
+		return
+	}
+
+	subdirectory := r.FormValue("subdirectory")
+
+	videoDir := h.appService.GetDirectoryService().GetDirectoryPath() + "/video"
+	if subdirectory != "" {
+		videoDir = filepath.Join(videoDir, subdirectory)
+	}
+
+	// Ensure video directory exists
+	if err := os.MkdirAll(videoDir, 0755); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create video directory: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	uploadedFiles := []string{}
+
+	for _, fileHeader := range files {
+		if !utils.IsVideoFile(fileHeader.Filename) {
+			continue // Skip non-video files
+		}
+
+		file, err := fileHeader.Open()
+		if err != nil {
+			log.Printf("Failed to open uploaded file: %v", err)
+			continue
+		}
+		defer file.Close()
+
+		destPath := filepath.Join(videoDir, fileHeader.Filename)
+		destFile, err := os.Create(destPath)
+		if err != nil {
+			log.Printf("Failed to create destination file: %v", err)
+			continue
+		}
+		defer destFile.Close()
+
+		_, err = io.Copy(destFile, file)
+		if err != nil {
+			log.Printf("Failed to copy file: %v", err)
+			continue
+		}
+
+		uploadedFiles = append(uploadedFiles, fileHeader.Filename)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message": "Video files uploaded successfully",
+		"files":   uploadedFiles,
+		"count":   len(uploadedFiles),
+	})
+}
+
+// HandleAudioGalleryNames handles GET /api/subdirectories/audio requests
+func (h *Handler) HandleAudioGalleryNames(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	galleryNames, err := h.appService.GetDirectoryService().GetAudioGalleryNames()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to get audio gallery names: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"galleries": galleryNames,
+		"count":     len(galleryNames),
+	})
+}
+
+// HandleVideoGalleryNames handles GET /api/subdirectories/video requests
+func (h *Handler) HandleVideoGalleryNames(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	galleryNames, err := h.appService.GetDirectoryService().GetVideoGalleryNames()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to get video gallery names: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"galleries": galleryNames,
+		"count":     len(galleryNames),
+	})
 }

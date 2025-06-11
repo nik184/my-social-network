@@ -142,4 +142,102 @@
         </div>
     </div>
 </div>
+
+<!-- Upload Modal for Audio -->
+<div id="uploadAudioModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title">🎵 Upload Audio</div>
+            <span class="close" onclick="closeUploadModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="uploadAudioForm" enctype="multipart/form-data">
+                <div style="margin-bottom: 15px;">
+                    <label for="audioFiles" style="display: block; font-weight: bold; margin-bottom: 5px;">
+                        Select Audio Files:
+                    </label>
+                    <input type="file" id="audioFiles" name="files" multiple 
+                           accept=".mp3,.wav,.flac,.aac,.ogg,.m4a,.wma,.opus" 
+                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    <small style="color: #666;">Supported formats: MP3, WAV, FLAC, AAC, OGG, M4A, WMA, OPUS</small>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label for="audioSubdirectory" style="display: block; font-weight: bold; margin-bottom: 5px;">
+                        Collection Name (optional):
+                    </label>
+                    <input type="text" id="audioSubdirectory" name="subdirectory" list="audioSubdirectoryList"
+                           placeholder="Leave empty for main audio folder or enter collection name"
+                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    <datalist id="audioSubdirectoryList">
+                        <!-- Options will be populated by JavaScript -->
+                    </datalist>
+                    <small style="color: #666;">Examples: "music", "podcasts", "audiobooks"</small>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <div id="uploadAudioStatus" class="status" style="display: none;"></div>
+                </div>
+                
+                <div style="text-align: right;">
+                    <button type="button" onclick="closeUploadModal()" class="button" style="margin-right: 10px;">
+                        Cancel
+                    </button>
+                    <button type="submit" class="button" style="background-color: #6f42c1;">
+                        📤 Upload Audio
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Modal for Video -->
+<div id="uploadVideoModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title">🎬 Upload Video</div>
+            <span class="close" onclick="closeUploadModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="uploadVideoForm" enctype="multipart/form-data">
+                <div style="margin-bottom: 15px;">
+                    <label for="videoFiles" style="display: block; font-weight: bold; margin-bottom: 5px;">
+                        Select Video Files:
+                    </label>
+                    <input type="file" id="videoFiles" name="files" multiple 
+                           accept=".mp4,.avi,.mkv,.mov,.wmv,.flv,.webm,.m4v,.3gp,.mpg,.mpeg" 
+                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    <small style="color: #666;">Supported formats: MP4, AVI, MKV, MOV, WMV, FLV, WebM, M4V, 3GP, MPG, MPEG</small>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label for="videoSubdirectory" style="display: block; font-weight: bold; margin-bottom: 5px;">
+                        Collection Name (optional):
+                    </label>
+                    <input type="text" id="videoSubdirectory" name="subdirectory" list="videoSubdirectoryList"
+                           placeholder="Leave empty for main video folder or enter collection name"
+                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    <datalist id="videoSubdirectoryList">
+                        <!-- Options will be populated by JavaScript -->
+                    </datalist>
+                    <small style="color: #666;">Examples: "movies", "tutorials", "family videos"</small>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <div id="uploadVideoStatus" class="status" style="display: none;"></div>
+                </div>
+                
+                <div style="text-align: right;">
+                    <button type="button" onclick="closeUploadModal()" class="button" style="margin-right: 10px;">
+                        Cancel
+                    </button>
+                    <button type="submit" class="button" style="background-color: #dc3545;">
+                        📤 Upload Video
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {{end}}

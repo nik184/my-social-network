@@ -67,5 +67,40 @@ func IsTextFile(filename string) bool {
 	return validExtensions[ext]
 }
 
+// IsAudioFile checks if a file is an audio file based on extension
+func IsAudioFile(filename string) bool {
+	ext := strings.ToLower(filepath.Ext(filename))
+	validExtensions := map[string]bool{
+		".mp3":  true,
+		".wav":  true,
+		".flac": true,
+		".aac":  true,
+		".ogg":  true,
+		".m4a":  true,
+		".wma":  true,
+		".opus": true,
+	}
+	return validExtensions[ext]
+}
+
+// IsVideoFile checks if a file is a video file based on extension
+func IsVideoFile(filename string) bool {
+	ext := strings.ToLower(filepath.Ext(filename))
+	validExtensions := map[string]bool{
+		".mp4":  true,
+		".avi":  true,
+		".mkv":  true,
+		".mov":  true,
+		".wmv":  true,
+		".flv":  true,
+		".webm": true,
+		".m4v":  true,
+		".3gp":  true,
+		".mpg":  true,
+		".mpeg": true,
+	}
+	return validExtensions[ext]
+}
+
 // Singleton instance
 var DefaultPathValidator = &PathValidator{}

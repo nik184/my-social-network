@@ -66,6 +66,8 @@ async function loadFriendProfile() {
         // Hide upload buttons for friend profiles
         document.getElementById('addDocsBtn').style.display = 'none';
         document.getElementById('addPhotosBtn').style.display = 'none';
+        document.getElementById('addAudioBtn').style.display = 'none';
+        document.getElementById('addVideoBtn').style.display = 'none';
 
         // Load friend's docs
         await loadFriendDocs(peerID);
@@ -115,6 +117,8 @@ async function loadUserInfo() {
         // Show upload buttons for own profile
         document.getElementById('addDocsBtn').style.display = 'inline-block';
         document.getElementById('addPhotosBtn').style.display = 'inline-block';
+        document.getElementById('addAudioBtn').style.display = 'inline-block';
+        document.getElementById('addVideoBtn').style.display = 'inline-block';
     } catch (error) {
         console.error('Error loading user info:', error);
         document.getElementById('profileName').textContent = 'Error loading profile';
@@ -376,11 +380,25 @@ function switchTab(tabName) {
         } else {
             loadPhotos();
         }
+    } else if (tabName === 'audio' && !audioLoaded) {
+        if (isViewingFriend && currentFriend) {
+            loadFriendAudio(currentFriend.peer_id);
+        } else {
+            loadAudio();
+        }
+    } else if (tabName === 'video' && !videoLoaded) {
+        if (isViewingFriend && currentFriend) {
+            loadFriendVideo(currentFriend.peer_id);
+        } else {
+            loadVideo();
+        }
     }
 }
 
 // Gallery variables
 let photosLoaded = false;
+let audioLoaded = false;
+let videoLoaded = false;
 
 // Load photos and galleries
 async function loadPhotos() {
@@ -457,12 +475,15 @@ function displayGalleries(galleries) {
             ? `<img src="/api/galleries/${encodeURIComponent(gallery.name)}/${encodeURIComponent(gallery.images[0])}" alt="${sharedApp.escapeHtml(gallery.name)}" />`
             : '<div class="gallery-placeholder">📷</div>';
 
+        // Display user-friendly name for root gallery
+        const displayName = gallery.name === 'root_images' ? '📁 Root Images' : gallery.name;
+
         galleryCard.innerHTML = `
             <div class="gallery-preview">
                 ${preview}
             </div>
             <div class="gallery-info">
-                <div class="gallery-name">${sharedApp.escapeHtml(gallery.name)}</div>
+                <div class="gallery-name">${sharedApp.escapeHtml(displayName)}</div>
                 <div class="gallery-count">${gallery.image_count} images</div>
             </div>
         `;
@@ -639,6 +660,428 @@ async function openFriendGallery(peerID, galleryName, source = 'live') {
     }
 }
 
+// Load audio galleries
+async function loadAudio() {
+    try {
+        sharedApp.showStatus('audioStatus', 'Loading audio collections...', false);
+        
+        const data = await sharedApp.fetchAPI('/api/audio-galleries');
+        
+        displayAudioGalleries(data.audio_galleries || []);
+        audioLoaded = true;
+        sharedApp.hideStatus('audioStatus');
+    } catch (error) {
+        console.error('Error loading audio galleries:', error);
+        sharedApp.showStatus('audioStatus', 'Error loading audio collections: ' + error.message, true);
+        displayAudioEmptyState('Failed to load audio collections');
+    }
+}
+
+// Load friend's audio galleries
+async function loadFriendAudio(peerID) {
+    try {
+        sharedApp.showStatus('audioStatus', 'Loading friend\'s audio collections...', false);
+        
+        // For now, just show empty state - P2P audio not implemented yet
+        displayFriendAudioEmptyState('Audio sharing via P2P not yet implemented');
+        audioLoaded = true;
+        sharedApp.hideStatus('audioStatus');
+    } catch (error) {
+        console.error('Error loading friend audio:', error);
+        sharedApp.showStatus('audioStatus', 'Error loading friend audio: ' + error.message, true);
+        displayFriendAudioEmptyState('Failed to load audio from friend');
+    }
+}
+
+// Display audio galleries
+function displayAudioGalleries(audioGalleries) {
+    const audioContent = document.getElementById('audioContent');
+    
+    if (audioGalleries.length === 0) {
+        displayAudioEmptyState('No audio collections found');
+        return;
+    }
+
+    const galleriesGrid = document.createElement('div');
+    galleriesGrid.className = 'galleries-grid';
+
+    audioGalleries.forEach(gallery => {
+        const galleryCard = document.createElement('div');
+        galleryCard.className = 'gallery-card';
+        galleryCard.onclick = () => openAudioGallery(gallery.name);
+
+        // Display user-friendly name for root gallery
+        const displayName = gallery.name === 'root_audio' ? '🎶 Root Playlist' : gallery.name;
+
+        galleryCard.innerHTML = `
+            <div class="gallery-preview">
+                <div class="gallery-placeholder">🎵</div>
+            </div>
+            <div class="gallery-info">
+                <div class="gallery-name">${sharedApp.escapeHtml(displayName)}</div>
+                <div class="gallery-count">${gallery.audio_count} audio files</div>
+            </div>
+        `;
+
+        galleriesGrid.appendChild(galleryCard);
+    });
+
+    audioContent.innerHTML = '';
+    audioContent.appendChild(galleriesGrid);
+}
+
+// Display empty state for audio
+function displayAudioEmptyState(message) {
+    const audioContent = document.getElementById('audioContent');
+    audioContent.innerHTML = `
+        <div class="empty-state">
+            <div class="empty-state-icon">🎵</div>
+            <div>${message}</div>
+            <div class="create-doc-hint">
+                💡 To add audio collections, create subdirectories in your space184/audio directory and add audio files to them
+            </div>
+        </div>
+    `;
+}
+
+// Display empty state for friend audio
+function displayFriendAudioEmptyState(message) {
+    const audioContent = document.getElementById('audioContent');
+    audioContent.innerHTML = `
+        <div class="empty-state">
+            <div class="empty-state-icon">🎵</div>
+            <div>${message}</div>
+            <div class="create-doc-hint">
+                📡 Audio files would be requested directly from your friend via P2P connection
+            </div>
+        </div>
+    `;
+}
+
+// Open audio gallery
+async function openAudioGallery(galleryName) {
+    try {
+        const data = await sharedApp.fetchAPI(`/api/audio-galleries/${encodeURIComponent(galleryName)}`);
+        const audioFiles = data.audio_files || [];
+        
+        if (audioFiles.length > 0) {
+            // Open audio player modal
+            openAudioPlayer(audioFiles, galleryName);
+        } else {
+            alert('No audio files found in this collection');
+        }
+    } catch (error) {
+        console.error('Error loading audio gallery:', error);
+        alert('Error loading audio gallery: ' + error.message);
+    }
+}
+
+// Open audio player modal
+function openAudioPlayer(audioFiles, galleryName) {
+    // Create audio player modal
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.display = 'block';
+    
+    // Display user-friendly name for root gallery
+    const displayName = galleryName === 'root_audio' ? '🎶 Root Playlist' : galleryName;
+    
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">🎵 ${sharedApp.escapeHtml(displayName)} Collection</div>
+                <span class="close" onclick="this.closest('.modal').remove()">&times;</span>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <div id="audioPlayerContent">
+                    <h4 id="currentAudioTitle">${sharedApp.escapeHtml(audioFiles[0])}</h4>
+                    <audio controls style="width: 100%; margin: 20px 0;">
+                        <source src="/api/audio-galleries/${encodeURIComponent(galleryName)}/${encodeURIComponent(audioFiles[0])}" type="audio/mpeg">
+                        Your browser does not support the audio element.
+                    </audio>
+                    <div style="margin-top: 20px;">
+                        <button onclick="previousAudio()" class="read-more-btn" style="margin-right: 10px;">← Previous</button>
+                        <span id="audioCounter">1 of ${audioFiles.length}</span>
+                        <button onclick="nextAudio()" class="read-more-btn" style="margin-left: 10px;">Next →</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Store audio data in window for navigation
+    window.currentAudioData = {
+        files: audioFiles,
+        galleryName: galleryName,
+        currentIndex: 0,
+        modal: modal
+    };
+    
+    // Close modal when clicking outside
+    modal.onclick = function(event) {
+        if (event.target === modal) {
+            modal.remove();
+            window.currentAudioData = null;
+        }
+    };
+}
+
+// Audio navigation functions
+function nextAudio() {
+    if (!window.currentAudioData) return;
+    
+    const data = window.currentAudioData;
+    data.currentIndex = (data.currentIndex + 1) % data.files.length;
+    updateAudioPlayer();
+}
+
+function previousAudio() {
+    if (!window.currentAudioData) return;
+    
+    const data = window.currentAudioData;
+    data.currentIndex = (data.currentIndex - 1 + data.files.length) % data.files.length;
+    updateAudioPlayer();
+}
+
+function updateAudioPlayer() {
+    if (!window.currentAudioData) return;
+    
+    const data = window.currentAudioData;
+    const currentFile = data.files[data.currentIndex];
+    
+    // Update title
+    const titleElement = data.modal.querySelector('#currentAudioTitle');
+    if (titleElement) {
+        titleElement.textContent = currentFile;
+    }
+    
+    // Update audio source
+    const audioElement = data.modal.querySelector('audio');
+    if (audioElement) {
+        audioElement.src = `/api/audio-galleries/${encodeURIComponent(data.galleryName)}/${encodeURIComponent(currentFile)}`;
+        audioElement.load();
+    }
+    
+    // Update counter
+    const counterElement = data.modal.querySelector('#audioCounter');
+    if (counterElement) {
+        counterElement.textContent = `${data.currentIndex + 1} of ${data.files.length}`;
+    }
+}
+
+// Load video galleries
+async function loadVideo() {
+    try {
+        sharedApp.showStatus('videoStatus', 'Loading video collections...', false);
+        
+        const data = await sharedApp.fetchAPI('/api/video-galleries');
+        
+        displayVideoGalleries(data.video_galleries || []);
+        videoLoaded = true;
+        sharedApp.hideStatus('videoStatus');
+    } catch (error) {
+        console.error('Error loading video galleries:', error);
+        sharedApp.showStatus('videoStatus', 'Error loading video collections: ' + error.message, true);
+        displayVideoEmptyState('Failed to load video collections');
+    }
+}
+
+// Load friend's video galleries
+async function loadFriendVideo(peerID) {
+    try {
+        sharedApp.showStatus('videoStatus', 'Loading friend\'s video collections...', false);
+        
+        // For now, just show empty state - P2P video not implemented yet
+        displayFriendVideoEmptyState('Video sharing via P2P not yet implemented');
+        videoLoaded = true;
+        sharedApp.hideStatus('videoStatus');
+    } catch (error) {
+        console.error('Error loading friend video:', error);
+        sharedApp.showStatus('videoStatus', 'Error loading friend video: ' + error.message, true);
+        displayFriendVideoEmptyState('Failed to load video from friend');
+    }
+}
+
+// Display video galleries
+function displayVideoGalleries(videoGalleries) {
+    const videoContent = document.getElementById('videoContent');
+    
+    if (videoGalleries.length === 0) {
+        displayVideoEmptyState('No video collections found');
+        return;
+    }
+
+    const galleriesGrid = document.createElement('div');
+    galleriesGrid.className = 'galleries-grid';
+
+    videoGalleries.forEach(gallery => {
+        const galleryCard = document.createElement('div');
+        galleryCard.className = 'gallery-card';
+        galleryCard.onclick = () => openVideoGallery(gallery.name);
+
+        // Display user-friendly name for root gallery
+        const displayName = gallery.name === 'root_video' ? '🎥 Root Videos' : gallery.name;
+
+        galleryCard.innerHTML = `
+            <div class="gallery-preview">
+                <div class="gallery-placeholder">🎬</div>
+            </div>
+            <div class="gallery-info">
+                <div class="gallery-name">${sharedApp.escapeHtml(displayName)}</div>
+                <div class="gallery-count">${gallery.video_count} video files</div>
+            </div>
+        `;
+
+        galleriesGrid.appendChild(galleryCard);
+    });
+
+    videoContent.innerHTML = '';
+    videoContent.appendChild(galleriesGrid);
+}
+
+// Display empty state for video
+function displayVideoEmptyState(message) {
+    const videoContent = document.getElementById('videoContent');
+    videoContent.innerHTML = `
+        <div class="empty-state">
+            <div class="empty-state-icon">🎬</div>
+            <div>${message}</div>
+            <div class="create-doc-hint">
+                💡 To add video collections, create subdirectories in your space184/video directory and add video files to them
+            </div>
+        </div>
+    `;
+}
+
+// Display empty state for friend video
+function displayFriendVideoEmptyState(message) {
+    const videoContent = document.getElementById('videoContent');
+    videoContent.innerHTML = `
+        <div class="empty-state">
+            <div class="empty-state-icon">🎬</div>
+            <div>${message}</div>
+            <div class="create-doc-hint">
+                📡 Video files would be requested directly from your friend via P2P connection
+            </div>
+        </div>
+    `;
+}
+
+// Open video gallery
+async function openVideoGallery(galleryName) {
+    try {
+        const data = await sharedApp.fetchAPI(`/api/video-galleries/${encodeURIComponent(galleryName)}`);
+        const videoFiles = data.video_files || [];
+        
+        if (videoFiles.length > 0) {
+            // Open video player modal
+            openVideoPlayer(videoFiles, galleryName);
+        } else {
+            alert('No video files found in this collection');
+        }
+    } catch (error) {
+        console.error('Error loading video gallery:', error);
+        alert('Error loading video gallery: ' + error.message);
+    }
+}
+
+// Open video player modal
+function openVideoPlayer(videoFiles, galleryName) {
+    // Create video player modal
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.display = 'block';
+    
+    // Display user-friendly name for root gallery
+    const displayName = galleryName === 'root_video' ? '🎥 Root Videos' : galleryName;
+    
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 90%; width: 1000px;">
+            <div class="modal-header">
+                <div class="modal-title">🎬 ${sharedApp.escapeHtml(displayName)} Collection</div>
+                <span class="close" onclick="this.closest('.modal').remove()">&times;</span>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <div id="videoPlayerContent">
+                    <h4 id="currentVideoTitle">${sharedApp.escapeHtml(videoFiles[0])}</h4>
+                    <video controls style="width: 100%; max-width: 800px; height: auto; margin: 20px 0;">
+                        <source src="/api/video-galleries/${encodeURIComponent(galleryName)}/${encodeURIComponent(videoFiles[0])}" type="video/mp4">
+                        Your browser does not support the video element.
+                    </video>
+                    <div style="margin-top: 20px;">
+                        <button onclick="previousVideo()" class="read-more-btn" style="margin-right: 10px;">← Previous</button>
+                        <span id="videoCounter">1 of ${videoFiles.length}</span>
+                        <button onclick="nextVideo()" class="read-more-btn" style="margin-left: 10px;">Next →</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Store video data in window for navigation
+    window.currentVideoData = {
+        files: videoFiles,
+        galleryName: galleryName,
+        currentIndex: 0,
+        modal: modal
+    };
+    
+    // Close modal when clicking outside
+    modal.onclick = function(event) {
+        if (event.target === modal) {
+            modal.remove();
+            window.currentVideoData = null;
+        }
+    };
+}
+
+// Video navigation functions
+function nextVideo() {
+    if (!window.currentVideoData) return;
+    
+    const data = window.currentVideoData;
+    data.currentIndex = (data.currentIndex + 1) % data.files.length;
+    updateVideoPlayer();
+}
+
+function previousVideo() {
+    if (!window.currentVideoData) return;
+    
+    const data = window.currentVideoData;
+    data.currentIndex = (data.currentIndex - 1 + data.files.length) % data.files.length;
+    updateVideoPlayer();
+}
+
+function updateVideoPlayer() {
+    if (!window.currentVideoData) return;
+    
+    const data = window.currentVideoData;
+    const currentFile = data.files[data.currentIndex];
+    
+    // Update title
+    const titleElement = data.modal.querySelector('#currentVideoTitle');
+    if (titleElement) {
+        titleElement.textContent = currentFile;
+    }
+    
+    // Update video source
+    const videoElement = data.modal.querySelector('video');
+    if (videoElement) {
+        videoElement.src = `/api/video-galleries/${encodeURIComponent(data.galleryName)}/${encodeURIComponent(currentFile)}`;
+        videoElement.load();
+    }
+    
+    // Update counter
+    const counterElement = data.modal.querySelector('#videoCounter');
+    if (counterElement) {
+        counterElement.textContent = `${data.currentIndex + 1} of ${data.files.length}`;
+    }
+}
+
 // Friend-specific functions
 function goBack() {
     window.location.href = '/friends';
@@ -720,20 +1163,32 @@ async function openUploadModal(type) {
     } else if (type === 'photos') {
         document.getElementById('uploadPhotosModal').style.display = 'block';
         await populateImageGalleries();
+    } else if (type === 'audio') {
+        document.getElementById('uploadAudioModal').style.display = 'block';
+        await populateAudioGalleries();
+    } else if (type === 'video') {
+        document.getElementById('uploadVideoModal').style.display = 'block';
+        await populateVideoGalleries();
     }
 }
 
 function closeUploadModal() {
     document.getElementById('uploadDocsModal').style.display = 'none';
     document.getElementById('uploadPhotosModal').style.display = 'none';
+    document.getElementById('uploadAudioModal').style.display = 'none';
+    document.getElementById('uploadVideoModal').style.display = 'none';
     
     // Reset forms
     document.getElementById('uploadDocsForm').reset();
     document.getElementById('uploadPhotosForm').reset();
+    document.getElementById('uploadAudioForm').reset();
+    document.getElementById('uploadVideoForm').reset();
     
     // Hide status messages
     sharedApp.hideStatus('uploadDocsStatus');
     sharedApp.hideStatus('uploadPhotosStatus');
+    sharedApp.hideStatus('uploadAudioStatus');
+    sharedApp.hideStatus('uploadVideoStatus');
 }
 
 // Handle document upload form submission
@@ -753,15 +1208,53 @@ document.addEventListener('DOMContentLoaded', function() {
             await handleFileUpload('photos');
         });
     }
+    
+    const uploadAudioForm = document.getElementById('uploadAudioForm');
+    if (uploadAudioForm) {
+        uploadAudioForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            await handleFileUpload('audio');
+        });
+    }
+    
+    const uploadVideoForm = document.getElementById('uploadVideoForm');
+    if (uploadVideoForm) {
+        uploadVideoForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            await handleFileUpload('video');
+        });
+    }
 });
 
-// Handle file upload for both docs and photos
+// Handle file upload for docs, photos, audio, and video
 async function handleFileUpload(type) {
     const isPhotos = type === 'photos';
-    const formId = isPhotos ? 'uploadPhotosForm' : 'uploadDocsForm';
-    const filesInputId = isPhotos ? 'photosFiles' : 'docsFiles';
-    const subdirInputId = isPhotos ? 'photosSubdirectory' : 'docsSubdirectory';
-    const statusId = isPhotos ? 'uploadPhotosStatus' : 'uploadDocsStatus';
+    const isAudio = type === 'audio';
+    const isVideo = type === 'video';
+    
+    let formId, filesInputId, subdirInputId, statusId;
+    
+    if (isPhotos) {
+        formId = 'uploadPhotosForm';
+        filesInputId = 'photosFiles';
+        subdirInputId = 'photosSubdirectory';
+        statusId = 'uploadPhotosStatus';
+    } else if (isAudio) {
+        formId = 'uploadAudioForm';
+        filesInputId = 'audioFiles';
+        subdirInputId = 'audioSubdirectory';
+        statusId = 'uploadAudioStatus';
+    } else if (isVideo) {
+        formId = 'uploadVideoForm';
+        filesInputId = 'videoFiles';
+        subdirInputId = 'videoSubdirectory';
+        statusId = 'uploadVideoStatus';
+    } else {
+        formId = 'uploadDocsForm';
+        filesInputId = 'docsFiles';
+        subdirInputId = 'docsSubdirectory';
+        statusId = 'uploadDocsStatus';
+    }
     
     const form = document.getElementById(formId);
     const filesInput = document.getElementById(filesInputId);
@@ -774,9 +1267,16 @@ async function handleFileUpload(type) {
     }
     
     // Validate file types
-    const allowedExtensions = isPhotos 
-        ? ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg']
-        : ['md', 'pdf', 'txt', 'html', 'djvu', 'doc', 'docx'];
+    let allowedExtensions;
+    if (isPhotos) {
+        allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+    } else if (isAudio) {
+        allowedExtensions = ['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a', 'wma', 'opus'];
+    } else if (isVideo) {
+        allowedExtensions = ['mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm', 'm4v', '3gp', 'mpg', 'mpeg'];
+    } else {
+        allowedExtensions = ['md', 'pdf', 'txt', 'html', 'djvu', 'doc', 'docx'];
+    }
     
     for (let file of filesInput.files) {
         const extension = file.name.split('.').pop().toLowerCase();
@@ -799,7 +1299,17 @@ async function handleFileUpload(type) {
     
     try {
         // Show loading status
-        const uploadType = isPhotos ? 'photos' : 'documents';
+        let uploadType;
+        if (isPhotos) {
+            uploadType = 'photos';
+        } else if (isAudio) {
+            uploadType = 'audio files';
+        } else if (isVideo) {
+            uploadType = 'video files';
+        } else {
+            uploadType = 'documents';
+        }
+        
         sharedApp.showStatus(statusId, `📤 Uploading ${uploadType}...`, false);
         
         // Disable form submit button
@@ -808,7 +1318,17 @@ async function handleFileUpload(type) {
         submitBtn.textContent = '📤 Uploading...';
         
         // Make upload request
-        const endpoint = isPhotos ? '/api/upload/photos' : '/api/upload/docs';
+        let endpoint;
+        if (isPhotos) {
+            endpoint = '/api/upload/photos';
+        } else if (isAudio) {
+            endpoint = '/api/upload/audio';
+        } else if (isVideo) {
+            endpoint = '/api/upload/video';
+        } else {
+            endpoint = '/api/upload/docs';
+        }
+        
         const response = await fetch(endpoint, {
             method: 'POST',
             body: formData
@@ -832,6 +1352,12 @@ async function handleFileUpload(type) {
             // Refresh the appropriate tab content
             if (isPhotos) {
                 loadPhotos();
+            } else if (isAudio) {
+                audioLoaded = false;
+                loadAudio();
+            } else if (isVideo) {
+                videoLoaded = false;
+                loadVideo();
             } else {
                 loadDocs();
             }
@@ -844,7 +1370,18 @@ async function handleFileUpload(type) {
         // Re-enable form submit button
         const submitBtn = form.querySelector('button[type="submit"]');
         submitBtn.disabled = false;
-        submitBtn.textContent = isPhotos ? '📤 Upload Photos' : '📤 Upload Documents';
+        
+        let buttonText;
+        if (isPhotos) {
+            buttonText = '📤 Upload Photos';
+        } else if (isAudio) {
+            buttonText = '📤 Upload Audio';
+        } else if (isVideo) {
+            buttonText = '📤 Upload Video';
+        } else {
+            buttonText = '📤 Upload Documents';
+        }
+        submitBtn.textContent = buttonText;
     }
 }
 
@@ -896,12 +1433,63 @@ async function populateImageGalleries() {
     }
 }
 
+// Populate audio galleries for dropdown suggestions
+async function populateAudioGalleries() {
+    try {
+        const response = await sharedApp.fetchAPI('/api/subdirectories/audio');
+        const galleries = response.galleries || [];
+        
+        const datalist = document.getElementById('audioSubdirectoryList');
+        if (datalist) {
+            // Clear existing options
+            datalist.innerHTML = '';
+            
+            // Add options for each existing gallery
+            galleries.forEach(gallery => {
+                const option = document.createElement('option');
+                option.value = gallery;
+                datalist.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading audio galleries:', error);
+        // Continue silently - not critical for upload functionality
+    }
+}
+
+// Populate video galleries for dropdown suggestions
+async function populateVideoGalleries() {
+    try {
+        const response = await sharedApp.fetchAPI('/api/subdirectories/video');
+        const galleries = response.galleries || [];
+        
+        const datalist = document.getElementById('videoSubdirectoryList');
+        if (datalist) {
+            // Clear existing options
+            datalist.innerHTML = '';
+            
+            // Add options for each existing gallery
+            galleries.forEach(gallery => {
+                const option = document.createElement('option');
+                option.value = gallery;
+                datalist.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading video galleries:', error);
+        // Continue silently - not critical for upload functionality
+    }
+}
+
 // Close modal when clicking outside of it
 window.onclick = function(event) {
     const docsModal = document.getElementById('uploadDocsModal');
     const photosModal = document.getElementById('uploadPhotosModal');
+    const audioModal = document.getElementById('uploadAudioModal');
+    const videoModal = document.getElementById('uploadVideoModal');
     
-    if (event.target === docsModal || event.target === photosModal) {
+    if (event.target === docsModal || event.target === photosModal || 
+        event.target === audioModal || event.target === videoModal) {
         closeUploadModal();
     }
 }
