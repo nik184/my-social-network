@@ -96,7 +96,7 @@ func (w *WebViewUI) StartServer() {
 
 // ShowWebView displays the WebView window using Windows browser
 func (w *WebViewUI) ShowWebView() {
-	url := fmt.Sprintf("http://localhost:%d/network", w.port)
+	url := fmt.Sprintf("http://localhost:%d/profile", w.port)
 	log.Printf("🌐 Opening application in system browser: %s", url)
 
 	// Try to open in default browser on Windows

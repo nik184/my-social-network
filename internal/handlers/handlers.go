@@ -129,69 +129,6 @@ func (h *Handler) HandleConnectByIP(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(nodeInfo)
 }
 
-// HandleConnectionInfo handles GET /api/connection-info requests
-func (h *Handler) HandleConnectionInfo(w http.ResponseWriter, r *http.Request) {
-	connectionInfo := h.appService.GetP2PService().GetConnectionInfo()
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(connectionInfo)
-}
-
-// HandleConnectionHistory handles GET /api/connection-history requests
-func (h *Handler) HandleConnectionHistory(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	history, err := h.appService.GetConnectionHistory()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(history)
-}
-
-// HandleSecondDegreePeers handles GET /api/second-degree-peers requests
-func (h *Handler) HandleSecondDegreePeers(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	secondDegreePeers, err := h.appService.GetSecondDegreeConnections()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(secondDegreePeers)
-}
-
-// HandleConnectSecondDegree handles POST /api/connect-second-degree requests
-func (h *Handler) HandleConnectSecondDegree(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req models.SecondDegreeConnectionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	nodeInfo, err := h.appService.ConnectToSecondDegreePeer(req.TargetPeerID, req.ViaPeerID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(nodeInfo)
-}
 
 // HandleAvatarList handles GET /api/avatar requests
 func (h *Handler) HandleAvatarList(w http.ResponseWriter, r *http.Request) {
@@ -851,13 +788,6 @@ func (h *Handler) HandleGalleryImage(w http.ResponseWriter, r *http.Request) {
 }
 
 // Page handlers
-func (h *Handler) HandleNetworkPage(w http.ResponseWriter, r *http.Request) {
-	data := services.TemplateData{
-		PageTitle:   "Distributed Social Network",
-		CurrentPage: "network",
-	}
-	h.templateService.RenderPage(w, "network", data)
-}
 
 func (h *Handler) HandleProfilePage(w http.ResponseWriter, r *http.Request) {
 	data := services.TemplateData{
@@ -1628,8 +1558,7 @@ func (h *Handler) HandleImageGalleries(w http.ResponseWriter, r *http.Request) {
 // RegisterRoutes registers all HTTP routes
 func (h *Handler) RegisterRoutes() {
 	// Page routes
-	http.HandleFunc("/", h.HandleNetworkPage)
-	http.HandleFunc("/network", h.HandleNetworkPage)
+	http.HandleFunc("/", h.HandleProfilePage)
 	http.HandleFunc("/profile", h.HandleProfilePage)
 	http.HandleFunc("/friends", h.HandleFriendsPage)
 	http.HandleFunc("/friend-profile", h.HandleFriendProfilePage)
@@ -1641,10 +1570,6 @@ func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/api/peers", h.HandlePeers)
 	http.HandleFunc("/api/monitor", h.HandleMonitorStatus)
 	http.HandleFunc("/api/connect-ip", h.HandleConnectByIP)
-	http.HandleFunc("/api/connection-info", h.HandleConnectionInfo)
-	http.HandleFunc("/api/connection-history", h.HandleConnectionHistory)
-	http.HandleFunc("/api/second-degree-peers", h.HandleSecondDegreePeers)
-	http.HandleFunc("/api/connect-second-degree", h.HandleConnectSecondDegree)
 	http.HandleFunc("/api/avatar", h.HandleAvatarList)
 	http.HandleFunc("/api/avatar/", h.HandleAvatarImage)
 	http.HandleFunc("/api/peer-avatar/", h.HandlePeerAvatar)

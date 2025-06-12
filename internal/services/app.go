@@ -1,7 +1,6 @@
 package services
 
 import (
-	"fmt"
 	"log"
 
 	"my-social-network/internal/interfaces"
@@ -86,70 +85,6 @@ func (a *AppService) GetNodeInfo() *models.NodeInfoResponse {
 	}
 
 	return response
-}
-
-// GetConnectionHistory returns connection history with current connection status
-func (a *AppService) GetConnectionHistory() (*models.ConnectionHistoryResponse, error) {
-	database := a.container.GetDatabase()
-	if database == nil {
-		return nil, fmt.Errorf("database service not available")
-	}
-
-	// Get connection history from database
-	connections, err := database.GetConnectionHistory()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get connection history: %w", err)
-	}
-
-	// Get currently connected peers
-	currentlyConnected := make(map[string]bool)
-	p2pService := a.container.GetP2PService()
-	if p2pService != nil {
-		connectedPeers := p2pService.GetConnectedPeers()
-		for _, peerID := range connectedPeers {
-			currentlyConnected[peerID.String()] = true
-		}
-	}
-
-	// Convert to response format with current connection status
-	var historyConnections []models.ConnectionHistoryItem
-	for _, conn := range connections {
-		item := models.ConnectionHistoryItem{
-			PeerID:             conn.PeerID,
-			PeerName:           conn.PeerName,
-			Address:            conn.Address,
-			LastConnected:      conn.LastConnected,
-			ConnectionType:     conn.ConnectionType,
-			IsValidated:        conn.IsValidated,
-			CurrentlyConnected: currentlyConnected[conn.PeerID],
-		}
-		historyConnections = append(historyConnections, item)
-	}
-
-	return &models.ConnectionHistoryResponse{
-		Connections: historyConnections,
-		Count:       len(historyConnections),
-	}, nil
-}
-
-// GetSecondDegreeConnections returns second-degree peer connections
-func (a *AppService) GetSecondDegreeConnections() (*models.SecondDegreeConnectionsResponse, error) {
-	p2pService := a.container.GetP2PService()
-	if p2pService == nil {
-		return nil, fmt.Errorf("P2P service not available")
-	}
-
-	return p2pService.GetSecondDegreeConnections()
-}
-
-// ConnectToSecondDegreePeer attempts to connect to a second-degree peer using hole punching
-func (a *AppService) ConnectToSecondDegreePeer(targetPeerID, viaPeerID string) (*models.NodeInfoResponse, error) {
-	p2pService := a.container.GetP2PService()
-	if p2pService == nil {
-		return nil, fmt.Errorf("P2P service not available")
-	}
-
-	return p2pService.ConnectToSecondDegreePeer(targetPeerID, viaPeerID)
 }
 
 // StartMonitoring starts the file system monitoring

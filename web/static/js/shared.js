@@ -564,14 +564,6 @@ function executePageScripts(url) {
                 }, 100);
             }
             break;
-        case '/network':
-            // Re-initialize network page if functions exist
-            if (typeof loadNetworkInfo === 'function') {
-                setTimeout(() => {
-                    loadNetworkInfo();
-                }, 100);
-            }
-            break;
         case '/friends':
             // Re-initialize friends page if functions exist
             if (typeof loadFriends === 'function') {
