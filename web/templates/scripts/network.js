@@ -422,12 +422,20 @@ async function connectToSecondDegreePeer(targetPeerId, viaPeerId, displayName) {
     }
 }
 
-// Load initial data
-window.onload = function() {
+// Load network information - for SPA navigation
+function loadNetworkInfo() {
     loadAvatarImages();
     getNodeInfo();
     getMonitorStatus();
     getDetailedPeerInfo();
     getConnectionHistory();
     getSecondDegreeConnections();
+}
+
+// Make loadNetworkInfo globally accessible for SPA navigation
+window.loadNetworkInfo = loadNetworkInfo;
+
+// Load initial data
+window.onload = function() {
+    loadNetworkInfo();
 };

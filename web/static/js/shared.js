@@ -1,5 +1,9 @@
 // Shared JavaScript functionality for both Profile and Network pages
 
+// SPA (Single Page Application) functionality
+let currentPage = '';
+let isNavigating = false;
+
 // Global variables for unified image gallery
 let galleryImages = [];
 let currentGalleryIndex = 0;
@@ -11,6 +15,14 @@ let isOwnContent = false;
 
 // Legacy avatar variables (for backward compatibility)
 let avatarImages = [];
+
+// Global Audio Player Data
+window.globalPlaylistData = {
+    currentGallery: null,
+    files: [],
+    currentIndex: -1,
+    isPlaying: false
+};
 
 // Shared utility functions
 function showStatus(elementId, message, isError = false) {
@@ -267,6 +279,13 @@ window.onclick = function(event) {
     }
 }
 
+// Initialize SPA navigation early
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeSPANavigation);
+} else {
+    initializeSPANavigation();
+}
+
 // Keyboard navigation
 document.addEventListener('keydown', function(event) {
     const imageGalleryModal = document.getElementById('imageGalleryModal');
@@ -439,8 +458,350 @@ function setCurrentDocFilename(filename) {
     }
 }
 
+// SPA Navigation Functions
+async function loadPage(url, addToHistory = true) {
+    if (isNavigating) return;
+    
+    try {
+        isNavigating = true;
+        
+        // Add loading indicator
+        const mainContent = document.querySelector('.main-content');
+        if (mainContent) {
+            mainContent.style.opacity = '0.7';
+        }
+        
+        // Fetch the new page content
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const html = await response.text();
+        
+        // Parse the response to extract main content
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        
+        // Extract the new page content
+        const newContainer = doc.querySelector('.container');
+        const newTitle = doc.querySelector('title');
+        
+        if (newContainer) {
+            // Replace the container content
+            const currentContainer = document.querySelector('.container');
+            if (currentContainer) {
+                currentContainer.innerHTML = newContainer.innerHTML;
+            }
+        }
+        
+        // Update page title
+        if (newTitle) {
+            document.title = newTitle.textContent;
+        }
+        
+        // Update navigation active states
+        updateNavigationState(url);
+        
+        // Add to browser history
+        if (addToHistory) {
+            history.pushState({ url: url }, '', url);
+        }
+        
+        // Execute any page-specific scripts
+        executePageScripts(url);
+        
+        // Store current page
+        currentPage = url;
+        
+    } catch (error) {
+        console.error('Error loading page:', error);
+        // Fallback to regular navigation
+        window.location.href = url;
+    } finally {
+        isNavigating = false;
+        
+        // Remove loading indicator
+        const mainContent = document.querySelector('.main-content');
+        if (mainContent) {
+            mainContent.style.opacity = '1';
+        }
+    }
+}
+
+function updateNavigationState(url) {
+    // Remove active class from all nav links
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.classList.remove('active');
+    });
+    
+    // Add active class to current page nav link
+    const currentLink = document.querySelector(`a[href="${url}"]`);
+    if (currentLink) {
+        currentLink.classList.add('active');
+    }
+}
+
+function executePageScripts(url) {
+    // Execute page-specific initialization based on URL
+    const path = url.split('?')[0]; // Remove query parameters
+    
+    switch (path) {
+        case '/profile':
+        case '/friend-profile':
+            // Re-initialize profile page if functions exist
+            if (typeof loadUserInfo === 'function') {
+                setTimeout(() => {
+                    const peerID = getPeerIdFromUrl();
+                    if (peerID) {
+                        isViewingFriend = true;
+                        loadFriendProfile();
+                    } else {
+                        isViewingFriend = false;
+                        loadUserInfo();
+                        loadDocs();
+                    }
+                }, 100);
+            }
+            break;
+        case '/network':
+            // Re-initialize network page if functions exist
+            if (typeof loadNetworkInfo === 'function') {
+                setTimeout(() => {
+                    loadNetworkInfo();
+                }, 100);
+            }
+            break;
+        case '/friends':
+            // Re-initialize friends page if functions exist
+            if (typeof loadFriends === 'function') {
+                setTimeout(() => {
+                    loadFriends();
+                }, 100);
+            }
+            break;
+    }
+}
+
+// Intercept navigation clicks
+function initializeSPANavigation() {
+    // Handle navigation links
+    document.addEventListener('click', function(event) {
+        const link = event.target.closest('a');
+        if (!link) return;
+        
+        const href = link.getAttribute('href');
+        if (!href || href.startsWith('#') || href.startsWith('http') || href.includes('://')) {
+            return; // Skip external links and anchors
+        }
+        
+        // Only intercept internal navigation links
+        if (href.startsWith('/')) {
+            event.preventDefault();
+            loadPage(href);
+        }
+    });
+    
+    // Handle browser back/forward buttons
+    window.addEventListener('popstate', function(event) {
+        if (event.state && event.state.url) {
+            loadPage(event.state.url, false);
+        } else {
+            loadPage(window.location.pathname, false);
+        }
+    });
+    
+    // Initialize current page state
+    currentPage = window.location.pathname;
+    history.replaceState({ url: currentPage }, '', currentPage);
+}
+
+// Function to get peer ID from URL (for profile pages)
+function getPeerIdFromUrl() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('peer_id');
+}
+
+// Global Audio Player Functions
+function playTrack(galleryName, trackIndex, fileName) {
+    // Load all files for the gallery to enable navigation
+    fetchAPI(`/api/audio-galleries/${encodeURIComponent(galleryName)}`)
+        .then(data => {
+            const audioFiles = data.audio_files || [];
+            if (audioFiles.length > 0) {
+                // Store playlist data globally
+                window.globalPlaylistData = {
+                    currentGallery: galleryName,
+                    files: audioFiles,
+                    currentIndex: trackIndex,
+                    isPlaying: false
+                };
+                
+                // Play the track in the global player
+                playTrackInGlobalPlayer(galleryName, trackIndex, fileName);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading audio files:', error);
+            alert('Error playing track: ' + error.message);
+        });
+}
+
+function playTrackInGlobalPlayer(galleryName, trackIndex, fileName) {
+    // Get global player elements
+    const globalPlayer = document.getElementById('globalAudioPlayer');
+    const globalAudio = document.getElementById('globalAudio');
+    const globalTitle = document.getElementById('globalPlayerTitle');
+    const globalPlaylist = document.getElementById('globalPlayerPlaylist');
+    const globalPlayPauseBtn = document.getElementById('globalPlayPauseBtn');
+    const globalPrevBtn = document.getElementById('globalPrevBtn');
+    const globalNextBtn = document.getElementById('globalNextBtn');
+    
+    if (!globalPlayer || !globalAudio || !globalTitle) return;
+    
+    // Show the global player
+    globalPlayer.classList.add('active');
+    
+    // Update track highlighting
+    updateTrackHighlighting(galleryName, trackIndex);
+    
+    // Set audio source
+    const trackUrl = `/api/audio-galleries/${encodeURIComponent(galleryName)}/${encodeURIComponent(fileName)}`;
+    globalAudio.src = trackUrl;
+    
+    // Update title and playlist info
+    const trackName = fileName.replace(/\.[^/.]+$/, '');
+    const displayName = galleryName === 'root_audio' ? '🎶 Root Playlist' : galleryName;
+    globalTitle.textContent = trackName;
+    globalPlaylist.textContent = displayName;
+    
+    // Enable controls
+    globalPlayPauseBtn.disabled = false;
+    updateGlobalNavigationButtons();
+    
+    // Auto-play the track
+    globalAudio.play().catch(error => {
+        console.log('Auto-play prevented:', error);
+    });
+    
+    // Update play/pause button when audio state changes
+    globalAudio.onplay = () => {
+        globalPlayPauseBtn.textContent = '⏸';
+        window.globalPlaylistData.isPlaying = true;
+    };
+    
+    globalAudio.onpause = () => {
+        globalPlayPauseBtn.textContent = '▶';
+        window.globalPlaylistData.isPlaying = false;
+    };
+    
+    // Auto-advance to next track when current track ends
+    globalAudio.onended = () => {
+        globalNextTrack();
+    };
+}
+
+function updateTrackHighlighting(galleryName, currentIndex) {
+    // Remove highlighting from all tracks in all playlists
+    const allTracks = document.querySelectorAll('.track-item.playing');
+    allTracks.forEach(track => {
+        track.classList.remove('playing');
+    });
+    
+    // Highlight current track in the specific gallery
+    const tracksContainer = document.getElementById(`tracks-${galleryName}`);
+    if (!tracksContainer) return;
+    
+    const galleryTracks = tracksContainer.querySelectorAll('.track-item');
+    const currentTrack = galleryTracks[currentIndex];
+    if (currentTrack) {
+        currentTrack.classList.add('playing');
+    }
+}
+
+function updateGlobalNavigationButtons() {
+    const playlistData = window.globalPlaylistData;
+    if (!playlistData || !playlistData.files) return;
+    
+    const globalPrevBtn = document.getElementById('globalPrevBtn');
+    const globalNextBtn = document.getElementById('globalNextBtn');
+    
+    if (globalPrevBtn) {
+        globalPrevBtn.disabled = playlistData.currentIndex <= 0;
+    }
+    
+    if (globalNextBtn) {
+        globalNextBtn.disabled = playlistData.currentIndex >= playlistData.files.length - 1;
+    }
+}
+
+function globalTogglePlayPause() {
+    const globalAudio = document.getElementById('globalAudio');
+    if (!globalAudio) return;
+    
+    if (globalAudio.paused) {
+        globalAudio.play();
+    } else {
+        globalAudio.pause();
+    }
+}
+
+function globalPreviousTrack() {
+    const playlistData = window.globalPlaylistData;
+    if (!playlistData || !playlistData.currentGallery || playlistData.currentIndex <= 0) return;
+    
+    const newIndex = playlistData.currentIndex - 1;
+    const fileName = playlistData.files[newIndex];
+    
+    playlistData.currentIndex = newIndex;
+    playTrackInGlobalPlayer(playlistData.currentGallery, newIndex, fileName);
+}
+
+function globalNextTrack() {
+    const playlistData = window.globalPlaylistData;
+    if (!playlistData || !playlistData.currentGallery || playlistData.currentIndex >= playlistData.files.length - 1) return;
+    
+    const newIndex = playlistData.currentIndex + 1;
+    const fileName = playlistData.files[newIndex];
+    
+    playlistData.currentIndex = newIndex;
+    playTrackInGlobalPlayer(playlistData.currentGallery, newIndex, fileName);
+}
+
+function hideGlobalPlayer() {
+    const globalPlayer = document.getElementById('globalAudioPlayer');
+    const globalAudio = document.getElementById('globalAudio');
+    
+    if (globalPlayer) {
+        globalPlayer.classList.remove('active');
+    }
+    
+    if (globalAudio) {
+        globalAudio.pause();
+        globalAudio.src = '';
+    }
+    
+    // Clear highlighting from all tracks
+    const allTracks = document.querySelectorAll('.track-item.playing');
+    allTracks.forEach(track => {
+        track.classList.remove('playing');
+    });
+    
+    // Reset global playlist data
+    window.globalPlaylistData = {
+        currentGallery: null,
+        files: [],
+        currentIndex: -1,
+        isPlaying: false
+    };
+}
+
 // Export functions for global access
 window.sharedApp = {
+    // SPA functions
+    loadPage,
+    initializeSPANavigation,
+    
     // Unified image gallery functions
     openImageGallery,
     closeImageGallery,
@@ -474,3 +835,15 @@ window.sharedApp = {
     showResult,
     closeDocModal
 };
+
+// Make global audio player functions available globally
+window.playTrack = playTrack;
+window.globalTogglePlayPause = globalTogglePlayPause;
+window.globalPreviousTrack = globalPreviousTrack;
+window.globalNextTrack = globalNextTrack;
+window.hideGlobalPlayer = hideGlobalPlayer;
+
+// Initialize SPA when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    initializeSPANavigation();
+});

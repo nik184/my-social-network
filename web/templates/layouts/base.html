@@ -22,6 +22,27 @@
 
     {{template "modals" .}}
 
+    <!-- Global Audio Player (persists across all pages) -->
+    <div id="globalAudioPlayer" class="global-audio-player">
+        <div class="player-container">
+            <div class="player-info">
+                <h4 id="globalPlayerTitle" class="player-track-title">Select a track to play</h4>
+                <p id="globalPlayerPlaylist" class="player-playlist-name">No playlist selected</p>
+            </div>
+            <div class="player-controls">
+                <button id="globalPrevBtn" class="player-btn" onclick="globalPreviousTrack()" disabled>⏮</button>
+                <button id="globalPlayPauseBtn" class="player-btn play-pause" onclick="globalTogglePlayPause()" disabled>▶</button>
+                <button id="globalNextBtn" class="player-btn" onclick="globalNextTrack()" disabled>⏭</button>
+            </div>
+            <div class="player-audio-container">
+                <audio id="globalAudio" class="player-audio" controls>
+                    Your browser does not support the audio element.
+                </audio>
+            </div>
+            <button class="player-close" onclick="hideGlobalPlayer()">×</button>
+        </div>
+    </div>
+
     <script src="/js/shared.js"></script>
     {{if .PageScript}}
     <script>

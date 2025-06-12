@@ -6,6 +6,9 @@ document.addEventListener('DOMContentLoaded', function() {
     sharedApp.hideStatus('connectionStatus');
 });
 
+// Make loadFriends globally accessible for SPA navigation
+window.loadFriends = loadFriends;
+
 // Load friends from the server
 async function loadFriends() {
     try {
@@ -122,9 +125,13 @@ async function removeFriend(peerID, friendName) {
     }
 }
 
-// Navigate to friend profile page
+// Navigate to friend profile page using SPA navigation
 function viewFriendProfile(peerID) {
-    window.location.href = `/friend-profile?peer_id=${encodeURIComponent(peerID)}`;
+    if (typeof sharedApp !== 'undefined' && sharedApp.loadPage) {
+        sharedApp.loadPage(`/friend-profile?peer_id=${encodeURIComponent(peerID)}`);
+    } else {
+        window.location.href = `/friend-profile?peer_id=${encodeURIComponent(peerID)}`;
+    }
 }
 
 // Connect to a peer using connection string and add to friends
