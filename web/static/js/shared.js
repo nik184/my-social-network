@@ -53,13 +53,13 @@ async function loadAvatarImages() {
     try {
         const response = await fetch('/api/avatar');
         const data = await response.json();
-        
+
         avatarImages = data.images || [];
         return data;
     } catch (error) {
         console.log('No avatar images found or error loading:', error.message);
         avatarImages = [];
-        return { images: [], count: 0 };
+        return {images: [], count: 0};
     }
 }
 
@@ -81,7 +81,7 @@ function openImageGallery(images, title = 'Gallery', type = 'default', urlProvid
         }
         return;
     }
-    
+
     galleryImages = images;
     galleryTitle = title;
     galleryType = type;
@@ -89,19 +89,19 @@ function openImageGallery(images, title = 'Gallery', type = 'default', urlProvid
     currentGalleryName = galleryName;
     isOwnContent = ownContent;
     currentGalleryIndex = 0;
-    
+
     // Set title
     const titleElement = document.getElementById('galleryModalTitle');
     if (titleElement) {
         titleElement.textContent = title;
     }
-    
+
     // Show/hide kebab menu based on whether this is own content
     const kebabMenu = document.getElementById('imageKebabMenu');
     if (kebabMenu) {
         kebabMenu.style.display = isOwnContent && type === 'gallery' ? 'block' : 'none';
     }
-    
+
     showGalleryImage();
     updateGalleryImageCounter();
     document.getElementById('imageGalleryModal').style.display = 'block';
@@ -112,13 +112,13 @@ function closeImageGallery() {
     if (modal) {
         modal.style.display = 'none';
     }
-    
+
     // Hide kebab dropdown
     const dropdown = document.getElementById('imageKebabDropdown');
     if (dropdown) {
         dropdown.classList.remove('show');
     }
-    
+
     // Reset gallery state
     galleryImages = [];
     galleryType = '';
@@ -131,14 +131,14 @@ function closeImageGallery() {
 
 function showGalleryImage() {
     if (galleryImages.length === 0) return;
-    
-    const imageUrl = galleryUrlProvider ? galleryUrlProvider(galleryImages[currentGalleryIndex], currentGalleryIndex) : 
-                     galleryType === 'avatar' ? `/api/avatar/${galleryImages[currentGalleryIndex]}` :
-                     galleryImages[currentGalleryIndex];
-    
+
+    const imageUrl = galleryUrlProvider ? galleryUrlProvider(galleryImages[currentGalleryIndex], currentGalleryIndex) :
+        galleryType === 'avatar' ? `/api/avatar/${galleryImages[currentGalleryIndex]}` :
+            galleryImages[currentGalleryIndex];
+
     const galleryContent = document.getElementById('galleryImageContent');
     if (galleryContent) {
-        galleryContent.innerHTML = 
+        galleryContent.innerHTML =
             `<img src="${imageUrl}" alt="${galleryTitle}" style="max-width: 100%; max-height: 400px; border-radius: 10px;" />`;
     }
 }
@@ -164,7 +164,7 @@ function updateGalleryImageCounter() {
     if (counterElement) {
         counterElement.textContent = `${currentGalleryIndex + 1} of ${galleryImages.length}`;
     }
-    
+
     // Hide navigation if only one image
     const prevBtn = document.getElementById('prevGalleryBtn');
     const nextBtn = document.getElementById('nextGalleryBtn');
@@ -187,7 +187,7 @@ function openGallery() {
 // Create avatar directory instruction
 async function createAvatarDirectory() {
     try {
-        await fetch('/api/create', { method: 'POST' });
+        await fetch('/api/create', {method: 'POST'});
         alert('Avatar directory is ready!\n\nTo add your avatar:\n1. Navigate to your space184/images/avatar folder\n2. Place one or more image files (jpg, png, gif, etc.)\n3. Refresh this page\n\nThe first image will become your avatar, and you can browse all images by clicking on it.');
     } catch (error) {
         alert('Error creating avatar directory: ' + error.message);
@@ -256,21 +256,21 @@ function escapeHtml(text) {
 }
 
 // Global event handlers
-window.onclick = function(event) {
+window.onclick = function (event) {
     const imageGalleryModal = document.getElementById('imageGalleryModal');
     const docModal = document.getElementById('docModal');
-    
+
     if (imageGalleryModal && event.target === imageGalleryModal) {
         closeImageGallery();
     }
     if (docModal && event.target === docModal) {
         closeDocModal();
     }
-    
+
     // Close kebab dropdowns when clicking outside
     const imageKebabDropdown = document.getElementById('imageKebabDropdown');
     const docKebabDropdown = document.getElementById('docKebabDropdown');
-    
+
     if (imageKebabDropdown && !event.target.closest('.kebab-menu')) {
         imageKebabDropdown.classList.remove('show');
     }
@@ -287,10 +287,10 @@ if (document.readyState === 'loading') {
 }
 
 // Keyboard navigation
-document.addEventListener('keydown', function(event) {
+document.addEventListener('keydown', function (event) {
     const imageGalleryModal = document.getElementById('imageGalleryModal');
     const docModal = document.getElementById('docModal');
-    
+
     // Image gallery modal keyboard controls
     if (imageGalleryModal && imageGalleryModal.style.display === 'block') {
         if (event.key === 'ArrowLeft') {
@@ -302,7 +302,7 @@ document.addEventListener('keydown', function(event) {
         }
         event.preventDefault();
     }
-    
+
     // Doc modal keyboard controls
     if (docModal && docModal.style.display === 'block' && event.key === 'Escape') {
         closeDocModal();
@@ -322,7 +322,7 @@ function openAvatarGallery() {
         alert('No avatar images available. Add images to your space184/images/avatar directory.');
         return;
     }
-    
+
     openImageGallery(avatarImages, 'Avatar Gallery', 'avatar');
 }
 
@@ -351,35 +351,35 @@ async function deleteCurrentImage() {
     if (!isOwnContent || galleryImages.length === 0) {
         return;
     }
-    
+
     const currentImage = galleryImages[currentGalleryIndex];
     if (!currentImage || !currentGalleryName) {
         alert('Unable to determine which image to delete');
         return;
     }
-    
+
     if (!confirm(`Are you sure you want to delete "${currentImage}"?`)) {
         return;
     }
-    
+
     try {
         const response = await fetch(`/api/delete/images/${encodeURIComponent(currentGalleryName)}/${encodeURIComponent(currentImage)}`, {
             method: 'DELETE'
         });
-        
+
         if (!response.ok) {
             const errorText = await response.text();
             throw new Error(`Failed to delete image: ${errorText}`);
         }
-        
+
         // Remove image from gallery array
         galleryImages.splice(currentGalleryIndex, 1);
-        
+
         if (galleryImages.length === 0) {
             // No more images, close gallery
             closeImageGallery();
             alert('Image deleted successfully. Gallery is now empty.');
-            
+
             // Refresh the photos tab if we're on profile page
             if (typeof loadPhotos === 'function') {
                 loadPhotos();
@@ -389,20 +389,20 @@ async function deleteCurrentImage() {
             if (currentGalleryIndex >= galleryImages.length) {
                 currentGalleryIndex = galleryImages.length - 1;
             }
-            
+
             // Update display
             showGalleryImage();
             updateGalleryImageCounter();
-            
+
             alert('Image deleted successfully');
         }
-        
+
         // Hide dropdown
         const dropdown = document.getElementById('imageKebabDropdown');
         if (dropdown) {
             dropdown.classList.remove('show');
         }
-        
+
     } catch (error) {
         console.error('Error deleting image:', error);
         alert('Error deleting image: ' + error.message);
@@ -415,30 +415,30 @@ async function deleteCurrentDoc() {
         alert('Unable to determine which document to delete');
         return;
     }
-    
+
     if (!confirm(`Are you sure you want to delete "${currentDocFilename}"?`)) {
         return;
     }
-    
+
     try {
         const response = await fetch(`/api/delete/docs/${encodeURIComponent(currentDocFilename)}`, {
             method: 'DELETE'
         });
-        
+
         if (!response.ok) {
             const errorText = await response.text();
             throw new Error(`Failed to delete document: ${errorText}`);
         }
-        
+
         // Close modal
         closeDocModal();
         alert('Document deleted successfully');
-        
+
         // Refresh the docs tab if we're on profile page
         if (typeof loadDocs === 'function') {
             loadDocs();
         }
-        
+
     } catch (error) {
         console.error('Error deleting document:', error);
         alert('Error deleting document: ' + error.message);
@@ -448,7 +448,7 @@ async function deleteCurrentDoc() {
 // Function to set current doc filename (called when opening doc modal)
 function setCurrentDocFilename(filename) {
     currentDocFilename = filename;
-    
+
     // Show/hide kebab menu for own documents only
     const kebabMenu = document.getElementById('docKebabMenu');
     if (kebabMenu) {
@@ -461,32 +461,32 @@ function setCurrentDocFilename(filename) {
 // SPA Navigation Functions
 async function loadPage(url, addToHistory = true) {
     if (isNavigating) return;
-    
+
     try {
         isNavigating = true;
-        
+
         // Add loading indicator
         const mainContent = document.querySelector('.main-content');
         if (mainContent) {
             mainContent.style.opacity = '0.7';
         }
-        
+
         // Fetch the new page content
         const response = await fetch(url);
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        
+
         const html = await response.text();
-        
+
         // Parse the response to extract main content
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
-        
+
         // Extract the new page content
         const newContainer = doc.querySelector('.container');
         const newTitle = doc.querySelector('title');
-        
+
         if (newContainer) {
             // Replace the container content
             const currentContainer = document.querySelector('.container');
@@ -494,33 +494,33 @@ async function loadPage(url, addToHistory = true) {
                 currentContainer.innerHTML = newContainer.innerHTML;
             }
         }
-        
+
         // Update page title
         if (newTitle) {
             document.title = newTitle.textContent;
         }
-        
+
         // Update navigation active states
         updateNavigationState(url);
-        
+
         // Add to browser history
         if (addToHistory) {
-            history.pushState({ url: url }, '', url);
+            history.pushState({url: url}, '', url);
         }
-        
+
         // Execute any page-specific scripts
         executePageScripts(url);
-        
+
         // Store current page
         currentPage = url;
-        
+
     } catch (error) {
         console.error('Error loading page:', error);
         // Fallback to regular navigation
         window.location.href = url;
     } finally {
         isNavigating = false;
-        
+
         // Remove loading indicator
         const mainContent = document.querySelector('.main-content');
         if (mainContent) {
@@ -534,7 +534,7 @@ function updateNavigationState(url) {
     document.querySelectorAll('.nav-link').forEach(link => {
         link.classList.remove('active');
     });
-    
+
     // Add active class to current page nav link
     const currentLink = document.querySelector(`a[href="${url}"]`);
     if (currentLink) {
@@ -545,32 +545,22 @@ function updateNavigationState(url) {
 function executePageScripts(url) {
     // Execute page-specific initialization based on URL
     const path = url.split('?')[0]; // Remove query parameters
-    
+
     switch (path) {
         case '/profile':
         case '/friend-profile':
-            // Re-initialize profile page if functions exist
-            if (typeof loadUserInfo === 'function') {
-                setTimeout(() => {
-                    const peerID = getPeerIdFromUrl();
-                    if (peerID) {
-                        isViewingFriend = true;
-                        loadFriendProfile();
-                    } else {
-                        isViewingFriend = false;
-                        loadUserInfo();
-                        loadDocs();
-                    }
-                }, 100);
+            const peerID = getPeerIdFromUrl();
+            if (peerID) {
+                isViewingFriend = true;
+                loadFriendProfile();
+            } else {
+                isViewingFriend = false;
+                loadUserInfo();
+                loadDocs();
             }
             break;
         case '/friends':
-            // Re-initialize friends page if functions exist
-            if (typeof loadFriends === 'function') {
-                setTimeout(() => {
-                    loadFriends();
-                }, 100);
-            }
+            loadFriends();
             break;
     }
 }
@@ -578,34 +568,34 @@ function executePageScripts(url) {
 // Intercept navigation clicks
 function initializeSPANavigation() {
     // Handle navigation links
-    document.addEventListener('click', function(event) {
+    document.addEventListener('click', function (event) {
         const link = event.target.closest('a');
         if (!link) return;
-        
+
         const href = link.getAttribute('href');
         if (!href || href.startsWith('#') || href.startsWith('http') || href.includes('://')) {
             return; // Skip external links and anchors
         }
-        
+
         // Only intercept internal navigation links
         if (href.startsWith('/')) {
             event.preventDefault();
             loadPage(href);
         }
     });
-    
+
     // Handle browser back/forward buttons
-    window.addEventListener('popstate', function(event) {
+    window.addEventListener('popstate', function (event) {
         if (event.state && event.state.url) {
             loadPage(event.state.url, false);
         } else {
             loadPage(window.location.pathname, false);
         }
     });
-    
+
     // Initialize current page state
     currentPage = window.location.pathname;
-    history.replaceState({ url: currentPage }, '', currentPage);
+    history.replaceState({url: currentPage}, '', currentPage);
 }
 
 // Function to get peer ID from URL (for profile pages)
@@ -628,7 +618,7 @@ function playTrack(galleryName, trackIndex, fileName) {
                     currentIndex: trackIndex,
                     isPlaying: false
                 };
-                
+
                 // Play the track in the global player
                 playTrackInGlobalPlayer(galleryName, trackIndex, fileName);
             }
@@ -648,45 +638,45 @@ function playTrackInGlobalPlayer(galleryName, trackIndex, fileName) {
     const globalPlayPauseBtn = document.getElementById('globalPlayPauseBtn');
     const globalPrevBtn = document.getElementById('globalPrevBtn');
     const globalNextBtn = document.getElementById('globalNextBtn');
-    
+
     if (!globalPlayer || !globalAudio || !globalTitle) return;
-    
+
     // Show the global player
     globalPlayer.classList.add('active');
-    
+
     // Update track highlighting
     updateTrackHighlighting(galleryName, trackIndex);
-    
+
     // Set audio source
     const trackUrl = `/api/audio-galleries/${encodeURIComponent(galleryName)}/${encodeURIComponent(fileName)}`;
     globalAudio.src = trackUrl;
-    
+
     // Update title and playlist info
     const trackName = fileName.replace(/\.[^/.]+$/, '');
     const displayName = galleryName === 'root_audio' ? '🎶 Root Playlist' : galleryName;
     globalTitle.textContent = trackName;
     globalPlaylist.textContent = displayName;
-    
+
     // Enable controls
     globalPlayPauseBtn.disabled = false;
     updateGlobalNavigationButtons();
-    
+
     // Auto-play the track
     globalAudio.play().catch(error => {
         console.log('Auto-play prevented:', error);
     });
-    
+
     // Update play/pause button when audio state changes
     globalAudio.onplay = () => {
         globalPlayPauseBtn.textContent = '⏸';
         window.globalPlaylistData.isPlaying = true;
     };
-    
+
     globalAudio.onpause = () => {
         globalPlayPauseBtn.textContent = '▶';
         window.globalPlaylistData.isPlaying = false;
     };
-    
+
     // Auto-advance to next track when current track ends
     globalAudio.onended = () => {
         globalNextTrack();
@@ -699,11 +689,11 @@ function updateTrackHighlighting(galleryName, currentIndex) {
     allTracks.forEach(track => {
         track.classList.remove('playing');
     });
-    
+
     // Highlight current track in the specific gallery
     const tracksContainer = document.getElementById(`tracks-${galleryName}`);
     if (!tracksContainer) return;
-    
+
     const galleryTracks = tracksContainer.querySelectorAll('.track-item');
     const currentTrack = galleryTracks[currentIndex];
     if (currentTrack) {
@@ -714,14 +704,14 @@ function updateTrackHighlighting(galleryName, currentIndex) {
 function updateGlobalNavigationButtons() {
     const playlistData = window.globalPlaylistData;
     if (!playlistData || !playlistData.files) return;
-    
+
     const globalPrevBtn = document.getElementById('globalPrevBtn');
     const globalNextBtn = document.getElementById('globalNextBtn');
-    
+
     if (globalPrevBtn) {
         globalPrevBtn.disabled = playlistData.currentIndex <= 0;
     }
-    
+
     if (globalNextBtn) {
         globalNextBtn.disabled = playlistData.currentIndex >= playlistData.files.length - 1;
     }
@@ -730,7 +720,7 @@ function updateGlobalNavigationButtons() {
 function globalTogglePlayPause() {
     const globalAudio = document.getElementById('globalAudio');
     if (!globalAudio) return;
-    
+
     if (globalAudio.paused) {
         globalAudio.play();
     } else {
@@ -741,10 +731,10 @@ function globalTogglePlayPause() {
 function globalPreviousTrack() {
     const playlistData = window.globalPlaylistData;
     if (!playlistData || !playlistData.currentGallery || playlistData.currentIndex <= 0) return;
-    
+
     const newIndex = playlistData.currentIndex - 1;
     const fileName = playlistData.files[newIndex];
-    
+
     playlistData.currentIndex = newIndex;
     playTrackInGlobalPlayer(playlistData.currentGallery, newIndex, fileName);
 }
@@ -752,10 +742,10 @@ function globalPreviousTrack() {
 function globalNextTrack() {
     const playlistData = window.globalPlaylistData;
     if (!playlistData || !playlistData.currentGallery || playlistData.currentIndex >= playlistData.files.length - 1) return;
-    
+
     const newIndex = playlistData.currentIndex + 1;
     const fileName = playlistData.files[newIndex];
-    
+
     playlistData.currentIndex = newIndex;
     playTrackInGlobalPlayer(playlistData.currentGallery, newIndex, fileName);
 }
@@ -763,22 +753,22 @@ function globalNextTrack() {
 function hideGlobalPlayer() {
     const globalPlayer = document.getElementById('globalAudioPlayer');
     const globalAudio = document.getElementById('globalAudio');
-    
+
     if (globalPlayer) {
         globalPlayer.classList.remove('active');
     }
-    
+
     if (globalAudio) {
         globalAudio.pause();
         globalAudio.src = '';
     }
-    
+
     // Clear highlighting from all tracks
     const allTracks = document.querySelectorAll('.track-item.playing');
     allTracks.forEach(track => {
         track.classList.remove('playing');
     });
-    
+
     // Reset global playlist data
     window.globalPlaylistData = {
         currentGallery: null,
@@ -793,7 +783,7 @@ window.sharedApp = {
     // SPA functions
     loadPage,
     initializeSPANavigation,
-    
+
     // Unified image gallery functions
     openImageGallery,
     closeImageGallery,
@@ -801,14 +791,14 @@ window.sharedApp = {
     previousGalleryImage,
     nextGalleryImage,
     updateGalleryImageCounter,
-    
+
     // Kebab menu functions
     toggleImageKebab,
     toggleDocKebab,
     deleteCurrentImage,
     deleteCurrentDoc,
     setCurrentDocFilename,
-    
+
     // Legacy functions (for backward compatibility)
     loadAvatarImages,
     updateHeaderAvatar,
@@ -836,6 +826,6 @@ window.globalNextTrack = globalNextTrack;
 window.hideGlobalPlayer = hideGlobalPlayer;
 
 // Initialize SPA when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     initializeSPANavigation();
 });

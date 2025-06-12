@@ -1,13 +1,37 @@
-// Load initial data when page loads
-document.addEventListener('DOMContentLoaded', function() {
+// Function to initialize the friends page
+function initializeFriendsPage() {
+    // Check if the friends page elements exist before initializing
+    const friendsContent = document.getElementById('friendsContent');
+    const friendsStatus = document.getElementById('friendsStatus');
+
+    if (!friendsContent) {
+        // Friends page elements not found, try again later
+        setTimeout(initializeFriendsPage, 50);
+        return;
+    }
+
     loadFriends();
     // Show connection status initially
-    sharedApp.showStatus('connectionStatus', '', false);
-    sharedApp.hideStatus('connectionStatus');
-});
+    if (typeof sharedApp !== 'undefined') {
+        sharedApp.showStatus('connectionStatus', '', false);
+        sharedApp.hideStatus('connectionStatus');
+    }
+}
 
-// Make loadFriends globally accessible for SPA navigation
+// Load initial data when page loads (for direct page access)
+document.addEventListener('DOMContentLoaded', initializeFriendsPage);
+
+// Also run immediately if DOM is already loaded (for SPA navigation)
+if (document.readyState === 'loading') {
+    // DOM is still loading, event listener will handle it
+} else {
+    // DOM is already loaded, run initialization immediately
+    setTimeout(initializeFriendsPage, 100);
+}
+
+// Make functions globally accessible for SPA navigation
 window.loadFriends = loadFriends;
+window.initializeFriendsPage = initializeFriendsPage;
 
 // Load friends from the server
 async function loadFriends() {
