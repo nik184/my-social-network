@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log"
 
-	"my-social-network/internal/interfaces"
-	"my-social-network/internal/repository"
-	"my-social-network/internal/utils"
+	"old-school/internal/interfaces"
+	"old-school/internal/repository"
+	"old-school/internal/utils"
 )
 
 // ServiceContainer manages all application services

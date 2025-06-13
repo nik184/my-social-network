@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/yuin/goldmark"
-	"my-social-network/internal/models"
-	"my-social-network/internal/utils"
+	"old-school/internal/models"
+	"old-school/internal/utils"
 )
 
 // DirectoryServiceInterface defines the interface for directory operations
@@ -505,7 +505,7 @@ func (d *DirectoryService) GetGalleries() ([]models.Gallery, error) {
 // GetGalleryImages returns a list of image files in a specific gallery
 func (d *DirectoryService) GetGalleryImages(galleryName string) ([]string, error) {
 	var galleryDir string
-	
+
 	if galleryName == "root_images" {
 		// Special case for root images - read directly from images folder
 		galleryDir = d.pathManager.GetImagesPath()
@@ -615,7 +615,7 @@ func (d *DirectoryService) GetAudioGalleries() ([]models.AudioGallery, error) {
 // GetAudioGalleryFiles returns a list of audio files in a specific gallery
 func (d *DirectoryService) GetAudioGalleryFiles(galleryName string) ([]string, error) {
 	var galleryDir string
-	
+
 	if galleryName == "root_audio" {
 		// Special case for root audio - read directly from audio folder
 		galleryDir = d.pathManager.GetAudioPath()
@@ -826,7 +826,7 @@ func (d *DirectoryService) GetVideoGalleries() ([]models.VideoGallery, error) {
 // GetVideoGalleryFiles returns a list of video files in a specific gallery
 func (d *DirectoryService) GetVideoGalleryFiles(galleryName string) ([]string, error) {
 	var galleryDir string
-	
+
 	if galleryName == "root_video" {
 		// Special case for root video - read directly from video folder
 		galleryDir = d.pathManager.GetVideoPath()

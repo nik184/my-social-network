@@ -11,9 +11,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"my-social-network/internal/models"
-	"my-social-network/internal/services"
-	"my-social-network/internal/utils"
+	"old-school/internal/models"
+	"old-school/internal/services"
+	"old-school/internal/utils"
 )
 
 // Handler manages HTTP requests
@@ -128,7 +128,6 @@ func (h *Handler) HandleConnectByIP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(nodeInfo)
 }
-
 
 // HandleAvatarList handles GET /api/avatar requests
 func (h *Handler) HandleAvatarList(w http.ResponseWriter, r *http.Request) {
@@ -1654,7 +1653,7 @@ func (h *Handler) HandleAudioGallery(w http.ResponseWriter, r *http.Request) {
 		// Return list of audio files in gallery
 		var audioFiles []string
 		var err error
-		
+
 		if galleryName == "root_audio" {
 			// Get files directly from audio root directory
 			audioDir := filepath.Join(h.appService.GetDirectoryService().GetDirectoryPath(), "audio")
@@ -1663,7 +1662,7 @@ func (h *Handler) HandleAudioGallery(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, fmt.Sprintf("Failed to read audio directory: %v", readErr), http.StatusInternalServerError)
 				return
 			}
-			
+
 			for _, file := range files {
 				if !file.IsDir() && utils.IsAudioFile(file.Name()) {
 					audioFiles = append(audioFiles, file.Name())
@@ -1745,7 +1744,7 @@ func (h *Handler) HandleVideoGallery(w http.ResponseWriter, r *http.Request) {
 		// Return list of video files in gallery
 		var videoFiles []string
 		var err error
-		
+
 		if galleryName == "root_video" {
 			// Get files directly from video root directory
 			videoDir := filepath.Join(h.appService.GetDirectoryService().GetDirectoryPath(), "video")
@@ -1754,7 +1753,7 @@ func (h *Handler) HandleVideoGallery(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, fmt.Sprintf("Failed to read video directory: %v", readErr), http.StatusInternalServerError)
 				return
 			}
-			
+
 			for _, file := range files {
 				if !file.IsDir() && utils.IsVideoFile(file.Name()) {
 					videoFiles = append(videoFiles, file.Name())

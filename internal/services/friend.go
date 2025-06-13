@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"my-social-network/internal/interfaces"
-	"my-social-network/internal/models"
+	"old-school/internal/interfaces"
+	"old-school/internal/models"
 )
 
 // FriendService handles friend-related operations including reconnection

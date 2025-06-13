@@ -1,4 +1,4 @@
-module my-social-network
+module old-school
 
 go 1.23.8
 

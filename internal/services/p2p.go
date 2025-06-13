@@ -24,28 +24,28 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	"github.com/multiformats/go-multiaddr"
 
-	"my-social-network/internal/interfaces"
-	"my-social-network/internal/models"
+	"old-school/internal/interfaces"
+	"old-school/internal/models"
 )
 
 const (
 	// Protocol ID for our application
-	AppProtocol = "/my-social-network/1.0.0"
+	AppProtocol = "/old-school/1.0.0"
 
 	// Service tag for mDNS discovery
-	ServiceTag = "my-social-network-p2p"
+	ServiceTag = "old-school-p2p"
 
 	// Application identifier for peer validation
 	AppIdentifier = "MySocialNetwork-DistributedApp"
 
 	// Protocol for peer identification
-	IdentifyProtocol = "/my-social-network/identify/1.0.0"
+	IdentifyProtocol = "/old-school/identify/1.0.0"
 
 	// Protocol for rendezvous/relay assistance
-	RendezvousProtocol = "/my-social-network/rendezvous/1.0.0"
+	RendezvousProtocol = "/old-school/rendezvous/1.0.0"
 
 	// NAT traversal assistance protocol
-	NATAssistProtocol = "/my-social-network/nat-assist/1.0.0"
+	NATAssistProtocol = "/old-school/nat-assist/1.0.0"
 )
 
 // PeerInfo stores information about connected peers

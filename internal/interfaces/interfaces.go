@@ -3,7 +3,7 @@ package interfaces
 import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"my-social-network/internal/models"
+	"old-school/internal/models"
 )
 
 // Repository interfaces following Repository pattern

@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"my-social-network/internal/handlers"
-	"my-social-network/internal/services"
+	"old-school/internal/handlers"
+	"old-school/internal/services"
 )
 
 // WebViewUI manages the WebView interface on Windows

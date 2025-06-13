@@ -18,7 +18,7 @@ A truly distributed Go application using libp2p that manages a shared directory 
 ## Project Structure
 
 ```
-my-social-network/
+old-school/
 ├── cmd/
 │   └── distributed-app/
 │       └── main.go              # Application entry point

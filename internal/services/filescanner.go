@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"my-social-network/internal/interfaces"
-	"my-social-network/internal/utils"
+	"old-school/internal/interfaces"
+	"old-school/internal/utils"
 )
 
 // FileScannerService handles file system scanning and hash computation

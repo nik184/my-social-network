@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	"my-social-network/internal/services"
-	"my-social-network/internal/ui"
+	"old-school/internal/services"
+	"old-school/internal/ui"
 )
 
 // showConnectionString displays the connection string for sharing

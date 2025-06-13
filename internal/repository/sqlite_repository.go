@@ -10,9 +10,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	_ "modernc.org/sqlite"
 
-	"my-social-network/internal/interfaces"
-	"my-social-network/internal/models"
-	"my-social-network/internal/utils"
+	"old-school/internal/interfaces"
+	"old-school/internal/models"
+	"old-school/internal/utils"
 )
 
 // SQLiteRepository implements all repository interfaces using SQLite

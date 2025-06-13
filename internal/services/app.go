@@ -3,8 +3,8 @@ package services
 import (
 	"log"
 
-	"my-social-network/internal/interfaces"
-	"my-social-network/internal/models"
+	"old-school/internal/interfaces"
+	"old-school/internal/models"
 )
 
 // AppService provides high-level application operations and coordinates business logic
