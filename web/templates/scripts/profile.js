@@ -2,24 +2,49 @@ let userInfo = null;
 let currentFriend = null;
 let isViewingFriend = false;
 
-// Load initial data when page loads
-document.addEventListener('DOMContentLoaded', function() {
+// Function to initialize the profile page
+function initializeProfilePage() {
+    // Reset tab loading flags when switching between profiles
+    photosLoaded = false;
+    audioLoaded = false;
+    videoLoaded = false;
+    
     // Check if we're viewing a friend's profile or our own
-    const peerID = getPeerIdFromUrl();
+    // Use the navigated URL if available (from SPA navigation), otherwise current location
+    const urlToCheck = window.currentNavigatedURL || window.location.href;
+    const peerID = getPeerIdFromUrl(urlToCheck);
+    
     if (peerID) {
         isViewingFriend = true;
+        window.isViewingFriend = true;
         loadFriendProfile();
     } else {
         isViewingFriend = false;
+        window.isViewingFriend = false;
         loadUserInfo();
         loadDocs();
+    }
+}
+
+// Load initial data when page loads (for direct page access only)
+document.addEventListener('DOMContentLoaded', function() {
+    // Only run automatically if this is not SPA navigation
+    if (!window.currentNavigatedURL) {
+        initializeProfilePage();
     }
 });
 
 // Get peer ID from URL parameters
-function getPeerIdFromUrl() {
-    const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get('peer_id');
+function getPeerIdFromUrl(url) {
+    // If URL is provided, parse it; otherwise use current window location
+    if (url) {
+        const urlObj = new URL(url, window.location.origin);
+        const urlParams = new URLSearchParams(urlObj.search);
+        return urlParams.get('peer_id');
+    } else {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get('peer_id');
+    }
 }
 
 // Load friend profile and docs
@@ -372,9 +397,9 @@ function switchTab(tabName) {
     // Add active class to clicked button and corresponding content
     event.target.classList.add('active');
     document.getElementById(tabName + 'Tab').classList.add('active');
-    
+
     // Load tab content if needed
-    if (tabName === 'photos' && !photosLoaded) {
+        if (tabName === 'photos' && !photosLoaded) {
         if (isViewingFriend && currentFriend) {
             loadFriendPhotos(currentFriend.peer_id);
         } else {
@@ -1451,3 +1476,4 @@ window.onclick = function(event) {
 window.loadUserInfo = loadUserInfo;
 window.loadFriendProfile = loadFriendProfile;
 window.loadDocs = loadDocs;
+window.initializeProfilePage = initializeProfilePage;

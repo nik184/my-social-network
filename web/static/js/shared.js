@@ -535,8 +535,17 @@ function updateNavigationState(url) {
         link.classList.remove('active');
     });
 
+    // Extract the base path without query parameters
+    const path = url.split('?')[0];
+    
+    // For friend profiles, we want to highlight the Friends nav link
+    let navPath = path;
+    if (path === '/friend-profile') {
+        navPath = '/friends';
+    }
+    
     // Add active class to current page nav link
-    const currentLink = document.querySelector(`a[href="${url}"]`);
+    const currentLink = document.querySelector(`a[href="${navPath}"]`);
     if (currentLink) {
         currentLink.classList.add('active');
     }
@@ -549,18 +558,17 @@ function executePageScripts(url) {
     switch (path) {
         case '/profile':
         case '/friend-profile':
-            const peerID = getPeerIdFromUrl();
-            if (peerID) {
-                isViewingFriend = true;
-                loadFriendProfile();
-            } else {
-                isViewingFriend = false;
-                loadUserInfo();
-                loadDocs();
-            }
+            // Extract peer ID from the passed URL and set global state
+            const peerID = getPeerIdFromUrl(url);
+            window.isViewingFriend = peerID ? true : false;
+            window.currentNavigatedURL = url;
+
+            // Direct call to initialization function
+            window.initializeProfilePage();
             break;
         case '/friends':
-            loadFriends();
+            // Direct call to initialization function
+            window.initializeFriendsPage();
             break;
     }
 }
@@ -589,19 +597,26 @@ function initializeSPANavigation() {
         if (event.state && event.state.url) {
             loadPage(event.state.url, false);
         } else {
-            loadPage(window.location.pathname, false);
+            loadPage(window.location.pathname + window.location.search, false);
         }
     });
 
-    // Initialize current page state
-    currentPage = window.location.pathname;
+    // Initialize current page state with query parameters
+    currentPage = window.location.pathname + window.location.search;
     history.replaceState({url: currentPage}, '', currentPage);
 }
 
 // Function to get peer ID from URL (for profile pages)
-function getPeerIdFromUrl() {
-    const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get('peer_id');
+function getPeerIdFromUrl(url) {
+    // If URL is provided, parse it; otherwise use current window location
+    if (url) {
+        const urlObj = new URL(url, window.location.origin);
+        const urlParams = new URLSearchParams(urlObj.search);
+        return urlParams.get('peer_id');
+    } else {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get('peer_id');
+    }
 }
 
 // Global Audio Player Functions

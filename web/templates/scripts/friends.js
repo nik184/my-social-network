@@ -18,16 +18,11 @@ function initializeFriendsPage() {
     }
 }
 
-// Load initial data when page loads (for direct page access)
-document.addEventListener('DOMContentLoaded', initializeFriendsPage);
-
-// Also run immediately if DOM is already loaded (for SPA navigation)
-if (document.readyState === 'loading') {
-    // DOM is still loading, event listener will handle it
-} else {
-    // DOM is already loaded, run initialization immediately
-    setTimeout(initializeFriendsPage, 100);
-}
+// Load initial data when page loads (for direct page access only)
+document.addEventListener('DOMContentLoaded', function() {
+    // Always run for friends page since it doesn't have complex SPA state
+    initializeFriendsPage();
+});
 
 // Make functions globally accessible for SPA navigation
 window.loadFriends = loadFriends;
