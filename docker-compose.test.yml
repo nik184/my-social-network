@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  node1:
+    build: .
+    container_name: social-network-node1
+    environment:
+      - WEB_PORT=6996
+      - P2P_PORT=9000
+      - NODE_NAME=TestNode1
+      - DATA_DIR=/data
+    ports:
+      - "6996:6996"  # Web interface
+      - "9000:9000"  # P2P port
+    volumes:
+      - node1_data:/data
+    networks:
+      - social-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:6996/api/info"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  node2:
+    build: .
+    container_name: social-network-node2
+    environment:
+      - WEB_PORT=6996
+      - P2P_PORT=9001
+      - NODE_NAME=TestNode2
+      - DATA_DIR=/data
+    ports:
+      - "6997:6996"  # Map host port 6997 to container port 6996
+      - "9001:9001"  # P2P port
+    volumes:
+      - node2_data:/data
+    networks:
+      - social-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:6996/api/info"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+networks:
+  social-network:
+    driver: bridge
+
+volumes:
+  node1_data:
+  node2_data:

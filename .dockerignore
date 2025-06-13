@@ -1,0 +1,42 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+*.md
+
+# Test files
+tests/
+e2e/
+*.spec.js
+*test.go
+
+# Node.js
+node_modules/
+package*.json
+playwright.config.js
+
+# Development files
+.env
+.env.local
+
+# Build artifacts
+main
+*.exe
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Logs
+*.log

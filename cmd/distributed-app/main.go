@@ -174,6 +174,14 @@ func startConsoleInput(appService *services.AppService) {
 }
 
 func main() {
+	// Get configuration from environment variables
+	webPort := 6996
+	if envPort := os.Getenv("WEB_PORT"); envPort != "" {
+		if port, err := strconv.Atoi(envPort); err == nil {
+			webPort = port
+		}
+	}
+
 	// Initialize application services
 	appService := services.NewAppService()
 	defer func() {
@@ -182,8 +190,8 @@ func main() {
 		}
 	}()
 
-	// Initialize WebView UI with automatic port discovery
-	webUI, err := ui.NewWebViewUI(appService, 6996)
+	// Initialize WebView UI with configured port
+	webUI, err := ui.NewWebViewUI(appService, webPort)
 	if err != nil {
 		log.Fatalf("Failed to create WebView UI: %v", err)
 	}

@@ -4,3 +4,6 @@ data
 integration.test
 my-social-network
 build
+test-results
+node_modules
+playwright-report

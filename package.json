@@ -1,0 +1,19 @@
+{
+  "name": "social-network-e2e-tests",
+  "version": "1.0.0",
+  "description": "E2E tests for P2P Social Network",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "docker:setup": "docker-compose -f docker-compose.test.yml up -d --build",
+    "docker:cleanup": "docker-compose -f docker-compose.test.yml down -v",
+    "test:e2e": "npm run docker:setup && npm run test && npm run docker:cleanup"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0"
+  },
+  "keywords": ["e2e", "testing", "p2p", "social-network"],
+  "author": "",
+  "license": "MIT"
+}
