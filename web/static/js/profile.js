@@ -992,6 +992,7 @@ function playAudioFromGallery(galleryName, audioName) {
         const globalPlayer = document.getElementById('globalAudioPlayer');
         if (globalPlayer) {
             globalPlayer.style.display = 'block';
+            globalPlayer.classList.add('active');
         }
         
         globalAudio.play();
