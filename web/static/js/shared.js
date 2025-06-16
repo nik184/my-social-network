@@ -486,6 +486,7 @@ async function loadPage(url, addToHistory = true) {
         // Extract the new page content
         const newContainer = doc.querySelector('.container');
         const newTitle = doc.querySelector('title');
+        const newScript = doc.querySelector('script');
 
         if (newContainer) {
             // Replace the container content
@@ -499,6 +500,9 @@ async function loadPage(url, addToHistory = true) {
         if (newTitle) {
             document.title = newTitle.textContent;
         }
+
+        // Load and execute page-specific scripts
+        loadPageScript(url);
 
         // Update navigation active states
         updateNavigationState(url);
@@ -516,8 +520,6 @@ async function loadPage(url, addToHistory = true) {
 
     } catch (error) {
         console.error('Error loading page:', error);
-        // Fallback to regular navigation
-        window.location.href = url;
     } finally {
         isNavigating = false;
 
@@ -551,6 +553,46 @@ function updateNavigationState(url) {
     }
 }
 
+// Track loaded scripts to avoid duplicates
+const loadedScripts = new Set();
+
+function loadPageScript(url) {
+    const path = url.split('?')[0]; // Remove query parameters
+    let scriptPath = '';
+    
+    switch (path) {
+        case '/profile':
+        case '/friend-profile':
+            scriptPath = '/js/profile.js';
+            break;
+        case '/friends':
+            scriptPath = '/js/friends.js';
+            break;
+        default:
+            return;
+    }
+    
+    // Don't reload if already loaded
+    if (loadedScripts.has(scriptPath)) {
+        executePageScripts(url);
+        return;
+    }
+    
+    // Create and load script
+    const script = document.createElement('script');
+    script.src = scriptPath;
+    script.onload = () => {
+        loadedScripts.add(scriptPath);
+        executePageScripts(url);
+    };
+    script.onerror = () => {
+        console.error(`Failed to load script: ${scriptPath}`);
+        executePageScripts(url);
+    };
+    
+    document.head.appendChild(script);
+}
+
 function executePageScripts(url) {
     // Execute page-specific initialization based on URL
     const path = url.split('?')[0]; // Remove query parameters
@@ -563,12 +605,24 @@ function executePageScripts(url) {
             window.isViewingFriend = peerID ? true : false;
             window.currentNavigatedURL = url;
 
-            // Direct call to initialization function
-            window.initializeProfilePage();
+            // Try to call the initialization function, with fallback
+            if (typeof window.initializeProfilePage === 'function') {
+                window.initializeProfilePage();
+            } else {
+                console.warn('initializeProfilePage not found, using fallback');
+                // Fallback initialization
+                setTimeout(() => executePageScripts(url), 100);
+            }
             break;
         case '/friends':
-            // Direct call to initialization function
-            window.initializeFriendsPage();
+            // Try to call the initialization function, with fallback  
+            if (typeof window.initializeFriendsPage === 'function') {
+                window.initializeFriendsPage();
+            } else {
+                console.warn('initializeFriendsPage not found, using fallback');
+                // Fallback initialization
+                setTimeout(() => executePageScripts(url), 100);
+            }
             break;
     }
 }
@@ -840,7 +894,3 @@ window.globalPreviousTrack = globalPreviousTrack;
 window.globalNextTrack = globalNextTrack;
 window.hideGlobalPlayer = hideGlobalPlayer;
 
-// Initialize SPA when DOM is loaded
-document.addEventListener('DOMContentLoaded', function () {
-    initializeSPANavigation();
-});
