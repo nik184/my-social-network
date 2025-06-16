@@ -178,7 +178,7 @@ async function loadDocs() {
         
         const data = await sharedApp.fetchAPI('/api/media/docs/galleries');
         
-        displayDocsGalleries(data.galleries || []);
+        displayDocsWithFilters(data.galleries || []);
         sharedApp.hideStatus('docsStatus');
     } catch (error) {
         console.error('Error loading docs:', error);
@@ -203,8 +203,8 @@ async function loadFriendDocs(peerID) {
     }
 }
 
-// Display docs galleries (subdirectories) in the grid
-function displayDocsGalleries(galleries) {
+// Display docs with filter buttons and file list
+function displayDocsWithFilters(galleries) {
     const docsContent = document.getElementById('docsContent');
     
     if (galleries.length === 0) {
@@ -212,32 +212,75 @@ function displayDocsGalleries(galleries) {
         return;
     }
 
-    const galleriesGrid = document.createElement('div');
-    galleriesGrid.className = 'galleries-grid';
-
+    // Collect all files with their gallery info
+    let allFiles = [];
+    const galleryNames = [];
+    
     galleries.forEach(gallery => {
-        const galleryCard = document.createElement('div');
-        galleryCard.className = 'gallery-card docs-gallery-card';
-        galleryCard.onclick = () => openDocsGallery(gallery.name);
-
-        // Display user-friendly name for root gallery
-        const displayName = gallery.name === 'root_docs' ? '📁 Root Documents' : gallery.name;
-
-        galleryCard.innerHTML = `
-            <div class="gallery-preview">
-                <div class="gallery-placeholder">📄</div>
-            </div>
-            <div class="gallery-info">
-                <div class="gallery-name">${sharedApp.escapeHtml(displayName)}</div>
-                <div class="gallery-count">${gallery.file_count} documents</div>
-            </div>
-        `;
-
-        galleriesGrid.appendChild(galleryCard);
+        const displayName = gallery.name === 'root_docs' ? 'All Documents' : gallery.name;
+        galleryNames.push({name: gallery.name, displayName, count: gallery.file_count});
+        
+        gallery.files.forEach(file => {
+            allFiles.push({
+                name: file,
+                gallery: gallery.name,
+                galleryDisplayName: displayName
+            });
+        });
     });
 
-    docsContent.innerHTML = '';
-    docsContent.appendChild(galleriesGrid);
+    // Create filter buttons
+    const filtersHtml = galleryNames.map(gallery => {
+        const isRoot = gallery.name === 'root_docs';
+        return `<button class="gallery-filter-btn ${isRoot ? 'active' : ''}" 
+                        data-gallery="${gallery.name}" 
+                        onclick="filterDocs('${gallery.name}')">
+                    ${sharedApp.escapeHtml(gallery.displayName)} (${gallery.count})
+                </button>`;
+    }).join('');
+
+    // Create file list
+    const filesHtml = allFiles.map(file => {
+        return `<div class="doc-item" data-gallery="${file.gallery}">
+                    <div class="doc-icon">📄</div>
+                    <div class="doc-info">
+                        <div class="doc-name">${sharedApp.escapeHtml(file.name.replace(/\.[^/.]+$/, ''))}</div>
+                        <div class="doc-gallery">${sharedApp.escapeHtml(file.galleryDisplayName)}</div>
+                    </div>
+                    <button class="doc-open-btn" onclick="openDocFromGallery('${file.gallery}', '${sharedApp.escapeHtml(file.name)}')">
+                        Open
+                    </button>
+                </div>`;
+    }).join('');
+
+    docsContent.innerHTML = `
+        <div class="media-filters">
+            ${filtersHtml}
+        </div>
+        <div class="media-files">
+            ${filesHtml}
+        </div>
+    `;
+}
+
+// Filter docs by gallery
+function filterDocs(galleryName) {
+    // Update active filter button
+    document.querySelectorAll('.gallery-filter-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.gallery === galleryName) {
+            btn.classList.add('active');
+        }
+    });
+
+    // Show/hide files based on gallery
+    document.querySelectorAll('.doc-item').forEach(item => {
+        if (galleryName === 'root_docs' || item.dataset.gallery === galleryName) {
+            item.style.display = 'flex';
+        } else {
+            item.style.display = 'none';
+        }
+    });
 }
 
 // Display empty state for docs
@@ -505,17 +548,17 @@ let videoLoaded = false;
 // Load photos and galleries
 async function loadPhotos() {
     try {
-        sharedApp.showStatus('photosStatus', 'Loading galleries...', false);
+        sharedApp.showStatus('photosStatus', 'Loading images...', false);
         
         const data = await sharedApp.fetchAPI('/api/media/image/galleries');
         
-        displayGalleries(data.galleries || []);
+        displayPhotosWithFilters(data.galleries || []);
         photosLoaded = true;
         sharedApp.hideStatus('photosStatus');
     } catch (error) {
-        console.error('Error loading galleries:', error);
-        sharedApp.showStatus('photosStatus', 'Error loading galleries: ' + error.message, true);
-        displayPhotosEmptyState('Failed to load galleries');
+        console.error('Error loading images:', error);
+        sharedApp.showStatus('photosStatus', 'Error loading images: ' + error.message, true);
+        displayPhotosEmptyState('Failed to load images');
     }
 }
 
@@ -556,45 +599,103 @@ async function loadFriendPhotos(peerID) {
     }
 }
 
-// Display galleries in the grid
-function displayGalleries(galleries) {
+// Display photos with filter buttons and image grid
+function displayPhotosWithFilters(galleries) {
     const photosContent = document.getElementById('photosContent');
     
     if (galleries.length === 0) {
-        displayPhotosEmptyState('No photo galleries found');
+        displayPhotosEmptyState('No images found');
         return;
     }
 
-    const galleriesGrid = document.createElement('div');
-    galleriesGrid.className = 'galleries-grid';
-
+    // Collect all images with their gallery info
+    let allImages = [];
+    const galleryNames = [];
+    
     galleries.forEach(gallery => {
-        const galleryCard = document.createElement('div');
-        galleryCard.className = 'gallery-card';
-        galleryCard.onclick = () => openGallery(gallery.name);
-
-        const preview = gallery.files && gallery.files.length > 0 
-            ? `<img src="/api/media/image/galleries/${encodeURIComponent(gallery.name)}/${encodeURIComponent(gallery.files[0])}" alt="${sharedApp.escapeHtml(gallery.name)}" />`
-            : '<div class="gallery-placeholder">📷</div>';
-
-        // Display user-friendly name for root gallery
-        const displayName = gallery.name === 'root_images' ? '📁 Root Images' : gallery.name;
-
-        galleryCard.innerHTML = `
-            <div class="gallery-preview">
-                ${preview}
-            </div>
-            <div class="gallery-info">
-                <div class="gallery-name">${sharedApp.escapeHtml(displayName)}</div>
-                <div class="gallery-count">${gallery.file_count} images</div>
-            </div>
-        `;
-
-        galleriesGrid.appendChild(galleryCard);
+        const displayName = gallery.name === 'root_images' ? 'All Images' : gallery.name;
+        galleryNames.push({name: gallery.name, displayName, count: gallery.file_count});
+        
+        gallery.files.forEach(file => {
+            allImages.push({
+                name: file,
+                gallery: gallery.name,
+                galleryDisplayName: displayName
+            });
+        });
     });
 
-    photosContent.innerHTML = '';
-    photosContent.appendChild(galleriesGrid);
+    // Create filter buttons
+    const filtersHtml = galleryNames.map(gallery => {
+        const isRoot = gallery.name === 'root_images';
+        return `<button class="gallery-filter-btn ${isRoot ? 'active' : ''}" 
+                        data-gallery="${gallery.name}" 
+                        onclick="filterPhotos('${gallery.name}')">
+                    ${sharedApp.escapeHtml(gallery.displayName)} (${gallery.count})
+                </button>`;
+    }).join('');
+
+    // Create image grid
+    const imagesHtml = allImages.map(image => {
+        const imageUrl = `/api/media/image/galleries/${encodeURIComponent(image.gallery)}/${encodeURIComponent(image.name)}`;
+        return `<div class="image-item" data-gallery="${image.gallery}" onclick="openImageFromGallery('${image.gallery}', '${sharedApp.escapeHtml(image.name)}')">
+                    <div class="image-preview">
+                        <img src="${imageUrl}" alt="${sharedApp.escapeHtml(image.name)}" loading="lazy" />
+                    </div>
+                    <div class="image-info">
+                        <div class="image-name">${sharedApp.escapeHtml(image.name)}</div>
+                        <div class="image-gallery">${sharedApp.escapeHtml(image.galleryDisplayName)}</div>
+                    </div>
+                </div>`;
+    }).join('');
+
+    photosContent.innerHTML = `
+        <div class="media-filters">
+            ${filtersHtml}
+        </div>
+        <div class="media-grid images-grid">
+            ${imagesHtml}
+        </div>
+    `;
+}
+
+// Filter photos by gallery
+function filterPhotos(galleryName) {
+    // Update active filter button
+    document.querySelectorAll('.gallery-filter-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.gallery === galleryName) {
+            btn.classList.add('active');
+        }
+    });
+
+    // Show/hide images based on gallery
+    document.querySelectorAll('.image-item').forEach(item => {
+        if (galleryName === 'root_images' || item.dataset.gallery === galleryName) {
+            item.style.display = 'block';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+
+// Open image from gallery
+function openImageFromGallery(galleryName, imageName) {
+    // Get all images from the same gallery for navigation
+    const galleryImages = Array.from(document.querySelectorAll(`[data-gallery="${galleryName}"]`))
+        .filter(item => item.style.display !== 'none')
+        .map(item => item.querySelector('.image-name').textContent);
+    
+    const urlProvider = (name) => `/api/media/image/galleries/${encodeURIComponent(galleryName)}/${encodeURIComponent(name)}`;
+    const isOwnContent = !isViewingFriend;
+    
+    sharedApp.openImageGallery(galleryImages, `${galleryName} Gallery`, 'gallery', urlProvider, galleryName, isOwnContent);
+    
+    // Set the current image index
+    const currentIndex = galleryImages.indexOf(imageName);
+    if (currentIndex !== -1) {
+        sharedApp.setGalleryIndex(currentIndex);
+    }
 }
 
 // Display friend's galleries in the grid (both live and downloaded)
@@ -765,17 +866,17 @@ async function openFriendGallery(peerID, galleryName, source = 'live') {
 // Load audio galleries
 async function loadAudio() {
     try {
-        sharedApp.showStatus('audioStatus', 'Loading audio collections...', false);
+        sharedApp.showStatus('audioStatus', 'Loading audio files...', false);
         
         const data = await sharedApp.fetchAPI('/api/media/audio/galleries');
         
-        displayAudioGalleries(data.galleries || []);
+        displayAudioWithFilters(data.galleries || []);
         audioLoaded = true;
         sharedApp.hideStatus('audioStatus');
     } catch (error) {
-        console.error('Error loading audio galleries:', error);
-        sharedApp.showStatus('audioStatus', 'Error loading audio collections: ' + error.message, true);
-        displayAudioEmptyState('Failed to load audio collections');
+        console.error('Error loading audio:', error);
+        sharedApp.showStatus('audioStatus', 'Error loading audio: ' + error.message, true);
+        displayAudioEmptyState('Failed to load audio');
     }
 }
 
@@ -795,47 +896,106 @@ async function loadFriendAudio(peerID) {
     }
 }
 
-// Display audio galleries as playlists
-function displayAudioGalleries(audioGalleries) {
+// Display audio with filter buttons and file list
+function displayAudioWithFilters(galleries) {
     const audioContent = document.getElementById('audioContent');
     
-    if (audioGalleries.length === 0) {
-        displayAudioEmptyState('No audio collections found');
+    if (galleries.length === 0) {
+        displayAudioEmptyState('No audio found');
         return;
     }
 
-    const audioContainer = document.createElement('div');
-    audioContainer.className = 'audio-container';
-
-    audioGalleries.forEach(gallery => {
-        // Display user-friendly name for root gallery
-        const displayName = gallery.name === 'root_audio' ? '🎶 Root Playlist' : gallery.name;
+    // Collect all audio files with their gallery info
+    let allAudio = [];
+    const galleryNames = [];
+    
+    galleries.forEach(gallery => {
+        const displayName = gallery.name === 'root_audio' ? 'All Audio' : gallery.name;
+        galleryNames.push({name: gallery.name, displayName, count: gallery.file_count});
         
-        const playlistSection = document.createElement('div');
-        playlistSection.className = 'playlist-section';
-        
-        playlistSection.innerHTML = `
-            <div class="playlist-header">
-                <div class="playlist-title">
-                    🎵 ${sharedApp.escapeHtml(displayName)}
-                </div>
-                <div class="playlist-count">${gallery.file_count} tracks</div>
-            </div>
-            <div class="playlist-tracks" id="tracks-${gallery.name}">
-                <div style="text-align: center; padding: 20px; color: #666;">
-                    Loading tracks...
-                </div>
-            </div>
-        `;
-        
-        audioContainer.appendChild(playlistSection);
-        
-        // Load tracks for this playlist
-        loadPlaylistTracks(gallery.name, displayName);
+        gallery.files.forEach(file => {
+            allAudio.push({
+                name: file,
+                gallery: gallery.name,
+                galleryDisplayName: displayName
+            });
+        });
     });
 
-    audioContent.innerHTML = '';
-    audioContent.appendChild(audioContainer);
+    // Create filter buttons
+    const filtersHtml = galleryNames.map(gallery => {
+        const isRoot = gallery.name === 'root_audio';
+        return `<button class="gallery-filter-btn ${isRoot ? 'active' : ''}" 
+                        data-gallery="${gallery.name}" 
+                        onclick="filterAudio('${gallery.name}')">
+                    ${sharedApp.escapeHtml(gallery.displayName)} (${gallery.count})
+                </button>`;
+    }).join('');
+
+    // Create audio files list
+    const audioHtml = allAudio.map(audio => {
+        return `<div class="audio-item" data-gallery="${audio.gallery}">
+                    <div class="audio-icon">🎵</div>
+                    <div class="audio-info">
+                        <div class="audio-name">${sharedApp.escapeHtml(audio.name.replace(/\.[^/.]+$/, ''))}</div>
+                        <div class="audio-gallery">${sharedApp.escapeHtml(audio.galleryDisplayName)}</div>
+                    </div>
+                    <button class="audio-play-btn" onclick="playAudioFromGallery('${audio.gallery}', '${sharedApp.escapeHtml(audio.name)}')">
+                        ▶ Play
+                    </button>
+                </div>`;
+    }).join('');
+
+    audioContent.innerHTML = `
+        <div class="media-filters">
+            ${filtersHtml}
+        </div>
+        <div class="media-files">
+            ${audioHtml}
+        </div>
+    `;
+}
+
+// Filter audio by gallery
+function filterAudio(galleryName) {
+    // Update active filter button
+    document.querySelectorAll('.gallery-filter-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.gallery === galleryName) {
+            btn.classList.add('active');
+        }
+    });
+
+    // Show/hide audio files based on gallery
+    document.querySelectorAll('.audio-item').forEach(item => {
+        if (galleryName === 'root_audio' || item.dataset.gallery === galleryName) {
+            item.style.display = 'flex';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+
+// Play audio from gallery
+function playAudioFromGallery(galleryName, audioName) {
+    const audioUrl = `/api/media/audio/galleries/${encodeURIComponent(galleryName)}/${encodeURIComponent(audioName)}`;
+    
+    // Update global audio player
+    const globalAudio = document.getElementById('globalAudio');
+    const globalPlayerTitle = document.getElementById('globalPlayerTitle');
+    
+    if (globalAudio && globalPlayerTitle) {
+        globalAudio.src = audioUrl;
+        globalPlayerTitle.textContent = audioName.replace(/\.[^/.]+$/, '');
+        
+        // Show global player
+        const globalPlayer = document.getElementById('globalAudioPlayer');
+        if (globalPlayer) {
+            globalPlayer.style.display = 'block';
+        }
+        
+        globalAudio.play();
+    }
 }
 
 // Load tracks for a specific playlist

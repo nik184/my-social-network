@@ -148,6 +148,14 @@ function showGalleryImage() {
     }
 }
 
+function setGalleryIndex(index) {
+    if (index >= 0 && index < galleryImages.length) {
+        currentGalleryIndex = index;
+        showGalleryImage();
+        updateGalleryImageCounter();
+    }
+}
+
 function previousGalleryImage() {
     if (galleryImages.length > 1) {
         currentGalleryIndex = (currentGalleryIndex - 1 + galleryImages.length) % galleryImages.length;
@@ -862,6 +870,7 @@ window.sharedApp = {
     openImageGallery,
     closeImageGallery,
     showGalleryImage,
+    setGalleryIndex,
     previousGalleryImage,
     nextGalleryImage,
     updateGalleryImageCounter,
