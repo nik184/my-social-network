@@ -1398,8 +1398,10 @@ func (h *Handler) HandleMediaGalleries(w http.ResponseWriter, r *http.Request) {
 		mediaType = models.MediaTypeAudio
 	case "video":
 		mediaType = models.MediaTypeVideo
+	case "docs":
+		mediaType = models.MediaTypeDocs
 	default:
-		http.Error(w, "Invalid media type. Use 'image', 'audio', or 'video'", http.StatusBadRequest)
+		http.Error(w, "Invalid media type. Use 'image', 'audio', 'video', or 'docs'", http.StatusBadRequest)
 		return
 	}
 
@@ -1442,8 +1444,10 @@ func (h *Handler) HandleMediaGalleryContent(w http.ResponseWriter, r *http.Reque
 		mediaType = models.MediaTypeAudio
 	case "video":
 		mediaType = models.MediaTypeVideo
+	case "docs":
+		mediaType = models.MediaTypeDocs
 	default:
-		http.Error(w, "Invalid media type. Use 'image', 'audio', or 'video'", http.StatusBadRequest)
+		http.Error(w, "Invalid media type. Use 'image', 'audio', 'video', or 'docs'", http.StatusBadRequest)
 		return
 	}
 
@@ -1531,6 +1535,12 @@ func (h *Handler) HandleMediaGalleryContent(w http.ResponseWriter, r *http.Reque
 		} else {
 			filePath = filepath.Join(baseDir, "video", galleryName, fileName)
 		}
+	case models.MediaTypeDocs:
+		if galleryName == "root_docs" {
+			filePath = filepath.Join(baseDir, "docs", fileName)
+		} else {
+			filePath = filepath.Join(baseDir, "docs", galleryName, fileName)
+		}
 	}
 
 	// Set appropriate content type
@@ -1572,8 +1582,12 @@ func (h *Handler) HandleUploadMedia(w http.ResponseWriter, r *http.Request) {
 		mediaType = models.MediaTypeVideo
 		maxMemory = 500 << 20 // 500MB
 		isValidFileFunc = utils.IsVideoFile
+	case "docs":
+		mediaType = models.MediaTypeDocs
+		maxMemory = 32 << 20 // 32MB
+		isValidFileFunc = h.isValidDocumentFile
 	default:
-		http.Error(w, "Invalid media type. Use 'image', 'audio', or 'video'", http.StatusBadRequest)
+		http.Error(w, "Invalid media type. Use 'image', 'audio', 'video', or 'docs'", http.StatusBadRequest)
 		return
 	}
 
@@ -1612,6 +1626,8 @@ func (h *Handler) HandleUploadMedia(w http.ResponseWriter, r *http.Request) {
 		mediaDir = filepath.Join(baseDir, "audio")
 	case models.MediaTypeVideo:
 		mediaDir = filepath.Join(baseDir, "video")
+	case models.MediaTypeDocs:
+		mediaDir = filepath.Join(baseDir, "docs")
 	}
 
 	targetDir := mediaDir
@@ -1726,6 +1742,23 @@ func (h *Handler) setMediaContentType(w http.ResponseWriter, fileName string, me
 		default:
 			w.Header().Set("Content-Type", "video/octet-stream")
 		}
+	case models.MediaTypeDocs:
+		switch ext {
+		case ".txt":
+			w.Header().Set("Content-Type", "text/plain")
+		case ".md":
+			w.Header().Set("Content-Type", "text/markdown")
+		case ".html":
+			w.Header().Set("Content-Type", "text/html")
+		case ".pdf":
+			w.Header().Set("Content-Type", "application/pdf")
+		case ".doc":
+			w.Header().Set("Content-Type", "application/msword")
+		case ".docx":
+			w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+		default:
+			w.Header().Set("Content-Type", "application/octet-stream")
+		}
 	default:
 		w.Header().Set("Content-Type", "application/octet-stream")
 	}
@@ -1746,10 +1779,10 @@ func (h *Handler) HandleMediaRoutes(w http.ResponseWriter, r *http.Request) {
 
 	// Validate media type
 	switch mediaType {
-	case "images", "image", "audio", "video":
+	case "images", "image", "audio", "video", "docs":
 		// Valid types
 	default:
-		http.Error(w, "Invalid media type. Use 'image', 'audio', or 'video'", http.StatusBadRequest)
+		http.Error(w, "Invalid media type. Use 'image', 'audio', 'video', or 'docs'", http.StatusBadRequest)
 		return
 	}
 

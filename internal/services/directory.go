@@ -366,6 +366,10 @@ func (d *DirectoryService) GetMediaGalleries(mediaType models.MediaType) ([]mode
 		mediaDir = d.pathManager.GetVideoPath()
 		fileCheckFunc = utils.IsVideoFile
 		rootGalleryName = "root_video"
+	case models.MediaTypeDocs:
+		mediaDir = d.pathManager.GetDocsPath()
+		fileCheckFunc = utils.IsDocFile
+		rootGalleryName = "root_docs"
 	default:
 		return nil, fmt.Errorf("unsupported media type: %s", mediaType)
 	}
@@ -448,6 +452,10 @@ func (d *DirectoryService) GetMediaGalleryFiles(mediaType models.MediaType, gall
 		mediaDir = d.pathManager.GetVideoPath()
 		fileCheckFunc = utils.IsVideoFile
 		rootGalleryName = "root_video"
+	case models.MediaTypeDocs:
+		mediaDir = d.pathManager.GetDocsPath()
+		fileCheckFunc = utils.IsDocFile
+		rootGalleryName = "root_docs"
 	default:
 		return nil, fmt.Errorf("unsupported media type: %s", mediaType)
 	}

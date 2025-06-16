@@ -67,6 +67,21 @@ func IsTextFile(filename string) bool {
 	return validExtensions[ext]
 }
 
+// IsDocFile checks if a file is a document file based on extension
+func IsDocFile(filename string) bool {
+	ext := strings.ToLower(filepath.Ext(filename))
+	validExtensions := map[string]bool{
+		".md":   true,
+		".pdf":  true,
+		".txt":  true,
+		".html": true,
+		".djvu": true,
+		".doc":  true,
+		".docx": true,
+	}
+	return validExtensions[ext]
+}
+
 // IsAudioFile checks if a file is an audio file based on extension
 func IsAudioFile(filename string) bool {
 	ext := strings.ToLower(filepath.Ext(filename))

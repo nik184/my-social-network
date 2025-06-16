@@ -176,14 +176,14 @@ async function loadDocs() {
     try {
         sharedApp.showStatus('docsStatus', 'Loading docs...', false);
         
-        const data = await sharedApp.fetchAPI('/api/docs');
+        const data = await sharedApp.fetchAPI('/api/media/docs/galleries');
         
-        displayDocs(data.docs || []);
+        displayDocsGalleries(data.galleries || []);
         sharedApp.hideStatus('docsStatus');
     } catch (error) {
         console.error('Error loading docs:', error);
         sharedApp.showStatus('docsStatus', 'Error loading docs: ' + error.message, true);
-        displayEmptyState('Failed to load docs');
+        displayDocsEmptyState('Failed to load docs');
     }
 }
 
@@ -203,62 +203,139 @@ async function loadFriendDocs(peerID) {
     }
 }
 
-// Display docs in the grid
-function displayDocs(docs) {
+// Display docs galleries (subdirectories) in the grid
+function displayDocsGalleries(galleries) {
     const docsContent = document.getElementById('docsContent');
     
-    if (docs.length === 0) {
-        displayEmptyState('No docs found');
+    if (galleries.length === 0) {
+        displayDocsEmptyState('No docs found');
         return;
     }
 
-    const docsGrid = document.createElement('div');
-    docsGrid.className = 'docs-grid';
+    const galleriesGrid = document.createElement('div');
+    galleriesGrid.className = 'galleries-grid';
 
-    docs.forEach(doc => {
-        const docCard = document.createElement('div');
-        docCard.className = 'doc-card';
+    galleries.forEach(gallery => {
+        const galleryCard = document.createElement('div');
+        galleryCard.className = 'gallery-card docs-gallery-card';
+        galleryCard.onclick = () => openDocsGallery(gallery.name);
 
-        const modifiedDate = new Date(doc.modified_at).toLocaleDateString();
-        const sizeKB = Math.round(doc.size / 1024 * 100) / 100;
+        // Display user-friendly name for root gallery
+        const displayName = gallery.name === 'root_docs' ? '📁 Root Documents' : gallery.name;
 
-        docCard.innerHTML = `
-            <div class="doc-header">
-                <div class="doc-title">${sharedApp.escapeHtml(doc.title)}</div>
+        galleryCard.innerHTML = `
+            <div class="gallery-preview">
+                <div class="gallery-placeholder">📄</div>
             </div>
-            <div class="doc-body">
-                <div class="doc-preview">${sharedApp.escapeHtml(doc.preview)}</div>
-                <div class="doc-meta">
-                    <span>📅 ${modifiedDate}</span>
-                    <span>📄 ${sizeKB} KB</span>
-                </div>
-                <div class="doc-actions">
-                    <button class="read-more-btn" onclick="openDoc('${sharedApp.escapeHtml(doc.filename)}')">
-                        Read more
-                    </button>
-                </div>
+            <div class="gallery-info">
+                <div class="gallery-name">${sharedApp.escapeHtml(displayName)}</div>
+                <div class="gallery-count">${gallery.file_count} documents</div>
             </div>
         `;
 
-        docsGrid.appendChild(docCard);
+        galleriesGrid.appendChild(galleryCard);
     });
 
     docsContent.innerHTML = '';
-    docsContent.appendChild(docsGrid);
+    docsContent.appendChild(galleriesGrid);
 }
 
-// Display empty state
-function displayEmptyState(message) {
+// Display empty state for docs
+function displayDocsEmptyState(message) {
     const docsContent = document.getElementById('docsContent');
     docsContent.innerHTML = `
         <div class="empty-state">
             <div class="empty-state-icon">📝</div>
             <div>${message}</div>
             <div class="create-doc-hint">
-                💡 To add docs, create .txt files in your space184/docs directory
+                💡 To add docs, create subdirectories in your space184/docs directory and add documents to them
             </div>
         </div>
     `;
+}
+
+// Open docs gallery view
+async function openDocsGallery(galleryName) {
+    try {
+        const data = await sharedApp.fetchAPI(`/api/media/docs/galleries/${encodeURIComponent(galleryName)}`);
+        const docs = data.files || [];
+        
+        if (docs.length > 0) {
+            // Show documents in modal or navigate to gallery view
+            showDocsModal(docs, galleryName);
+        } else {
+            alert('No documents found in this gallery');
+        }
+    } catch (error) {
+        console.error('Error loading docs gallery:', error);
+        alert('Error loading docs gallery: ' + error.message);
+    }
+}
+
+// Show documents in a modal
+function showDocsModal(docs, galleryName) {
+    const displayName = galleryName === 'root_docs' ? 'Root Documents' : galleryName;
+    
+    // Create modal HTML
+    const modalHtml = `
+        <div class="modal" id="docsGalleryModal" style="display: block;">
+            <div class="modal-content" style="max-width: 90%; width: 800px;">
+                <div class="modal-header">
+                    <div class="modal-title">📄 ${sharedApp.escapeHtml(displayName)}</div>
+                    <span class="close" onclick="closeDocsGalleryModal()">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="docs-grid" id="modalDocsGrid">
+                        ${docs.map(docFile => `
+                            <div class="doc-card">
+                                <div class="doc-header">
+                                    <div class="doc-title">${sharedApp.escapeHtml(docFile.replace(/\.[^/.]+$/, ''))}</div>
+                                </div>
+                                <div class="doc-body">
+                                    <div class="doc-preview">Click to open document</div>
+                                    <div class="doc-actions">
+                                        <button class="read-more-btn" onclick="openDocFromGallery('${galleryName}', '${sharedApp.escapeHtml(docFile)}')">
+                                            Open Document
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Add modal to body
+    const existingModal = document.getElementById('docsGalleryModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+// Close docs gallery modal
+function closeDocsGalleryModal() {
+    const modal = document.getElementById('docsGalleryModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+// Open document from gallery
+async function openDocFromGallery(galleryName, fileName) {
+    try {
+        const fileUrl = `/api/media/docs/galleries/${encodeURIComponent(galleryName)}/${encodeURIComponent(fileName)}`;
+        
+        // For now, just open in new window/tab
+        window.open(fileUrl, '_blank');
+        
+    } catch (error) {
+        console.error('Error opening document:', error);
+        alert('Error opening document: ' + error.message);
+    }
 }
 
 // Display friend's docs
@@ -1308,7 +1385,7 @@ async function handleFileUpload(type) {
         } else if (isVideo) {
             endpoint = '/api/media/video/upload';
         } else {
-            endpoint = '/api/upload/docs';
+            endpoint = '/api/media/docs/upload';
         }
         
         const response = await fetch(endpoint, {
@@ -1370,23 +1447,24 @@ async function handleFileUpload(type) {
 // Populate docs subdirectories for dropdown suggestions
 async function populateDocsSubdirectories() {
     try {
-        const response = await sharedApp.fetchAPI('/api/subdirectories/docs');
-        const subdirectories = response.subdirectories || [];
+        const response = await sharedApp.fetchAPI('/api/media/docs/galleries');
+        const galleries = response.galleries || [];
+        const galleryNames = galleries.map(gallery => gallery.name);
         
         const datalist = document.getElementById('docsSubdirectoryList');
         if (datalist) {
             // Clear existing options
             datalist.innerHTML = '';
             
-            // Add options for each existing subdirectory
-            subdirectories.forEach(subdir => {
+            // Add options for each existing gallery
+            galleryNames.forEach(galleryName => {
                 const option = document.createElement('option');
-                option.value = subdir;
+                option.value = galleryName;
                 datalist.appendChild(option);
             });
         }
     } catch (error) {
-        console.error('Error loading docs subdirectories:', error);
+        console.error('Error loading docs galleries:', error);
         // Continue silently - not critical for upload functionality
     }
 }

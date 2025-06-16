@@ -32,6 +32,7 @@ const (
 	MediaTypeImage MediaType = "image"
 	MediaTypeAudio MediaType = "audio"
 	MediaTypeVideo MediaType = "video"
+	MediaTypeDocs  MediaType = "docs"
 )
 
 // MediaGallery represents a unified gallery for any media type
