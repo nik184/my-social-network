@@ -64,7 +64,7 @@ func (ts *TemplateService) loadTemplates(templateDir string) error {
 
 // loadPageScript loads the JavaScript for a specific page
 func (ts *TemplateService) loadPageScript(page string) (template.JS, error) {
-	scriptPath := filepath.Join(ts.templateDir, "scripts", page+".js")
+	scriptPath := filepath.Join(filepath.Dir(ts.templateDir), "static", "js", page+".js")
 	content, err := ioutil.ReadFile(scriptPath)
 	if err != nil {
 		return "", err

@@ -26,7 +26,8 @@
       "Bash(sed:*)",
       "Bash(/home/nik2023/go/old-school/remove_legacy.sh:*)",
       "Bash(/home/nik2023/go/old-school/remove_legacy_handlers.sh:*)",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "Bash(diff:*)"
     ],
     "deny": []
   },
