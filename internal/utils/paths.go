@@ -96,6 +96,11 @@ func (pm *PathManager) GetPeerVideoGalleryPath(peerID, galleryName string) strin
 	return filepath.Join(pm.GetSpace184Path(), "downloaded", peerID, "video", galleryName)
 }
 
+// GetPeerVideoGalleryPath returns the video gallery directory for a specific peer and gallery
+func (pm *PathManager) GetPeerDocsGalleryPath(peerID, galleryName string) string {
+	return filepath.Join(pm.GetSpace184Path(), "downloaded", peerID, "docs", galleryName)
+}
+
 // GetDatabasePath returns the database file path
 func (pm *PathManager) GetDatabasePath() string {
 	return filepath.Join(pm.GetSpace184Path(), "node.db")

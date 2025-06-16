@@ -29,14 +29,14 @@ type DirectoryServiceInterface interface {
 	CreateDocsDirectory() error
 	GetDocs() ([]models.Doc, error)
 	GetDoc(filename string) (*models.Doc, error)
-	
+
 	// Unified media gallery methods
 	GetMediaGalleries(mediaType models.MediaType) ([]models.MediaGallery, error)
 	GetMediaGalleryFiles(mediaType models.MediaType, galleryName string) ([]string, error)
 	GetPeerMediaGalleries(peerID string, mediaType models.MediaType) ([]models.MediaGallery, error)
 	GetPeerMediaGalleryFiles(peerID, galleryName string, mediaType models.MediaType) ([]string, error)
 	GetMediaGalleryNames(mediaType models.MediaType) ([]string, error)
-	
+
 	GetDocsSubdirectories() ([]string, error)
 }
 
@@ -491,7 +491,7 @@ func (d *DirectoryService) GetMediaGalleryFiles(mediaType models.MediaType, gall
 				if err != nil {
 					continue
 				}
-				
+
 				for _, subFile := range subFiles {
 					if !subFile.IsDir() && fileCheckFunc(subFile.Name()) {
 						mediaFiles = append(mediaFiles, subFile.Name())
@@ -524,6 +524,9 @@ func (d *DirectoryService) GetPeerMediaGalleries(peerID string, mediaType models
 	case models.MediaTypeVideo:
 		peerMediaDir = d.pathManager.GetPeerVideoPath(peerID)
 		fileCheckFunc = utils.IsVideoFile
+	case models.MediaTypeDocs:
+		peerMediaDir = d.pathManager.GetPeerDocsPath(peerID)
+		fileCheckFunc = utils.IsDocFile
 	default:
 		return nil, fmt.Errorf("unsupported media type: %s", mediaType)
 	}
@@ -593,6 +596,9 @@ func (d *DirectoryService) GetPeerMediaGalleryFiles(peerID, galleryName string, 
 	case models.MediaTypeVideo:
 		galleryDir = d.pathManager.GetPeerVideoGalleryPath(peerID, galleryName)
 		fileCheckFunc = utils.IsVideoFile
+	case models.MediaTypeDocs:
+		galleryDir = d.pathManager.GetPeerDocsGalleryPath(peerID, galleryName)
+		fileCheckFunc = utils.IsDocFile
 	default:
 		return nil, fmt.Errorf("unsupported media type: %s", mediaType)
 	}
@@ -653,4 +659,3 @@ func (d *DirectoryService) GetMediaGalleryNames(mediaType models.MediaType) ([]s
 
 	return galleryNames, nil
 }
-
