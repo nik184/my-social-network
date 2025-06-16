@@ -129,91 +129,6 @@ func (h *Handler) HandleConnectByIP(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(nodeInfo)
 }
 
-// HandleAvatarList handles GET /api/avatar requests
-func (h *Handler) HandleAvatarList(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	images, err := h.appService.GetDirectoryService().GetAvatarImages()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	response := map[string]interface{}{
-		"images": images,
-		"count":  len(images),
-	}
-
-	if len(images) > 0 {
-		response["primary"] = images[0] // First image is the primary avatar
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
-}
-
-// HandleAvatarImage handles GET /api/avatar/{filename} requests
-func (h *Handler) HandleAvatarImage(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" && r.Method != "HEAD" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Extract filename from URL path
-	filename := r.URL.Path[len("/api/avatar/"):]
-	if filename == "" {
-		http.Error(w, "Filename required", http.StatusBadRequest)
-		return
-	}
-
-	// Get avatar images list to verify the file exists
-	images, err := h.appService.GetDirectoryService().GetAvatarImages()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Check if the requested file exists in our avatar list
-	found := false
-	for _, img := range images {
-		if img == filename {
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		http.Error(w, "Avatar image not found", http.StatusNotFound)
-		return
-	}
-
-	// Serve the file
-	avatarDir := h.appService.GetDirectoryService().GetAvatarDirectory()
-	filePath := filepath.Join(avatarDir, filename)
-
-	// Set appropriate content type based on file extension
-	ext := filepath.Ext(filename)
-	switch ext {
-	case ".jpg", ".jpeg":
-		w.Header().Set("Content-Type", "image/jpeg")
-	case ".png":
-		w.Header().Set("Content-Type", "image/png")
-	case ".gif":
-		w.Header().Set("Content-Type", "image/gif")
-	case ".webp":
-		w.Header().Set("Content-Type", "image/webp")
-	case ".bmp":
-		w.Header().Set("Content-Type", "image/bmp")
-	default:
-		w.Header().Set("Content-Type", "application/octet-stream")
-	}
-
-	http.ServeFile(w, r, filePath)
-}
-
 // HandlePeerAvatar handles GET /api/peer-avatar/{peerID} and /api/peer-avatar/{peerID}/{filename} requests
 func (h *Handler) HandlePeerAvatar(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" && r.Method != "HEAD" {
@@ -667,8 +582,6 @@ func (h *Handler) saveContentToFile(filePath, content string) error {
 	return err
 }
 
-
-
 // Page handlers
 
 func (h *Handler) HandleProfilePage(w http.ResponseWriter, r *http.Request) {
@@ -795,7 +708,6 @@ func (h *Handler) HandleUploadDocs(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
-
 
 // isValidDocumentFile checks if a file is a valid document type
 func (h *Handler) isValidDocumentFile(filename string) bool {
@@ -1317,63 +1229,6 @@ func (h *Handler) HandleDocsSubdirectories(w http.ResponseWriter, r *http.Reques
 	})
 }
 
-
-// RegisterRoutes registers all HTTP routes
-func (h *Handler) RegisterRoutes() {
-	// Page routes
-	http.HandleFunc("/", h.HandleProfilePage)
-	http.HandleFunc("/profile", h.HandleProfilePage)
-	http.HandleFunc("/friends", h.HandleFriendsPage)
-	http.HandleFunc("/friend-profile", h.HandleFriendProfilePage)
-
-	// API routes
-	http.HandleFunc("/api/info", h.HandleGetInfo)
-	http.HandleFunc("/api/create", h.HandleCreate)
-	http.HandleFunc("/api/discover", h.HandleDiscover)
-	http.HandleFunc("/api/peers", h.HandlePeers)
-	http.HandleFunc("/api/monitor", h.HandleMonitorStatus)
-	http.HandleFunc("/api/connect-ip", h.HandleConnectByIP)
-	http.HandleFunc("/api/avatar", h.HandleAvatarList)
-	http.HandleFunc("/api/avatar/", h.HandleAvatarImage)
-	http.HandleFunc("/api/peer-avatar/", h.HandlePeerAvatar)
-	http.HandleFunc("/api/docs", h.HandleDocs)
-	http.HandleFunc("/api/docs/", h.HandleDoc)
-	http.HandleFunc("/api/friends", h.HandleFriends)
-	http.HandleFunc("/api/friends/", h.HandleFriend)
-	http.HandleFunc("/api/peer-docs/", h.HandlePeerDocs)
-	// Upload routes
-	http.HandleFunc("/api/upload/docs", h.HandleUploadDocs)
-
-	// Files sync routes
-	http.HandleFunc("/api/sync-friend-files", h.HandleSyncFriendFiles)
-
-	// Peer galleries routes
-	http.HandleFunc("/api/peer-galleries/", h.HandlePeerGalleries)
-
-	// Downloaded content routes
-	http.HandleFunc("/api/downloaded/", h.HandleDownloadedContent)
-
-	// Delete routes
-	http.HandleFunc("/api/delete/docs/", h.HandleDeleteDoc)
-	http.HandleFunc("/api/delete/images/", h.HandleDeleteImage)
-
-	// Subdirectory suggestion routes
-	http.HandleFunc("/api/subdirectories/docs", h.HandleDocsSubdirectories)
-
-	// Unified media routes
-	http.HandleFunc("/api/media/", h.HandleMediaRoutes)
-}
-
-
-
-
-
-
-
-
-
-// Unified media handlers
-
 // HandleMediaGalleries handles GET /api/media/{mediaType}/galleries requests
 func (h *Handler) HandleMediaGalleries(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
@@ -1418,6 +1273,8 @@ func (h *Handler) HandleMediaGalleries(w http.ResponseWriter, r *http.Request) {
 		"count":      len(galleries),
 	})
 }
+
+// Unified media handlers
 
 // HandleMediaGalleryContent handles GET /api/media/{mediaType}/galleries/{galleryName} and /api/media/{mediaType}/galleries/{galleryName}/{fileName} requests
 func (h *Handler) HandleMediaGalleryContent(w http.ResponseWriter, r *http.Request) {
@@ -1587,7 +1444,7 @@ func (h *Handler) HandleUploadMedia(w http.ResponseWriter, r *http.Request) {
 		maxMemory = 32 << 20 // 32MB
 		isValidFileFunc = h.isValidDocumentFile
 	default:
-		http.Error(w, "Invalid media type. Use 'image', 'audio', 'video', or 'docs'", http.StatusBadRequest)
+		http.Error(w, "Invalid media type. Use 'image', 'audio', 'video', 'docs', or 'avatar'", http.StatusBadRequest)
 		return
 	}
 
@@ -1802,4 +1659,48 @@ func (h *Handler) HandleMediaRoutes(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "Invalid media action. Use 'galleries' or 'upload'", http.StatusBadRequest)
 	}
+}
+
+// RegisterRoutes registers all HTTP routes
+func (h *Handler) RegisterRoutes() {
+	// Page routes
+	http.HandleFunc("/", h.HandleProfilePage)
+	http.HandleFunc("/profile", h.HandleProfilePage)
+	http.HandleFunc("/friends", h.HandleFriendsPage)
+	http.HandleFunc("/friend-profile", h.HandleFriendProfilePage)
+
+	// API routes
+	http.HandleFunc("/api/info", h.HandleGetInfo)
+	http.HandleFunc("/api/create", h.HandleCreate)
+	http.HandleFunc("/api/discover", h.HandleDiscover)
+	http.HandleFunc("/api/peers", h.HandlePeers)
+	http.HandleFunc("/api/monitor", h.HandleMonitorStatus)
+	http.HandleFunc("/api/connect-ip", h.HandleConnectByIP)
+	http.HandleFunc("/api/peer-avatar/", h.HandlePeerAvatar)
+	http.HandleFunc("/api/docs", h.HandleDocs)
+	http.HandleFunc("/api/docs/", h.HandleDoc)
+	http.HandleFunc("/api/friends", h.HandleFriends)
+	http.HandleFunc("/api/friends/", h.HandleFriend)
+	http.HandleFunc("/api/peer-docs/", h.HandlePeerDocs)
+	// Upload routes
+	http.HandleFunc("/api/upload/docs", h.HandleUploadDocs)
+
+	// Files sync routes
+	http.HandleFunc("/api/sync-friend-files", h.HandleSyncFriendFiles)
+
+	// Peer galleries routes
+	http.HandleFunc("/api/peer-galleries/", h.HandlePeerGalleries)
+
+	// Downloaded content routes
+	http.HandleFunc("/api/downloaded/", h.HandleDownloadedContent)
+
+	// Delete routes
+	http.HandleFunc("/api/delete/docs/", h.HandleDeleteDoc)
+	http.HandleFunc("/api/delete/images/", h.HandleDeleteImage)
+
+	// Subdirectory suggestion routes
+	http.HandleFunc("/api/subdirectories/docs", h.HandleDocsSubdirectories)
+
+	// Unified media routes
+	http.HandleFunc("/api/media/", h.HandleMediaRoutes)
 }

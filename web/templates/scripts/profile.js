@@ -157,7 +157,7 @@ async function loadAvatar() {
         
         if (avatarImages.length > 0) {
             const primaryAvatar = data.primary || avatarImages[0];
-            const avatarUrl = `/api/avatar/${primaryAvatar}`;
+            const avatarUrl = `/api/media/image/galleries/avatar/${primaryAvatar}`;
             
             document.getElementById('profileAvatar').innerHTML = 
                 `<img src="${avatarUrl}" alt="Avatar" />`;
