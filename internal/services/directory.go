@@ -29,22 +29,15 @@ type DirectoryServiceInterface interface {
 	CreateDocsDirectory() error
 	GetDocs() ([]models.Doc, error)
 	GetDoc(filename string) (*models.Doc, error)
-	GetGalleries() ([]models.Gallery, error)
-	GetGalleryImages(galleryName string) ([]string, error)
-	GetPeerGalleries(peerID string) ([]models.Gallery, error)
-	GetPeerGalleryImages(peerID, galleryName string) ([]string, error)
+	
+	// Unified media gallery methods
+	GetMediaGalleries(mediaType models.MediaType) ([]models.MediaGallery, error)
+	GetMediaGalleryFiles(mediaType models.MediaType, galleryName string) ([]string, error)
+	GetPeerMediaGalleries(peerID string, mediaType models.MediaType) ([]models.MediaGallery, error)
+	GetPeerMediaGalleryFiles(peerID, galleryName string, mediaType models.MediaType) ([]string, error)
+	GetMediaGalleryNames(mediaType models.MediaType) ([]string, error)
+	
 	GetDocsSubdirectories() ([]string, error)
-	GetImageGalleryNames() ([]string, error)
-	GetAudioGalleries() ([]models.AudioGallery, error)
-	GetAudioGalleryFiles(galleryName string) ([]string, error)
-	GetPeerAudioGalleries(peerID string) ([]models.AudioGallery, error)
-	GetPeerAudioGalleryFiles(peerID, galleryName string) ([]string, error)
-	GetAudioGalleryNames() ([]string, error)
-	GetVideoGalleries() ([]models.VideoGallery, error)
-	GetVideoGalleryFiles(galleryName string) ([]string, error)
-	GetPeerVideoGalleries(peerID string) ([]models.VideoGallery, error)
-	GetPeerVideoGalleryFiles(peerID, galleryName string) ([]string, error)
-	GetVideoGalleryNames() ([]string, error)
 }
 
 // DirectoryService handles directory operations
@@ -212,90 +205,6 @@ func (d *DirectoryService) GetPeerAvatarImages(peerID string) ([]string, error) 
 	return imageFiles, nil
 }
 
-// GetPeerGalleries returns a list of all downloaded photo galleries for a specific peer
-func (d *DirectoryService) GetPeerGalleries(peerID string) ([]models.Gallery, error) {
-	peerImagesDir := d.pathManager.GetPeerImagesPath(peerID)
-
-	// Check if peer images directory exists
-	if _, err := os.Stat(peerImagesDir); os.IsNotExist(err) {
-		return []models.Gallery{}, nil // Return empty list if directory doesn't exist
-	}
-
-	files, err := os.ReadDir(peerImagesDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read peer images directory: %w", err)
-	}
-
-	var galleries []models.Gallery
-
-	for _, file := range files {
-		if !file.IsDir() {
-			continue
-		}
-
-		galleryPath := filepath.Join(peerImagesDir, file.Name())
-		galleryFiles, err := os.ReadDir(galleryPath)
-		if err != nil {
-			continue // Skip galleries we can't read
-		}
-
-		var images []string
-		for _, galleryFile := range galleryFiles {
-			if galleryFile.IsDir() {
-				continue
-			}
-
-			if utils.IsImageFile(galleryFile.Name()) {
-				images = append(images, galleryFile.Name())
-			}
-		}
-
-		gallery := models.Gallery{
-			Name:       file.Name(),
-			ImageCount: len(images),
-			Images:     images,
-		}
-
-		galleries = append(galleries, gallery)
-	}
-
-	return galleries, nil
-}
-
-// GetPeerGalleryImages returns a list of image files in a specific peer's gallery
-func (d *DirectoryService) GetPeerGalleryImages(peerID, galleryName string) ([]string, error) {
-	// Validate gallery name to prevent directory traversal
-	if err := d.pathValidator.ValidateGalleryName(galleryName); err != nil {
-		return nil, fmt.Errorf("invalid gallery name: %s - %w", galleryName, err)
-	}
-
-	galleryDir := d.pathManager.GetPeerGalleryPath(peerID, galleryName)
-
-	// Check if directory exists
-	if _, err := os.Stat(galleryDir); os.IsNotExist(err) {
-		return []string{}, nil // Return empty list if directory doesn't exist
-	}
-
-	files, err := os.ReadDir(galleryDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read peer gallery directory: %w", err)
-	}
-
-	var imageFiles []string
-
-	for _, file := range files {
-		if file.IsDir() {
-			continue
-		}
-
-		if utils.IsImageFile(file.Name()) {
-			imageFiles = append(imageFiles, file.Name())
-		}
-	}
-
-	return imageFiles, nil
-}
-
 // GetDocsDirectory returns the path to the docs directory
 func (d *DirectoryService) GetDocsDirectory() string {
 	return d.pathManager.GetDocsPath()
@@ -436,194 +345,121 @@ func (d *DirectoryService) loadDocFile(filename string, fileInfo os.FileInfo) (*
 	return doc, nil
 }
 
-// GetGalleries returns a list of all photo galleries (subdirectories in space184/images/) plus root folder files
-func (d *DirectoryService) GetGalleries() ([]models.Gallery, error) {
-	imagesDir := d.pathManager.GetImagesPath()
+// Unified media gallery methods
 
-	// Check if images directory exists
-	if _, err := os.Stat(imagesDir); os.IsNotExist(err) {
-		return []models.Gallery{}, nil // Return empty list if directory doesn't exist
+// GetMediaGalleries returns a list of all media galleries for the specified type
+func (d *DirectoryService) GetMediaGalleries(mediaType models.MediaType) ([]models.MediaGallery, error) {
+	var mediaDir string
+	var fileCheckFunc func(string) bool
+	var rootGalleryName string
+
+	switch mediaType {
+	case models.MediaTypeImage:
+		mediaDir = d.pathManager.GetImagesPath()
+		fileCheckFunc = utils.IsImageFile
+		rootGalleryName = "root_images"
+	case models.MediaTypeAudio:
+		mediaDir = d.pathManager.GetAudioPath()
+		fileCheckFunc = utils.IsAudioFile
+		rootGalleryName = "root_audio"
+	case models.MediaTypeVideo:
+		mediaDir = d.pathManager.GetVideoPath()
+		fileCheckFunc = utils.IsVideoFile
+		rootGalleryName = "root_video"
+	default:
+		return nil, fmt.Errorf("unsupported media type: %s", mediaType)
 	}
 
-	files, err := os.ReadDir(imagesDir)
+	if _, err := os.Stat(mediaDir); os.IsNotExist(err) {
+		return []models.MediaGallery{}, nil
+	}
+
+	files, err := os.ReadDir(mediaDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read images directory: %w", err)
+		return nil, fmt.Errorf("failed to read %s directory: %w", mediaType, err)
 	}
 
-	var galleries []models.Gallery
-	var rootImages []string
+	var galleries []models.MediaGallery
+	var rootFiles []string
 
 	for _, file := range files {
 		if file.IsDir() {
-			// Handle subdirectory galleries
-			galleryPath := filepath.Join(imagesDir, file.Name())
+			galleryPath := filepath.Join(mediaDir, file.Name())
 			galleryFiles, err := os.ReadDir(galleryPath)
 			if err != nil {
-				continue // Skip galleries we can't read
+				continue
 			}
 
-			var images []string
+			var mediaFiles []string
 			for _, galleryFile := range galleryFiles {
 				if galleryFile.IsDir() {
 					continue
 				}
 
-				if utils.IsImageFile(galleryFile.Name()) {
-					images = append(images, galleryFile.Name())
+				if fileCheckFunc(galleryFile.Name()) {
+					mediaFiles = append(mediaFiles, galleryFile.Name())
 				}
 			}
 
-			gallery := models.Gallery{
-				Name:       file.Name(),
-				ImageCount: len(images),
-				Images:     images,
+			gallery := models.MediaGallery{
+				Name:      file.Name(),
+				MediaType: mediaType,
+				FileCount: len(mediaFiles),
+				Files:     mediaFiles,
 			}
 
 			galleries = append(galleries, gallery)
 		} else {
-			// Handle root folder files
-			if utils.IsImageFile(file.Name()) {
-				rootImages = append(rootImages, file.Name())
+			if fileCheckFunc(file.Name()) {
+				rootFiles = append(rootFiles, file.Name())
 			}
 		}
 	}
 
-	// Add root images as a special gallery if any exist
-	if len(rootImages) > 0 {
-		rootGallery := models.Gallery{
-			Name:       "root_images",
-			ImageCount: len(rootImages),
-			Images:     rootImages,
+	if len(rootFiles) > 0 {
+		rootGallery := models.MediaGallery{
+			Name:      rootGalleryName,
+			MediaType: mediaType,
+			FileCount: len(rootFiles),
+			Files:     rootFiles,
 		}
-		// Insert at the beginning
-		galleries = append([]models.Gallery{rootGallery}, galleries...)
+		galleries = append([]models.MediaGallery{rootGallery}, galleries...)
 	}
 
 	return galleries, nil
 }
 
-// GetGalleryImages returns a list of image files in a specific gallery
-func (d *DirectoryService) GetGalleryImages(galleryName string) ([]string, error) {
+// GetMediaGalleryFiles returns a list of files in a specific media gallery
+func (d *DirectoryService) GetMediaGalleryFiles(mediaType models.MediaType, galleryName string) ([]string, error) {
+	var mediaDir string
+	var fileCheckFunc func(string) bool
+	var rootGalleryName string
+
+	switch mediaType {
+	case models.MediaTypeImage:
+		mediaDir = d.pathManager.GetImagesPath()
+		fileCheckFunc = utils.IsImageFile
+		rootGalleryName = "root_images"
+	case models.MediaTypeAudio:
+		mediaDir = d.pathManager.GetAudioPath()
+		fileCheckFunc = utils.IsAudioFile
+		rootGalleryName = "root_audio"
+	case models.MediaTypeVideo:
+		mediaDir = d.pathManager.GetVideoPath()
+		fileCheckFunc = utils.IsVideoFile
+		rootGalleryName = "root_video"
+	default:
+		return nil, fmt.Errorf("unsupported media type: %s", mediaType)
+	}
+
 	var galleryDir string
-
-	if galleryName == "root_images" {
-		// Special case for root images - read directly from images folder
-		galleryDir = d.pathManager.GetImagesPath()
-	} else {
-		// Validate gallery name to prevent directory traversal
-		if err := d.pathValidator.ValidateGalleryName(galleryName); err != nil {
-			return nil, fmt.Errorf("invalid gallery name: %s - %w", galleryName, err)
-		}
-		galleryDir = filepath.Join(d.pathManager.GetImagesPath(), galleryName)
-	}
-
-	// Check if directory exists
-	if _, err := os.Stat(galleryDir); os.IsNotExist(err) {
-		return []string{}, nil // Return empty list if directory doesn't exist
-	}
-
-	files, err := os.ReadDir(galleryDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read gallery directory: %w", err)
-	}
-
-	var imageFiles []string
-
-	for _, file := range files {
-		if file.IsDir() {
-			// For root images, skip directories (they are handled separately as galleries)
-			if galleryName == "root_images" {
-				continue
-			}
-			continue
-		}
-
-		if utils.IsImageFile(file.Name()) {
-			imageFiles = append(imageFiles, file.Name())
-		}
-	}
-
-	return imageFiles, nil
-}
-
-// GetAudioGalleries returns a list of all audio galleries (subdirectories in space184/audio/) plus root folder files
-func (d *DirectoryService) GetAudioGalleries() ([]models.AudioGallery, error) {
-	audioDir := d.pathManager.GetAudioPath()
-
-	// Check if audio directory exists
-	if _, err := os.Stat(audioDir); os.IsNotExist(err) {
-		return []models.AudioGallery{}, nil
-	}
-
-	files, err := os.ReadDir(audioDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read audio directory: %w", err)
-	}
-
-	var audioGalleries []models.AudioGallery
-	var rootAudioFiles []string
-
-	for _, file := range files {
-		if file.IsDir() {
-			// Handle subdirectory galleries
-			galleryPath := filepath.Join(audioDir, file.Name())
-			galleryFiles, err := os.ReadDir(galleryPath)
-			if err != nil {
-				continue
-			}
-
-			var audioFiles []string
-			for _, galleryFile := range galleryFiles {
-				if galleryFile.IsDir() {
-					continue
-				}
-
-				if utils.IsAudioFile(galleryFile.Name()) {
-					audioFiles = append(audioFiles, galleryFile.Name())
-				}
-			}
-
-			audioGallery := models.AudioGallery{
-				Name:       file.Name(),
-				AudioCount: len(audioFiles),
-				AudioFiles: audioFiles,
-			}
-
-			audioGalleries = append(audioGalleries, audioGallery)
-		} else {
-			// Handle root folder files
-			if utils.IsAudioFile(file.Name()) {
-				rootAudioFiles = append(rootAudioFiles, file.Name())
-			}
-		}
-	}
-
-	// Add root audio files as a special gallery if any exist
-	if len(rootAudioFiles) > 0 {
-		rootGallery := models.AudioGallery{
-			Name:       "root_audio",
-			AudioCount: len(rootAudioFiles),
-			AudioFiles: rootAudioFiles,
-		}
-		// Insert at the beginning
-		audioGalleries = append([]models.AudioGallery{rootGallery}, audioGalleries...)
-	}
-
-	return audioGalleries, nil
-}
-
-// GetAudioGalleryFiles returns a list of audio files in a specific gallery
-func (d *DirectoryService) GetAudioGalleryFiles(galleryName string) ([]string, error) {
-	var galleryDir string
-
-	if galleryName == "root_audio" {
-		// Special case for root audio - read directly from audio folder
-		galleryDir = d.pathManager.GetAudioPath()
+	if galleryName == rootGalleryName {
+		galleryDir = mediaDir
 	} else {
 		if err := d.pathValidator.ValidateGalleryName(galleryName); err != nil {
 			return nil, fmt.Errorf("invalid gallery name: %s - %w", galleryName, err)
 		}
-		galleryDir = filepath.Join(d.pathManager.GetAudioPath(), galleryName)
+		galleryDir = filepath.Join(mediaDir, galleryName)
 	}
 
 	if _, err := os.Stat(galleryDir); os.IsNotExist(err) {
@@ -632,83 +468,113 @@ func (d *DirectoryService) GetAudioGalleryFiles(galleryName string) ([]string, e
 
 	files, err := os.ReadDir(galleryDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read audio gallery directory: %w", err)
+		return nil, fmt.Errorf("failed to read %s gallery directory: %w", mediaType, err)
 	}
 
-	var audioFiles []string
+	var mediaFiles []string
 	for _, file := range files {
 		if file.IsDir() {
-			// For root audio, skip directories (they are handled separately as galleries)
-			if galleryName == "root_audio" {
+			if galleryName == rootGalleryName {
 				continue
 			}
 			continue
 		}
 
-		if utils.IsAudioFile(file.Name()) {
-			audioFiles = append(audioFiles, file.Name())
+		if fileCheckFunc(file.Name()) {
+			mediaFiles = append(mediaFiles, file.Name())
 		}
 	}
 
-	return audioFiles, nil
+	return mediaFiles, nil
 }
 
-// GetPeerAudioGalleries returns a list of all downloaded audio galleries for a specific peer
-func (d *DirectoryService) GetPeerAudioGalleries(peerID string) ([]models.AudioGallery, error) {
-	peerAudioDir := d.pathManager.GetPeerAudioPath(peerID)
+// GetPeerMediaGalleries returns a list of all downloaded media galleries for a specific peer
+func (d *DirectoryService) GetPeerMediaGalleries(peerID string, mediaType models.MediaType) ([]models.MediaGallery, error) {
+	var peerMediaDir string
+	var fileCheckFunc func(string) bool
 
-	if _, err := os.Stat(peerAudioDir); os.IsNotExist(err) {
-		return []models.AudioGallery{}, nil
+	switch mediaType {
+	case models.MediaTypeImage:
+		peerMediaDir = d.pathManager.GetPeerImagesPath(peerID)
+		fileCheckFunc = utils.IsImageFile
+	case models.MediaTypeAudio:
+		peerMediaDir = d.pathManager.GetPeerAudioPath(peerID)
+		fileCheckFunc = utils.IsAudioFile
+	case models.MediaTypeVideo:
+		peerMediaDir = d.pathManager.GetPeerVideoPath(peerID)
+		fileCheckFunc = utils.IsVideoFile
+	default:
+		return nil, fmt.Errorf("unsupported media type: %s", mediaType)
 	}
 
-	files, err := os.ReadDir(peerAudioDir)
+	if _, err := os.Stat(peerMediaDir); os.IsNotExist(err) {
+		return []models.MediaGallery{}, nil
+	}
+
+	files, err := os.ReadDir(peerMediaDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read peer audio directory: %w", err)
+		return nil, fmt.Errorf("failed to read peer %s directory: %w", mediaType, err)
 	}
 
-	var audioGalleries []models.AudioGallery
+	var galleries []models.MediaGallery
 
 	for _, file := range files {
 		if !file.IsDir() {
 			continue
 		}
 
-		galleryPath := filepath.Join(peerAudioDir, file.Name())
+		galleryPath := filepath.Join(peerMediaDir, file.Name())
 		galleryFiles, err := os.ReadDir(galleryPath)
 		if err != nil {
 			continue
 		}
 
-		var audioFiles []string
+		var mediaFiles []string
 		for _, galleryFile := range galleryFiles {
 			if galleryFile.IsDir() {
 				continue
 			}
 
-			if utils.IsAudioFile(galleryFile.Name()) {
-				audioFiles = append(audioFiles, galleryFile.Name())
+			if fileCheckFunc(galleryFile.Name()) {
+				mediaFiles = append(mediaFiles, galleryFile.Name())
 			}
 		}
 
-		audioGallery := models.AudioGallery{
-			Name:       file.Name(),
-			AudioCount: len(audioFiles),
-			AudioFiles: audioFiles,
+		gallery := models.MediaGallery{
+			Name:      file.Name(),
+			MediaType: mediaType,
+			FileCount: len(mediaFiles),
+			Files:     mediaFiles,
 		}
 
-		audioGalleries = append(audioGalleries, audioGallery)
+		galleries = append(galleries, gallery)
 	}
 
-	return audioGalleries, nil
+	return galleries, nil
 }
 
-// GetPeerAudioGalleryFiles returns a list of audio files in a specific peer's gallery
-func (d *DirectoryService) GetPeerAudioGalleryFiles(peerID, galleryName string) ([]string, error) {
+// GetPeerMediaGalleryFiles returns a list of files in a specific peer's media gallery
+func (d *DirectoryService) GetPeerMediaGalleryFiles(peerID, galleryName string, mediaType models.MediaType) ([]string, error) {
 	if err := d.pathValidator.ValidateGalleryName(galleryName); err != nil {
 		return nil, fmt.Errorf("invalid gallery name: %s - %w", galleryName, err)
 	}
 
-	galleryDir := d.pathManager.GetPeerAudioGalleryPath(peerID, galleryName)
+	var galleryDir string
+	var fileCheckFunc func(string) bool
+
+	switch mediaType {
+	case models.MediaTypeImage:
+		galleryDir = d.pathManager.GetPeerGalleryPath(peerID, galleryName)
+		fileCheckFunc = utils.IsImageFile
+	case models.MediaTypeAudio:
+		galleryDir = d.pathManager.GetPeerAudioGalleryPath(peerID, galleryName)
+		fileCheckFunc = utils.IsAudioFile
+	case models.MediaTypeVideo:
+		galleryDir = d.pathManager.GetPeerVideoGalleryPath(peerID, galleryName)
+		fileCheckFunc = utils.IsVideoFile
+	default:
+		return nil, fmt.Errorf("unsupported media type: %s", mediaType)
+	}
 
 	if _, err := os.Stat(galleryDir); os.IsNotExist(err) {
 		return []string{}, nil
@@ -716,34 +582,45 @@ func (d *DirectoryService) GetPeerAudioGalleryFiles(peerID, galleryName string) 
 
 	files, err := os.ReadDir(galleryDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read peer audio gallery directory: %w", err)
+		return nil, fmt.Errorf("failed to read peer %s gallery directory: %w", mediaType, err)
 	}
 
-	var audioFiles []string
+	var mediaFiles []string
 	for _, file := range files {
 		if file.IsDir() {
 			continue
 		}
 
-		if utils.IsAudioFile(file.Name()) {
-			audioFiles = append(audioFiles, file.Name())
+		if fileCheckFunc(file.Name()) {
+			mediaFiles = append(mediaFiles, file.Name())
 		}
 	}
 
-	return audioFiles, nil
+	return mediaFiles, nil
 }
 
-// GetAudioGalleryNames returns a list of existing audio gallery names
-func (d *DirectoryService) GetAudioGalleryNames() ([]string, error) {
-	audioDir := d.pathManager.GetAudioPath()
+// GetMediaGalleryNames returns a list of existing media gallery names for the specified type
+func (d *DirectoryService) GetMediaGalleryNames(mediaType models.MediaType) ([]string, error) {
+	var mediaDir string
 
-	if _, err := os.Stat(audioDir); os.IsNotExist(err) {
+	switch mediaType {
+	case models.MediaTypeImage:
+		mediaDir = d.pathManager.GetImagesPath()
+	case models.MediaTypeAudio:
+		mediaDir = d.pathManager.GetAudioPath()
+	case models.MediaTypeVideo:
+		mediaDir = d.pathManager.GetVideoPath()
+	default:
+		return nil, fmt.Errorf("unsupported media type: %s", mediaType)
+	}
+
+	if _, err := os.Stat(mediaDir); os.IsNotExist(err) {
 		return []string{}, nil
 	}
 
-	files, err := os.ReadDir(audioDir)
+	files, err := os.ReadDir(mediaDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read audio directory: %w", err)
+		return nil, fmt.Errorf("failed to read %s directory: %w", mediaType, err)
 	}
 
 	var galleryNames []string
@@ -756,213 +633,3 @@ func (d *DirectoryService) GetAudioGalleryNames() ([]string, error) {
 	return galleryNames, nil
 }
 
-// Video methods...
-
-// GetVideoGalleries returns a list of all video galleries (subdirectories in space184/video/) plus root folder files
-func (d *DirectoryService) GetVideoGalleries() ([]models.VideoGallery, error) {
-	videoDir := d.pathManager.GetVideoPath()
-
-	if _, err := os.Stat(videoDir); os.IsNotExist(err) {
-		return []models.VideoGallery{}, nil
-	}
-
-	files, err := os.ReadDir(videoDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read video directory: %w", err)
-	}
-
-	var videoGalleries []models.VideoGallery
-	var rootVideoFiles []string
-
-	for _, file := range files {
-		if file.IsDir() {
-			// Handle subdirectory galleries
-			galleryPath := filepath.Join(videoDir, file.Name())
-			galleryFiles, err := os.ReadDir(galleryPath)
-			if err != nil {
-				continue
-			}
-
-			var videoFiles []string
-			for _, galleryFile := range galleryFiles {
-				if galleryFile.IsDir() {
-					continue
-				}
-
-				if utils.IsVideoFile(galleryFile.Name()) {
-					videoFiles = append(videoFiles, galleryFile.Name())
-				}
-			}
-
-			videoGallery := models.VideoGallery{
-				Name:       file.Name(),
-				VideoCount: len(videoFiles),
-				VideoFiles: videoFiles,
-			}
-
-			videoGalleries = append(videoGalleries, videoGallery)
-		} else {
-			// Handle root folder files
-			if utils.IsVideoFile(file.Name()) {
-				rootVideoFiles = append(rootVideoFiles, file.Name())
-			}
-		}
-	}
-
-	// Add root video files as a special gallery if any exist
-	if len(rootVideoFiles) > 0 {
-		rootGallery := models.VideoGallery{
-			Name:       "root_video",
-			VideoCount: len(rootVideoFiles),
-			VideoFiles: rootVideoFiles,
-		}
-		// Insert at the beginning
-		videoGalleries = append([]models.VideoGallery{rootGallery}, videoGalleries...)
-	}
-
-	return videoGalleries, nil
-}
-
-// GetVideoGalleryFiles returns a list of video files in a specific gallery
-func (d *DirectoryService) GetVideoGalleryFiles(galleryName string) ([]string, error) {
-	var galleryDir string
-
-	if galleryName == "root_video" {
-		// Special case for root video - read directly from video folder
-		galleryDir = d.pathManager.GetVideoPath()
-	} else {
-		if err := d.pathValidator.ValidateGalleryName(galleryName); err != nil {
-			return nil, fmt.Errorf("invalid gallery name: %s - %w", galleryName, err)
-		}
-		galleryDir = filepath.Join(d.pathManager.GetVideoPath(), galleryName)
-	}
-
-	if _, err := os.Stat(galleryDir); os.IsNotExist(err) {
-		return []string{}, nil
-	}
-
-	files, err := os.ReadDir(galleryDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read video gallery directory: %w", err)
-	}
-
-	var videoFiles []string
-	for _, file := range files {
-		if file.IsDir() {
-			// For root video, skip directories (they are handled separately as galleries)
-			if galleryName == "root_video" {
-				continue
-			}
-			continue
-		}
-
-		if utils.IsVideoFile(file.Name()) {
-			videoFiles = append(videoFiles, file.Name())
-		}
-	}
-
-	return videoFiles, nil
-}
-
-// GetPeerVideoGalleries returns a list of all downloaded video galleries for a specific peer
-func (d *DirectoryService) GetPeerVideoGalleries(peerID string) ([]models.VideoGallery, error) {
-	peerVideoDir := d.pathManager.GetPeerVideoPath(peerID)
-
-	if _, err := os.Stat(peerVideoDir); os.IsNotExist(err) {
-		return []models.VideoGallery{}, nil
-	}
-
-	files, err := os.ReadDir(peerVideoDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read peer video directory: %w", err)
-	}
-
-	var videoGalleries []models.VideoGallery
-
-	for _, file := range files {
-		if !file.IsDir() {
-			continue
-		}
-
-		galleryPath := filepath.Join(peerVideoDir, file.Name())
-		galleryFiles, err := os.ReadDir(galleryPath)
-		if err != nil {
-			continue
-		}
-
-		var videoFiles []string
-		for _, galleryFile := range galleryFiles {
-			if galleryFile.IsDir() {
-				continue
-			}
-
-			if utils.IsVideoFile(galleryFile.Name()) {
-				videoFiles = append(videoFiles, galleryFile.Name())
-			}
-		}
-
-		videoGallery := models.VideoGallery{
-			Name:       file.Name(),
-			VideoCount: len(videoFiles),
-			VideoFiles: videoFiles,
-		}
-
-		videoGalleries = append(videoGalleries, videoGallery)
-	}
-
-	return videoGalleries, nil
-}
-
-// GetPeerVideoGalleryFiles returns a list of video files in a specific peer's gallery
-func (d *DirectoryService) GetPeerVideoGalleryFiles(peerID, galleryName string) ([]string, error) {
-	if err := d.pathValidator.ValidateGalleryName(galleryName); err != nil {
-		return nil, fmt.Errorf("invalid gallery name: %s - %w", galleryName, err)
-	}
-
-	galleryDir := d.pathManager.GetPeerVideoGalleryPath(peerID, galleryName)
-
-	if _, err := os.Stat(galleryDir); os.IsNotExist(err) {
-		return []string{}, nil
-	}
-
-	files, err := os.ReadDir(galleryDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read peer video gallery directory: %w", err)
-	}
-
-	var videoFiles []string
-	for _, file := range files {
-		if file.IsDir() {
-			continue
-		}
-
-		if utils.IsVideoFile(file.Name()) {
-			videoFiles = append(videoFiles, file.Name())
-		}
-	}
-
-	return videoFiles, nil
-}
-
-// GetVideoGalleryNames returns a list of existing video gallery names
-func (d *DirectoryService) GetVideoGalleryNames() ([]string, error) {
-	videoDir := d.pathManager.GetVideoPath()
-
-	if _, err := os.Stat(videoDir); os.IsNotExist(err) {
-		return []string{}, nil
-	}
-
-	files, err := os.ReadDir(videoDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read video directory: %w", err)
-	}
-
-	var galleryNames []string
-	for _, file := range files {
-		if file.IsDir() {
-			galleryNames = append(galleryNames, file.Name())
-		}
-	}
-
-	return galleryNames, nil
-}

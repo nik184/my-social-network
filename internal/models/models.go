@@ -25,26 +25,23 @@ type Doc struct {
 	ContentType string    `json:"content_type"` // "text" for .txt files, "html" for .md files (converted to HTML)
 }
 
-// Gallery represents a photo gallery (subdirectory in images/)
-type Gallery struct {
-	Name       string   `json:"name"`
-	ImageCount int      `json:"image_count"`
-	Images     []string `json:"images"`
+// MediaType represents the type of media
+type MediaType string
+
+const (
+	MediaTypeImage MediaType = "image"
+	MediaTypeAudio MediaType = "audio"
+	MediaTypeVideo MediaType = "video"
+)
+
+// MediaGallery represents a unified gallery for any media type
+type MediaGallery struct {
+	Name      string    `json:"name"`
+	MediaType MediaType `json:"media_type"`
+	FileCount int       `json:"file_count"`
+	Files     []string  `json:"files"`
 }
 
-// AudioGallery represents an audio collection (subdirectory in audio/)
-type AudioGallery struct {
-	Name       string   `json:"name"`
-	AudioCount int      `json:"audio_count"`
-	AudioFiles []string `json:"audio_files"`
-}
-
-// VideoGallery represents a video collection (subdirectory in video/)
-type VideoGallery struct {
-	Name       string   `json:"name"`
-	VideoCount int      `json:"video_count"`
-	VideoFiles []string `json:"video_files"`
-}
 
 // ConnectionRecord represents a connection history record
 type ConnectionRecord struct {
@@ -198,106 +195,71 @@ type DocResponse struct {
 	Doc *Doc `json:"doc"`
 }
 
-// GalleriesRequest represents a P2P request for galleries list
-type GalleriesRequest struct {
-	// Currently no additional fields needed
+// MediaGalleriesRequest represents a P2P request for media galleries list
+type MediaGalleriesRequest struct {
+	MediaType MediaType `json:"media_type"`
 }
 
-// GalleriesResponse represents a P2P response with galleries list
+// MediaGalleriesResponse represents a P2P response with media galleries list
+type MediaGalleriesResponse struct {
+	MediaType MediaType      `json:"media_type"`
+	Galleries []MediaGallery `json:"galleries"`
+	Count     int            `json:"count"`
+}
+
+// MediaGalleryRequest represents a P2P request for a specific media gallery
+type MediaGalleryRequest struct {
+	MediaType   MediaType `json:"media_type"`
+	GalleryName string    `json:"gallery_name"`
+}
+
+// MediaGalleryResponse represents a P2P response with media gallery content
+type MediaGalleryResponse struct {
+	Gallery *MediaGallery `json:"gallery"`
+}
+
+// MediaFileRequest represents a P2P request for a specific media file
+type MediaFileRequest struct {
+	MediaType   MediaType `json:"media_type"`
+	GalleryName string    `json:"gallery_name"`
+	FileName    string    `json:"file_name"`
+}
+
+// MediaFileResponse represents a P2P response with media file data
+type MediaFileResponse struct {
+	MediaType MediaType `json:"media_type"`
+	FileData  string    `json:"file_data"` // base64 encoded file data
+	Filename  string    `json:"filename"`
+	Size      int       `json:"size"`
+}
+
+// Legacy compatibility types for P2P communication
 type GalleriesResponse struct {
-	Galleries []Gallery `json:"galleries"`
-	Count     int       `json:"count"`
+	Galleries []MediaGallery `json:"galleries"`
+	Count     int            `json:"count"`
 }
 
-// GalleryRequest represents a P2P request for a specific gallery
+type GalleryResponse struct {
+	Gallery *MediaGallery `json:"gallery"`
+}
+
+type GalleryImageResponse struct {
+	ImageData string `json:"image_data"`
+	Filename  string `json:"filename"`
+	Size      int    `json:"size"`
+}
+
 type GalleryRequest struct {
 	GalleryName string `json:"gallery_name"`
 }
 
-// GalleryResponse represents a P2P response with gallery content
-type GalleryResponse struct {
-	Gallery *Gallery `json:"gallery"`
-}
-
-// GalleryImageRequest represents a P2P request for a specific image
 type GalleryImageRequest struct {
 	GalleryName string `json:"gallery_name"`
 	ImageName   string `json:"image_name"`
 }
 
-// GalleryImageResponse represents a P2P response with image data
-type GalleryImageResponse struct {
-	ImageData string `json:"image_data"` // base64 encoded image data
-	Filename  string `json:"filename"`
-	Size      int    `json:"size"`
-}
-
-// AudioGalleriesRequest represents a P2P request for audio galleries list
-type AudioGalleriesRequest struct {
+type GalleriesRequest struct {
 	// Currently no additional fields needed
-}
-
-// AudioGalleriesResponse represents a P2P response with audio galleries list
-type AudioGalleriesResponse struct {
-	AudioGalleries []AudioGallery `json:"audio_galleries"`
-	Count          int            `json:"count"`
-}
-
-// AudioGalleryRequest represents a P2P request for a specific audio gallery
-type AudioGalleryRequest struct {
-	GalleryName string `json:"gallery_name"`
-}
-
-// AudioGalleryResponse represents a P2P response with audio gallery content
-type AudioGalleryResponse struct {
-	AudioGallery *AudioGallery `json:"audio_gallery"`
-}
-
-// AudioFileRequest represents a P2P request for a specific audio file
-type AudioFileRequest struct {
-	GalleryName string `json:"gallery_name"`
-	AudioName   string `json:"audio_name"`
-}
-
-// AudioFileResponse represents a P2P response with audio file data
-type AudioFileResponse struct {
-	AudioData string `json:"audio_data"` // base64 encoded audio data
-	Filename  string `json:"filename"`
-	Size      int    `json:"size"`
-}
-
-// VideoGalleriesRequest represents a P2P request for video galleries list
-type VideoGalleriesRequest struct {
-	// Currently no additional fields needed
-}
-
-// VideoGalleriesResponse represents a P2P response with video galleries list
-type VideoGalleriesResponse struct {
-	VideoGalleries []VideoGallery `json:"video_galleries"`
-	Count          int            `json:"count"`
-}
-
-// VideoGalleryRequest represents a P2P request for a specific video gallery
-type VideoGalleryRequest struct {
-	GalleryName string `json:"gallery_name"`
-}
-
-// VideoGalleryResponse represents a P2P response with video gallery content
-type VideoGalleryResponse struct {
-	VideoGallery *VideoGallery `json:"video_gallery"`
-}
-
-// VideoFileRequest represents a P2P request for a specific video file
-type VideoFileRequest struct {
-	GalleryName string `json:"gallery_name"`
-	VideoName   string `json:"video_name"`
-}
-
-// VideoFileResponse represents a P2P response with video file data
-type VideoFileResponse struct {
-	VideoData string `json:"video_data"` // base64 encoded video data
-	Filename  string `json:"filename"`
-	Size      int    `json:"size"`
 }
 
 // Constants for message types
@@ -322,16 +284,10 @@ const (
 	MessageTypeGetGalleryResp        = "getGalleryResp"
 	MessageTypeGetGalleryImage       = "getGalleryImage"
 	MessageTypeGetGalleryImageResp   = "getGalleryImageResp"
-	MessageTypeGetAudioGalleries     = "getAudioGalleries"
-	MessageTypeGetAudioGalleriesResp = "getAudioGalleriesResp"
-	MessageTypeGetAudioGallery       = "getAudioGallery"
-	MessageTypeGetAudioGalleryResp   = "getAudioGalleryResp"
-	MessageTypeGetAudioFile          = "getAudioFile"
-	MessageTypeGetAudioFileResp      = "getAudioFileResp"
-	MessageTypeGetVideoGalleries     = "getVideoGalleries"
-	MessageTypeGetVideoGalleriesResp = "getVideoGalleriesResp"
-	MessageTypeGetVideoGallery       = "getVideoGallery"
-	MessageTypeGetVideoGalleryResp   = "getVideoGalleryResp"
-	MessageTypeGetVideoFile          = "getVideoFile"
-	MessageTypeGetVideoFileResp      = "getVideoFileResp"
+	MessageTypeGetMediaGalleries     = "getMediaGalleries"
+	MessageTypeGetMediaGalleriesResp = "getMediaGalleriesResp"
+	MessageTypeGetMediaGallery       = "getMediaGallery"
+	MessageTypeGetMediaGalleryResp   = "getMediaGalleryResp"
+	MessageTypeGetMediaFile          = "getMediaFile"
+	MessageTypeGetMediaFileResp      = "getMediaFileResp"
 )

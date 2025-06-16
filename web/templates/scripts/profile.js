@@ -430,7 +430,7 @@ async function loadPhotos() {
     try {
         sharedApp.showStatus('photosStatus', 'Loading galleries...', false);
         
-        const data = await sharedApp.fetchAPI('/api/galleries');
+        const data = await sharedApp.fetchAPI('/api/media/image/galleries');
         
         displayGalleries(data.galleries || []);
         photosLoaded = true;
@@ -496,8 +496,8 @@ function displayGalleries(galleries) {
         galleryCard.className = 'gallery-card';
         galleryCard.onclick = () => openGallery(gallery.name);
 
-        const preview = gallery.images.length > 0 
-            ? `<img src="/api/galleries/${encodeURIComponent(gallery.name)}/${encodeURIComponent(gallery.images[0])}" alt="${sharedApp.escapeHtml(gallery.name)}" />`
+        const preview = gallery.files && gallery.files.length > 0 
+            ? `<img src="/api/media/image/galleries/${encodeURIComponent(gallery.name)}/${encodeURIComponent(gallery.files[0])}" alt="${sharedApp.escapeHtml(gallery.name)}" />`
             : '<div class="gallery-placeholder">📷</div>';
 
         // Display user-friendly name for root gallery
@@ -509,7 +509,7 @@ function displayGalleries(galleries) {
             </div>
             <div class="gallery-info">
                 <div class="gallery-name">${sharedApp.escapeHtml(displayName)}</div>
-                <div class="gallery-count">${gallery.image_count} images</div>
+                <div class="gallery-count">${gallery.file_count} images</div>
             </div>
         `;
 
@@ -563,15 +563,15 @@ function displayFriendGalleries(liveGalleries, downloadedGalleries, peerID) {
 
         // Choose appropriate preview source
         let previewSrc = '';
-        if (gallery.images.length > 0) {
+        if (gallery.files && gallery.files.length > 0) {
             if (gallery.source === 'live') {
-                previewSrc = `/api/peer-galleries/${encodeURIComponent(peerID)}/${encodeURIComponent(gallery.name)}/${encodeURIComponent(gallery.images[0])}`;
+                previewSrc = `/api/peer-galleries/${encodeURIComponent(peerID)}/${encodeURIComponent(gallery.name)}/${encodeURIComponent(gallery.files[0])}`;
             } else {
-                previewSrc = `/api/downloaded/${encodeURIComponent(peerID)}/images/${encodeURIComponent(gallery.name)}/${encodeURIComponent(gallery.images[0])}`;
+                previewSrc = `/api/downloaded/${encodeURIComponent(peerID)}/images/${encodeURIComponent(gallery.name)}/${encodeURIComponent(gallery.files[0])}`;
             }
         }
 
-        const preview = gallery.images.length > 0 
+        const preview = gallery.files && gallery.files.length > 0 
             ? `<img src="${previewSrc}" alt="${sharedApp.escapeHtml(gallery.name)}" />`
             : '<div class="gallery-placeholder">📷</div>';
 
@@ -588,7 +588,7 @@ function displayFriendGalleries(liveGalleries, downloadedGalleries, peerID) {
             </div>
             <div class="gallery-info">
                 <div class="gallery-name">${sharedApp.escapeHtml(gallery.name)}</div>
-                <div class="gallery-count">${gallery.image_count} images</div>
+                <div class="gallery-count">${gallery.file_count} images</div>
                 ${sourceIndicator}
             </div>
         `;
@@ -631,13 +631,13 @@ function displayFriendPhotosEmptyState(message) {
 // Open gallery view
 async function openGallery(galleryName) {
     try {
-        const data = await sharedApp.fetchAPI(`/api/galleries/${encodeURIComponent(galleryName)}`);
-        const images = data.images || [];
+        const data = await sharedApp.fetchAPI(`/api/media/image/galleries/${encodeURIComponent(galleryName)}`);
+        const images = data.files || [];
         
         if (images.length > 0) {
             // Create URL provider function for gallery images
             const urlProvider = (imageName) => 
-                `/api/galleries/${encodeURIComponent(galleryName)}/${encodeURIComponent(imageName)}`;
+                `/api/media/image/galleries/${encodeURIComponent(galleryName)}/${encodeURIComponent(imageName)}`;
             
             // This is own content, so show kebab menu
             const isOwnContent = !isViewingFriend;
@@ -669,7 +669,7 @@ async function openFriendGallery(peerID, galleryName, source = 'live') {
         }
         
         const data = await sharedApp.fetchAPI(apiUrl);
-        const images = data.images || [];
+        const images = data.files || [];
         
         if (images.length > 0) {
             const friendName = currentFriend ? currentFriend.peer_name : 'Friend';
@@ -690,9 +690,9 @@ async function loadAudio() {
     try {
         sharedApp.showStatus('audioStatus', 'Loading audio collections...', false);
         
-        const data = await sharedApp.fetchAPI('/api/audio-galleries');
+        const data = await sharedApp.fetchAPI('/api/media/audio/galleries');
         
-        displayAudioGalleries(data.audio_galleries || []);
+        displayAudioGalleries(data.galleries || []);
         audioLoaded = true;
         sharedApp.hideStatus('audioStatus');
     } catch (error) {
@@ -742,7 +742,7 @@ function displayAudioGalleries(audioGalleries) {
                 <div class="playlist-title">
                     🎵 ${sharedApp.escapeHtml(displayName)}
                 </div>
-                <div class="playlist-count">${gallery.audio_count} tracks</div>
+                <div class="playlist-count">${gallery.file_count} tracks</div>
             </div>
             <div class="playlist-tracks" id="tracks-${gallery.name}">
                 <div style="text-align: center; padding: 20px; color: #666;">
@@ -764,8 +764,8 @@ function displayAudioGalleries(audioGalleries) {
 // Load tracks for a specific playlist
 async function loadPlaylistTracks(galleryName, displayName) {
     try {
-        const data = await sharedApp.fetchAPI(`/api/audio-galleries/${encodeURIComponent(galleryName)}`);
-        const audioFiles = data.audio_files || [];
+        const data = await sharedApp.fetchAPI(`/api/media/audio/galleries/${encodeURIComponent(galleryName)}`);
+        const audioFiles = data.files || [];
         
         const tracksContainer = document.getElementById(`tracks-${galleryName}`);
         if (!tracksContainer) return;
@@ -854,9 +854,9 @@ async function loadVideo() {
     try {
         sharedApp.showStatus('videoStatus', 'Loading video collections...', false);
         
-        const data = await sharedApp.fetchAPI('/api/video-galleries');
+        const data = await sharedApp.fetchAPI('/api/media/video/galleries');
         
-        displayVideoGalleries(data.video_galleries || []);
+        displayVideoGalleries(data.galleries || []);
         videoLoaded = true;
         sharedApp.hideStatus('videoStatus');
     } catch (error) {
@@ -908,7 +908,7 @@ function displayVideoGalleries(videoGalleries) {
             </div>
             <div class="gallery-info">
                 <div class="gallery-name">${sharedApp.escapeHtml(displayName)}</div>
-                <div class="gallery-count">${gallery.video_count} video files</div>
+                <div class="gallery-count">${gallery.file_count} video files</div>
             </div>
         `;
 
@@ -950,8 +950,8 @@ function displayFriendVideoEmptyState(message) {
 // Open video gallery
 async function openVideoGallery(galleryName) {
     try {
-        const data = await sharedApp.fetchAPI(`/api/video-galleries/${encodeURIComponent(galleryName)}`);
-        const videoFiles = data.video_files || [];
+        const data = await sharedApp.fetchAPI(`/api/media/video/galleries/${encodeURIComponent(galleryName)}`);
+        const videoFiles = data.files || [];
         
         if (videoFiles.length > 0) {
             // Open video player modal
@@ -985,7 +985,7 @@ function openVideoPlayer(videoFiles, galleryName) {
                 <div id="videoPlayerContent">
                     <h4 id="currentVideoTitle">${sharedApp.escapeHtml(videoFiles[0])}</h4>
                     <video controls style="width: 100%; max-width: 800px; height: auto; margin: 20px 0;">
-                        <source src="/api/video-galleries/${encodeURIComponent(galleryName)}/${encodeURIComponent(videoFiles[0])}" type="video/mp4">
+                        <source src="/api/media/video/galleries/${encodeURIComponent(galleryName)}/${encodeURIComponent(videoFiles[0])}" type="video/mp4">
                         Your browser does not support the video element.
                     </video>
                     <div style="margin-top: 20px;">
@@ -1049,7 +1049,7 @@ function updateVideoPlayer() {
     // Update video source
     const videoElement = data.modal.querySelector('video');
     if (videoElement) {
-        videoElement.src = `/api/video-galleries/${encodeURIComponent(data.galleryName)}/${encodeURIComponent(currentFile)}`;
+        videoElement.src = `/api/media/video/galleries/${encodeURIComponent(data.galleryName)}/${encodeURIComponent(currentFile)}`;
         videoElement.load();
     }
     
@@ -1298,11 +1298,11 @@ async function handleFileUpload(type) {
         // Make upload request
         let endpoint;
         if (isPhotos) {
-            endpoint = '/api/upload/photos';
+            endpoint = '/api/media/image/upload';
         } else if (isAudio) {
-            endpoint = '/api/upload/audio';
+            endpoint = '/api/media/audio/upload';
         } else if (isVideo) {
-            endpoint = '/api/upload/video';
+            endpoint = '/api/media/video/upload';
         } else {
             endpoint = '/api/upload/docs';
         }
@@ -1390,8 +1390,9 @@ async function populateDocsSubdirectories() {
 // Populate image galleries for dropdown suggestions
 async function populateImageGalleries() {
     try {
-        const response = await sharedApp.fetchAPI('/api/subdirectories/images');
+        const response = await sharedApp.fetchAPI('/api/media/image/galleries');
         const galleries = response.galleries || [];
+        const galleryNames = galleries.map(gallery => gallery.name);
         
         const datalist = document.getElementById('photosSubdirectoryList');
         if (datalist) {
@@ -1399,9 +1400,9 @@ async function populateImageGalleries() {
             datalist.innerHTML = '';
             
             // Add options for each existing gallery
-            galleries.forEach(gallery => {
+            galleryNames.forEach(galleryName => {
                 const option = document.createElement('option');
-                option.value = gallery;
+                option.value = galleryName;
                 datalist.appendChild(option);
             });
         }
@@ -1414,8 +1415,9 @@ async function populateImageGalleries() {
 // Populate audio galleries for dropdown suggestions
 async function populateAudioGalleries() {
     try {
-        const response = await sharedApp.fetchAPI('/api/subdirectories/audio');
+        const response = await sharedApp.fetchAPI('/api/media/audio/galleries');
         const galleries = response.galleries || [];
+        const galleryNames = galleries.map(gallery => gallery.name);
         
         const datalist = document.getElementById('audioSubdirectoryList');
         if (datalist) {
@@ -1423,9 +1425,9 @@ async function populateAudioGalleries() {
             datalist.innerHTML = '';
             
             // Add options for each existing gallery
-            galleries.forEach(gallery => {
+            galleryNames.forEach(galleryName => {
                 const option = document.createElement('option');
-                option.value = gallery;
+                option.value = galleryName;
                 datalist.appendChild(option);
             });
         }
@@ -1438,8 +1440,9 @@ async function populateAudioGalleries() {
 // Populate video galleries for dropdown suggestions
 async function populateVideoGalleries() {
     try {
-        const response = await sharedApp.fetchAPI('/api/subdirectories/video');
+        const response = await sharedApp.fetchAPI('/api/media/video/galleries');
         const galleries = response.galleries || [];
+        const galleryNames = galleries.map(gallery => gallery.name);
         
         const datalist = document.getElementById('videoSubdirectoryList');
         if (datalist) {
@@ -1447,9 +1450,9 @@ async function populateVideoGalleries() {
             datalist.innerHTML = '';
             
             // Add options for each existing gallery
-            galleries.forEach(gallery => {
+            galleryNames.forEach(galleryName => {
                 const option = document.createElement('option');
-                option.value = gallery;
+                option.value = galleryName;
                 datalist.appendChild(option);
             });
         }

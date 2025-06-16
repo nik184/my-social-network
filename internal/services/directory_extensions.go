@@ -29,26 +29,3 @@ func (d *DirectoryService) GetDocsSubdirectories() ([]string, error) {
 	return subdirs, nil
 }
 
-// GetImageGalleryNames returns a list of existing gallery names (subdirectory names in images folder)
-func (d *DirectoryService) GetImageGalleryNames() ([]string, error) {
-	imagesDir := d.pathManager.GetImagesPath()
-
-	// Check if images directory exists
-	if _, err := os.Stat(imagesDir); os.IsNotExist(err) {
-		return []string{}, nil // Return empty list if directory doesn't exist
-	}
-
-	files, err := os.ReadDir(imagesDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read images directory: %w", err)
-	}
-
-	var galleryNames []string
-	for _, file := range files {
-		if file.IsDir() {
-			galleryNames = append(galleryNames, file.Name())
-		}
-	}
-
-	return galleryNames, nil
-}

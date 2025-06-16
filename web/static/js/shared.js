@@ -622,9 +622,9 @@ function getPeerIdFromUrl(url) {
 // Global Audio Player Functions
 function playTrack(galleryName, trackIndex, fileName) {
     // Load all files for the gallery to enable navigation
-    fetchAPI(`/api/audio-galleries/${encodeURIComponent(galleryName)}`)
+    fetchAPI(`/api/media/audio/galleries/${encodeURIComponent(galleryName)}`)
         .then(data => {
-            const audioFiles = data.audio_files || [];
+            const audioFiles = data.files || [];
             if (audioFiles.length > 0) {
                 // Store playlist data globally
                 window.globalPlaylistData = {
@@ -663,7 +663,7 @@ function playTrackInGlobalPlayer(galleryName, trackIndex, fileName) {
     updateTrackHighlighting(galleryName, trackIndex);
 
     // Set audio source
-    const trackUrl = `/api/audio-galleries/${encodeURIComponent(galleryName)}/${encodeURIComponent(fileName)}`;
+    const trackUrl = `/api/media/audio/galleries/${encodeURIComponent(galleryName)}/${encodeURIComponent(fileName)}`;
     globalAudio.src = trackUrl;
 
     // Update title and playlist info

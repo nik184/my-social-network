@@ -1858,16 +1858,16 @@ func (p *P2PService) RequestPeerDoc(peerID, filename string) (*models.DocRespons
 func (p *P2PService) handleGetGalleriesRequest() *models.GalleriesResponse {
 	if p.container == nil || p.container.GetDirectoryService() == nil {
 		return &models.GalleriesResponse{
-			Galleries: []models.Gallery{},
+			Galleries: []models.MediaGallery{},
 			Count:     0,
 		}
 	}
 
-	galleries, err := p.container.GetDirectoryService().GetGalleries()
+	galleries, err := p.container.GetDirectoryService().GetMediaGalleries(models.MediaTypeImage)
 	if err != nil {
 		log.Printf("Failed to get galleries for P2P request: %v", err)
 		return &models.GalleriesResponse{
-			Galleries: []models.Gallery{},
+			Galleries: []models.MediaGallery{},
 			Count:     0,
 		}
 	}
@@ -1899,17 +1899,18 @@ func (p *P2PService) handleGetGalleryRequest(payload interface{}) *models.Galler
 		return &models.GalleryResponse{Gallery: nil}
 	}
 
-	// Get gallery images
-	images, err := p.container.GetDirectoryService().GetGalleryImages(galleryRequest.GalleryName)
+	// Get gallery files using unified method
+	files, err := p.container.GetDirectoryService().GetMediaGalleryFiles(models.MediaTypeImage, galleryRequest.GalleryName)
 	if err != nil {
 		log.Printf("Failed to get gallery %s for P2P request: %v", galleryRequest.GalleryName, err)
 		return &models.GalleryResponse{Gallery: nil}
 	}
 
-	gallery := &models.Gallery{
-		Name:       galleryRequest.GalleryName,
-		ImageCount: len(images),
-		Images:     images,
+	gallery := &models.MediaGallery{
+		Name:      galleryRequest.GalleryName,
+		MediaType: models.MediaTypeImage,
+		FileCount: len(files),
+		Files:     files,
 	}
 
 	return &models.GalleryResponse{Gallery: gallery}
@@ -1942,8 +1943,8 @@ func (p *P2PService) handleGetGalleryImageRequest(payload interface{}) *models.G
 	imagesDir := p.container.GetDirectoryService().GetDirectoryPath()
 	imagePath := filepath.Join(imagesDir, "images", imageRequest.GalleryName, imageRequest.ImageName)
 
-	// Validate that the file exists and is within the gallery directory
-	galleryImages, err := p.container.GetDirectoryService().GetGalleryImages(imageRequest.GalleryName)
+	// Validate that the file exists and is within the gallery directory using unified method
+	galleryImages, err := p.container.GetDirectoryService().GetMediaGalleryFiles(models.MediaTypeImage, imageRequest.GalleryName)
 	if err != nil {
 		log.Printf("Failed to get gallery images for validation: %v", err)
 		return &models.GalleryImageResponse{ImageData: "", Filename: "", Size: 0}
