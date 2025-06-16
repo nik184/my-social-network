@@ -1376,25 +1376,25 @@ func (h *Handler) HandleMediaGalleryContent(w http.ResponseWriter, r *http.Reque
 	switch mediaType {
 	case models.MediaTypeImage:
 		if galleryName == "root_images" {
-			filePath = filepath.Join(baseDir, "images", fileName)
+			filePath = h.findFileInMediaDirectory(baseDir, "images", fileName)
 		} else {
 			filePath = filepath.Join(baseDir, "images", galleryName, fileName)
 		}
 	case models.MediaTypeAudio:
 		if galleryName == "root_audio" {
-			filePath = filepath.Join(baseDir, "audio", fileName)
+			filePath = h.findFileInMediaDirectory(baseDir, "audio", fileName)
 		} else {
 			filePath = filepath.Join(baseDir, "audio", galleryName, fileName)
 		}
 	case models.MediaTypeVideo:
 		if galleryName == "root_video" {
-			filePath = filepath.Join(baseDir, "video", fileName)
+			filePath = h.findFileInMediaDirectory(baseDir, "video", fileName)
 		} else {
 			filePath = filepath.Join(baseDir, "video", galleryName, fileName)
 		}
 	case models.MediaTypeDocs:
 		if galleryName == "root_docs" {
-			filePath = filepath.Join(baseDir, "docs", fileName)
+			filePath = h.findFileInMediaDirectory(baseDir, "docs", fileName)
 		} else {
 			filePath = filepath.Join(baseDir, "docs", galleryName, fileName)
 		}
@@ -1404,7 +1404,41 @@ func (h *Handler) HandleMediaGalleryContent(w http.ResponseWriter, r *http.Reque
 	h.setMediaContentType(w, fileName, mediaType)
 
 	// Serve the file
+	// Check if file exists
+	if filePath == "" {
+		http.Error(w, fmt.Sprintf("%s file not found", strings.Title(string(mediaType))), http.StatusNotFound)
+		return
+	}
+
 	http.ServeFile(w, r, filePath)
+}
+
+// findFileInMediaDirectory searches for a file in the main directory and all subdirectories
+func (h *Handler) findFileInMediaDirectory(baseDir, mediaType, fileName string) string {
+	mediaDir := filepath.Join(baseDir, mediaType)
+	
+	// First check in the main directory
+	mainFilePath := filepath.Join(mediaDir, fileName)
+	if _, err := os.Stat(mainFilePath); err == nil {
+		return mainFilePath
+	}
+	
+	// Then check in all subdirectories
+	files, err := os.ReadDir(mediaDir)
+	if err != nil {
+		return ""
+	}
+	
+	for _, file := range files {
+		if file.IsDir() {
+			subDirPath := filepath.Join(mediaDir, file.Name(), fileName)
+			if _, err := os.Stat(subDirPath); err == nil {
+				return subDirPath
+			}
+		}
+	}
+	
+	return ""
 }
 
 // HandleUploadMedia handles POST /api/media/{mediaType}/upload requests

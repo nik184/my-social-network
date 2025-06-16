@@ -402,6 +402,8 @@ func (d *DirectoryService) GetMediaGalleries(mediaType models.MediaType) ([]mode
 
 				if fileCheckFunc(galleryFile.Name()) {
 					mediaFiles = append(mediaFiles, galleryFile.Name())
+					// Also add subdirectory files to root gallery
+					rootFiles = append(rootFiles, galleryFile.Name())
 				}
 			}
 
@@ -483,7 +485,18 @@ func (d *DirectoryService) GetMediaGalleryFiles(mediaType models.MediaType, gall
 	for _, file := range files {
 		if file.IsDir() {
 			if galleryName == rootGalleryName {
-				continue
+				// For root galleries, also include files from subdirectories
+				subDirPath := filepath.Join(galleryDir, file.Name())
+				subFiles, err := os.ReadDir(subDirPath)
+				if err != nil {
+					continue
+				}
+				
+				for _, subFile := range subFiles {
+					if !subFile.IsDir() && fileCheckFunc(subFile.Name()) {
+						mediaFiles = append(mediaFiles, subFile.Name())
+					}
+				}
 			}
 			continue
 		}
