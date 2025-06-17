@@ -642,10 +642,6 @@ function displayPhotosWithFilters(galleries) {
                     <div class="image-preview">
                         <img src="${imageUrl}" alt="${sharedApp.escapeHtml(image.name)}" loading="lazy" />
                     </div>
-                    <div class="image-info">
-                        <div class="image-name">${sharedApp.escapeHtml(image.name)}</div>
-                        <div class="image-gallery">${sharedApp.escapeHtml(image.galleryDisplayName)}</div>
-                    </div>
                 </div>`;
     }).join('');
 
@@ -681,10 +677,10 @@ function filterPhotos(galleryName) {
 
 // Open image from gallery
 function openImageFromGallery(galleryName, imageName) {
-    // Get all images from the same gallery for navigation
-    const galleryImages = Array.from(document.querySelectorAll(`[data-gallery="${galleryName}"]`))
-        .filter(item => item.style.display !== 'none')
-        .map(item => item.querySelector('.image-name').textContent);
+    // Get all images from the same gallery for navigation by extracting from the image alt attribute
+    const galleryImages = Array.from(document.querySelectorAll(`[data-gallery="${galleryName}"] img`))
+        .filter(item => item.closest('.image-item').style.display !== 'none')
+        .map(item => item.alt);
     
     const urlProvider = (name) => `/api/media/image/galleries/${encodeURIComponent(galleryName)}/${encodeURIComponent(name)}`;
     const isOwnContent = !isViewingFriend;
