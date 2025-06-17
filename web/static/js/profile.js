@@ -1100,7 +1100,7 @@ async function loadVideo() {
         
         const data = await sharedApp.fetchAPI('/api/media/video/galleries');
         
-        displayVideoGalleries(data.galleries || []);
+        displayVideoWithFilters(data.galleries || []);
         videoLoaded = true;
         sharedApp.hideStatus('videoStatus');
     } catch (error) {
@@ -1126,41 +1126,126 @@ async function loadFriendVideo(peerID) {
     }
 }
 
-// Display video galleries
-function displayVideoGalleries(videoGalleries) {
+// Display video with filter buttons and file list
+function displayVideoWithFilters(galleries) {
     const videoContent = document.getElementById('videoContent');
     
-    if (videoGalleries.length === 0) {
-        displayVideoEmptyState('No video collections found');
+    if (galleries.length === 0) {
+        displayVideoEmptyState('No videos found');
         return;
     }
 
-    const galleriesGrid = document.createElement('div');
-    galleriesGrid.className = 'galleries-grid';
-
-    videoGalleries.forEach(gallery => {
-        const galleryCard = document.createElement('div');
-        galleryCard.className = 'gallery-card';
-        galleryCard.onclick = () => openVideoGallery(gallery.name);
-
-        // Display user-friendly name for root gallery
-        const displayName = gallery.name === 'root_video' ? '🎥 Root Videos' : gallery.name;
-
-        galleryCard.innerHTML = `
-            <div class="gallery-preview">
-                <div class="gallery-placeholder">🎬</div>
-            </div>
-            <div class="gallery-info">
-                <div class="gallery-name">${sharedApp.escapeHtml(displayName)}</div>
-                <div class="gallery-count">${gallery.file_count} video files</div>
-            </div>
-        `;
-
-        galleriesGrid.appendChild(galleryCard);
+    // Collect all video files with their gallery info
+    let allVideos = [];
+    const galleryNames = [];
+    
+    galleries.forEach(gallery => {
+        const displayName = gallery.name === 'root_video' ? 'All Videos' : gallery.name;
+        galleryNames.push({name: gallery.name, displayName, count: gallery.file_count});
+        
+        gallery.files.forEach(file => {
+            allVideos.push({
+                name: file,
+                gallery: gallery.name,
+                galleryDisplayName: displayName
+            });
+        });
     });
 
-    videoContent.innerHTML = '';
-    videoContent.appendChild(galleriesGrid);
+    // Create filter buttons
+    const filtersHtml = galleryNames.map(gallery => {
+        const isRoot = gallery.name === 'root_video';
+        return `<button class="gallery-filter-btn ${isRoot ? 'active' : ''}" 
+                        data-gallery="${gallery.name}" 
+                        onclick="filterVideos('${gallery.name}')">
+                    ${sharedApp.escapeHtml(gallery.displayName)} (${gallery.count})
+                </button>`;
+    }).join('');
+
+    // Create video files list
+    const videosHtml = allVideos.map(video => {
+        return `<div class="video-item" data-gallery="${video.gallery}">
+                    <div class="video-icon">🎬</div>
+                    <div class="video-info">
+                        <div class="video-name">${sharedApp.escapeHtml(video.name.replace(/\.[^/.]+$/, ''))}</div>
+                        <div class="video-gallery">${sharedApp.escapeHtml(video.galleryDisplayName)}</div>
+                    </div>
+                    <button class="video-play-btn" onclick="playVideoFromGallery('${video.gallery}', '${sharedApp.escapeHtml(video.name)}')">
+                        ▶ Play
+                    </button>
+                </div>`;
+    }).join('');
+
+    videoContent.innerHTML = `
+        <div class="media-filters">
+            ${filtersHtml}
+        </div>
+        <div class="media-files">
+            ${videosHtml}
+        </div>
+    `;
+
+    filterVideos('root_video');
+}
+
+// Filter videos by gallery
+function filterVideos(galleryName) {
+    // Update active filter button
+    document.querySelectorAll('.gallery-filter-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.gallery === galleryName) {
+            btn.classList.add('active');
+        }
+    });
+
+    // Show/hide video files based on gallery
+    document.querySelectorAll('.video-item').forEach(item => {
+        if (item.dataset.gallery === galleryName) {
+            item.style.display = 'flex';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+
+// Play video from gallery
+function playVideoFromGallery(galleryName, videoName) {
+    const videoUrl = `/api/media/video/galleries/${encodeURIComponent(galleryName)}/${encodeURIComponent(videoName)}`;
+    
+    // Open video player modal
+    openSingleVideoPlayer(videoUrl, videoName);
+}
+
+// Open single video player modal
+function openSingleVideoPlayer(videoUrl, videoName) {
+    // Create video player modal
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.display = 'block';
+    
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 90%; width: 1000px;">
+            <div class="modal-header">
+                <div class="modal-title">🎬 ${sharedApp.escapeHtml(videoName.replace(/\.[^/.]+$/, ''))}</div>
+                <span class="close" onclick="this.closest('.modal').remove()">&times;</span>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <video controls style="width: 100%; max-width: 800px; height: auto; margin: 20px 0;">
+                    <source src="${videoUrl}" type="video/mp4">
+                    Your browser does not support the video element.
+                </video>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Close modal when clicking outside
+    modal.onclick = function(event) {
+        if (event.target === modal) {
+            modal.remove();
+        }
+    };
 }
 
 // Display empty state for video
