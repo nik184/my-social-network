@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"old-school/internal/models"
@@ -1275,6 +1276,25 @@ func (h *Handler) HandleMediaGalleryContent(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// For HTML files in docs, sanitize before serving
+	if mediaType == models.MediaTypeDocs && (strings.ToLower(filepath.Ext(fileName)) == ".html" || strings.ToLower(filepath.Ext(fileName)) == ".htm") {
+		// Read the file content
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			http.Error(w, "Failed to read file", http.StatusInternalServerError)
+			return
+		}
+		
+		// Sanitize HTML content
+		sanitizedContent := h.sanitizeHTML(string(content))
+		
+		// Serve sanitized content
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(sanitizedContent)))
+		w.Write([]byte(sanitizedContent))
+		return
+	}
+
+	// For non-HTML files, serve directly
 	http.ServeFile(w, r, filePath)
 }
 
@@ -1656,8 +1676,8 @@ func (h *Handler) loadDocFromPath(filename, filePath string, fileInfo os.FileInf
 		processedContent = contentStr
 		contentType = "markdown" // Frontend will convert to HTML
 	} else if ext == ".html" || ext == ".htm" {
-		// For HTML files, return raw HTML content
-		processedContent = contentStr
+		// For HTML files, sanitize by removing JavaScript
+		processedContent = h.sanitizeHTML(contentStr)
 		contentType = "html" // Frontend will open in new tab
 	} else {
 		processedContent = contentStr
@@ -1673,6 +1693,63 @@ func (h *Handler) loadDocFromPath(filename, filePath string, fileInfo os.FileInf
 		Size:        fileInfo.Size(),
 		ContentType: contentType,
 	}, nil
+}
+
+// sanitizeHTML removes all JavaScript from HTML content for security
+func (h *Handler) sanitizeHTML(htmlContent string) string {
+	content := htmlContent
+
+	// Remove <script> tags and their content (case-insensitive, multiline)
+	scriptRegex := `(?is)<script[^>]*>.*?</script>`
+	re := regexp.MustCompile(scriptRegex)
+	content = re.ReplaceAllString(content, "")
+
+	// Remove standalone <script> tags (malformed)
+	standaloneScriptRegex := `(?is)<script[^>]*/?>`
+	re = regexp.MustCompile(standaloneScriptRegex)
+	content = re.ReplaceAllString(content, "")
+
+	// Remove all event handlers (on* attributes) - improved pattern
+	eventHandlerRegex := `(?is)\s+on[a-zA-Z]+\s*=\s*["'][^"']*["']`
+	re = regexp.MustCompile(eventHandlerRegex)
+	content = re.ReplaceAllString(content, "")
+
+	// Remove event handlers without quotes
+	eventHandlerNoQuotesRegex := `(?is)\s+on[a-zA-Z]+\s*=\s*[^"'\s>][^>\s]*`
+	re = regexp.MustCompile(eventHandlerNoQuotesRegex)
+	content = re.ReplaceAllString(content, "")
+
+	// Remove javascript: URLs (href="javascript:..." or src="javascript:...")
+	jsUrlRegex := `(?is)(href|src|action)\s*=\s*["']javascript:[^"']*["']`
+	re = regexp.MustCompile(jsUrlRegex)
+	content = re.ReplaceAllString(content, `$1="#"`)
+
+	// Remove javascript: URLs without quotes
+	jsUrlNoQuotesRegex := `(?is)(href|src|action)\s*=\s*javascript:[^>\s]*`
+	re = regexp.MustCompile(jsUrlNoQuotesRegex)
+	content = re.ReplaceAllString(content, `$1="#"`)
+
+	// Remove data: URLs that might contain JavaScript
+	dataUrlRegex := `(?is)(href|src|action)\s*=\s*["']data:[^"']*javascript[^"']*["']`
+	re = regexp.MustCompile(dataUrlRegex)
+	content = re.ReplaceAllString(content, `$1="#"`)
+
+	// Remove vbscript: URLs
+	vbscriptUrlRegex := `(?is)(href|src|action)\s*=\s*["']vbscript:[^"']*["']`
+	re = regexp.MustCompile(vbscriptUrlRegex)
+	content = re.ReplaceAllString(content, `$1="#"`)
+
+	// Remove <noscript> tags but keep content
+	noscriptRegex := `(?is)</?noscript[^>]*>`
+	re = regexp.MustCompile(noscriptRegex)
+	content = re.ReplaceAllString(content, "")
+
+	// Remove any remaining standalone javascript: references
+	jsStandaloneRegex := `(?is)javascript:[^"'\s>]*`
+	re = regexp.MustCompile(jsStandaloneRegex)
+	content = re.ReplaceAllString(content, "#")
+
+	return content
 }
 
 // RegisterRoutes registers all HTTP routes
