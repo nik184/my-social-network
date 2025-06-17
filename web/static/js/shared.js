@@ -48,6 +48,46 @@ function showResult(elementId, data) {
     }
 }
 
+// Simple markdown to HTML converter
+function convertMarkdownToHtml(markdown) {
+    let html = markdown;
+    
+    // Convert headers (# ## ### etc.)
+    html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+    html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+    html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+    
+    // Convert bold (**text** or __text__)
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
+    
+    // Convert italic (*text* or _text_)
+    html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    html = html.replace(/_(.*?)_/g, '<em>$1</em>');
+    
+    // Convert links [text](url)
+    html = html.replace(/\[([^\]]+)\]\(([^\)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+    
+    // Convert code blocks ```code```
+    html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+    
+    // Convert inline code `code`
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    
+    // Convert line breaks
+    html = html.replace(/\n\n/g, '</p><p>');
+    html = html.replace(/\n/g, '<br>');
+    
+    // Wrap in paragraphs
+    html = '<p>' + html + '</p>';
+    
+    // Clean up empty paragraphs
+    html = html.replace(/<p><\/p>/g, '');
+    html = html.replace(/<p><br><\/p>/g, '');
+    
+    return html;
+}
+
 // Avatar-related functions
 async function loadAvatarImages() {
     try {
@@ -898,7 +938,8 @@ window.sharedApp = {
     showStatus,
     hideStatus,
     showResult,
-    closeDocModal
+    closeDocModal,
+    convertMarkdownToHtml
 };
 
 // Make global audio player functions available globally

@@ -1652,10 +1652,13 @@ func (h *Handler) loadDocFromPath(filename, filePath string, fileInfo os.FileInf
 	var contentType string
 
 	if ext == ".md" {
-		// For markdown files, we could convert to HTML here
-		// For now, keep it simple and return raw markdown
+		// For markdown files, return raw markdown content
 		processedContent = contentStr
-		contentType = "html" // Frontend expects "html" for markdown
+		contentType = "markdown" // Frontend will convert to HTML
+	} else if ext == ".html" || ext == ".htm" {
+		// For HTML files, return raw HTML content
+		processedContent = contentStr
+		contentType = "html" // Frontend will open in new tab
 	} else {
 		processedContent = contentStr
 		contentType = "text"

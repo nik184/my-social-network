@@ -244,7 +244,7 @@ function displayDocsWithFilters(galleries) {
         return `<div class="doc-item" data-gallery="${file.gallery}">
                     <div class="doc-icon">📄</div>
                     <div class="doc-info">
-                        <div class="doc-name">${sharedApp.escapeHtml(file.name.replace(/\.[^/.]+$/, ''))}</div>
+                        <div class="doc-name">${sharedApp.escapeHtml(file.name)}</div>
                         <div class="doc-gallery">${sharedApp.escapeHtml(file.galleryDisplayName)}</div>
                     </div>
                     <button class="doc-open-btn" onclick="openDocFromGallery('${file.gallery}', '${sharedApp.escapeHtml(file.name)}')">
@@ -332,7 +332,7 @@ function showDocsModal(docs, galleryName) {
                         ${docs.map(docFile => `
                             <div class="doc-card">
                                 <div class="doc-header">
-                                    <div class="doc-title">${sharedApp.escapeHtml(docFile.replace(/\.[^/.]+$/, ''))}</div>
+                                    <div class="doc-title">${sharedApp.escapeHtml(docFile)}</div>
                                 </div>
                                 <div class="doc-body">
                                     <div class="doc-preview">Click to open document</div>
@@ -372,18 +372,26 @@ async function openDocFromGallery(galleryName, fileName) {
     try {
         const doc = await sharedApp.fetchAPI(`/api/media/docs/content/${encodeURIComponent(galleryName)}/${encodeURIComponent(fileName)}`);
         
-        document.getElementById('docModalTitle').textContent = doc.title;
+        // For HTML files, open in new tab instead of modal
+        if (doc.content_type === 'html') {
+            const htmlUrl = `/api/media/docs/galleries/${encodeURIComponent(galleryName)}/${encodeURIComponent(fileName)}`;
+            window.open(htmlUrl, '_blank');
+            return;
+        }
+        
+        document.getElementById('docModalTitle').textContent = doc.filename;
         document.getElementById('docModalMeta').innerHTML = `
             <strong>Filename:</strong> ${sharedApp.escapeHtml(doc.filename)}<br>
             <strong>Modified:</strong> ${new Date(doc.modified_at).toLocaleString()}<br>
             <strong>Size:</strong> ${Math.round(doc.size / 1024 * 100) / 100} KB<br>
-            <strong>Type:</strong> ${doc.content_type === 'html' ? 'Markdown' : 'Text'}
+            <strong>Type:</strong> ${doc.content_type === 'markdown' ? 'Markdown' : 'Text'}
         `;
         
         // Render content based on type
         const contentElement = document.getElementById('docModalContent');
-        if (doc.content_type === 'html') {
-            contentElement.innerHTML = doc.content;
+        if (doc.content_type === 'markdown') {
+            // Convert markdown to HTML
+            contentElement.innerHTML = sharedApp.convertMarkdownToHtml(doc.content);
             contentElement.className = 'doc-content html-content';
         } else {
             contentElement.textContent = doc.content;
@@ -421,7 +429,7 @@ function displayFriendDocs(docs) {
 
         docCard.innerHTML = `
             <div class="doc-header">
-                <div class="doc-title">${sharedApp.escapeHtml(doc.title)}</div>
+                <div class="doc-title">${sharedApp.escapeHtml(doc.filename)}</div>
             </div>
             <div class="doc-body">
                 <div class="doc-preview">${sharedApp.escapeHtml(doc.preview)}</div>
@@ -464,19 +472,27 @@ async function openFriendDoc(peerID, filename) {
     try {
         const doc = await sharedApp.fetchAPI(`/api/peer-docs/${peerID}/${encodeURIComponent(filename)}`);
         
-        document.getElementById('docModalTitle').textContent = doc.title;
+        document.getElementById('docModalTitle').textContent = doc.filename;
+        // For HTML files from friends, open in new tab
+        if (doc.content_type === 'html') {
+            const htmlUrl = `/api/peer-docs/${peerID}/${encodeURIComponent(filename)}`;
+            window.open(htmlUrl, '_blank');
+            return;
+        }
+        
         document.getElementById('docModalMeta').innerHTML = `
             <strong>From:</strong> ${sharedApp.escapeHtml(currentFriend.peer_name)}<br>
             <strong>Filename:</strong> ${sharedApp.escapeHtml(doc.filename)}<br>
             <strong>Modified:</strong> ${new Date(doc.modified_at).toLocaleString()}<br>
             <strong>Size:</strong> ${Math.round(doc.size / 1024 * 100) / 100} KB<br>
-            <strong>Type:</strong> ${doc.content_type === 'html' ? 'Markdown' : 'Text'}
+            <strong>Type:</strong> ${doc.content_type === 'markdown' ? 'Markdown' : 'Text'}
         `;
         
         // Render content based on type
         const contentElement = document.getElementById('docModalContent');
-        if (doc.content_type === 'html') {
-            contentElement.innerHTML = doc.content;
+        if (doc.content_type === 'markdown') {
+            // Convert markdown to HTML
+            contentElement.innerHTML = sharedApp.convertMarkdownToHtml(doc.content);
             contentElement.className = 'doc-content html-content';
         } else {
             contentElement.textContent = doc.content;
