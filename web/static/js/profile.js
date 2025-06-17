@@ -231,7 +231,7 @@ function displayDocsWithFilters(galleries) {
     // Create filter buttons
     const filtersHtml = galleryNames.map(gallery => {
         const isRoot = gallery.name === 'root_docs';
-        return `<button class="gallery-filter-btn ${isRoot ? 'active' : ''}" 
+        return `<button class="gallery-filter-btn docs-filter-btn ${isRoot ? 'active' : ''}" 
                         data-gallery="${gallery.name}" 
                         onclick="filterDocs('${gallery.name}')">
                     ${sharedApp.escapeHtml(gallery.displayName)} (${gallery.count})
@@ -267,7 +267,7 @@ function displayDocsWithFilters(galleries) {
 // Filter docs by gallery
 function filterDocs(galleryName) {
     // Update active filter button
-    document.querySelectorAll('.gallery-filter-btn').forEach(btn => {
+    document.querySelectorAll('.docs-filter-btn').forEach(btn => {
         btn.classList.remove('active');
         if (btn.dataset.gallery === galleryName) {
             btn.classList.add('active');
@@ -634,7 +634,7 @@ function displayPhotosWithFilters(galleries) {
         const isRoot = gallery.name === 'root_images';
         console.log(gallery.name, isRoot);
 
-        return `<button class="gallery-filter-btn ${isRoot ? 'active' : ''}" 
+        return `<button class="gallery-filter-btn photos-filter-btn ${isRoot ? 'active' : ''}" 
                         data-gallery="${gallery.name}" 
                         onclick="filterPhotos('${gallery.name}')">
                     ${sharedApp.escapeHtml(gallery.displayName)} (${gallery.count})
@@ -666,7 +666,7 @@ function displayPhotosWithFilters(galleries) {
 // Filter photos by gallery
 function filterPhotos(galleryName) {
     // Update active filter button
-    document.querySelectorAll('.gallery-filter-btn').forEach(btn => {
+    document.querySelectorAll('.photos-filter-btn').forEach(btn => {
         btn.classList.remove('active');
         if (btn.dataset.gallery === galleryName) {
             btn.classList.add('active');
@@ -929,7 +929,7 @@ function displayAudioWithFilters(galleries) {
     // Create filter buttons
     const filtersHtml = galleryNames.map(gallery => {
         const isRoot = gallery.name === 'root_audio';
-        return `<button class="gallery-filter-btn ${isRoot ? 'active' : ''}" 
+        return `<button class="gallery-filter-btn audio-filter-btn ${isRoot ? 'active' : ''}" 
                         data-gallery="${gallery.name}" 
                         onclick="filterAudio('${gallery.name}')">
                     ${sharedApp.escapeHtml(gallery.displayName)} (${gallery.count})
@@ -965,7 +965,7 @@ function displayAudioWithFilters(galleries) {
 // Filter audio by gallery
 function filterAudio(galleryName) {
     // Update active filter button
-    document.querySelectorAll('.gallery-filter-btn').forEach(btn => {
+    document.querySelectorAll('.audio-filter-btn').forEach(btn => {
         btn.classList.remove('active');
         if (btn.dataset.gallery === galleryName) {
             btn.classList.add('active');
@@ -1155,7 +1155,7 @@ function displayVideoWithFilters(galleries) {
     // Create filter buttons
     const filtersHtml = galleryNames.map(gallery => {
         const isRoot = gallery.name === 'root_video';
-        return `<button class="gallery-filter-btn ${isRoot ? 'active' : ''}" 
+        return `<button class="gallery-filter-btn video-filter-btn ${isRoot ? 'active' : ''}" 
                         data-gallery="${gallery.name}" 
                         onclick="filterVideos('${gallery.name}')">
                     ${sharedApp.escapeHtml(gallery.displayName)} (${gallery.count})
@@ -1191,7 +1191,7 @@ function displayVideoWithFilters(galleries) {
 // Filter videos by gallery
 function filterVideos(galleryName) {
     // Update active filter button
-    document.querySelectorAll('.gallery-filter-btn').forEach(btn => {
+    document.querySelectorAll('.video-filter-btn').forEach(btn => {
         btn.classList.remove('active');
         if (btn.dataset.gallery === galleryName) {
             btn.classList.add('active');
