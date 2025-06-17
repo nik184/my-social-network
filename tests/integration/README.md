@@ -4,148 +4,144 @@ This directory contains comprehensive integration tests for the distributed soci
 
 ## Test Categories
 
-### 1. Direct Connection Test (`direct_connection_test.go`)
-Tests basic peer-to-peer connectivity:
-- Two nodes connect directly
-- Names are exchanged during identification
-- Connection information is stored in databases
-- Peer validation works properly
+### 1. Node Connection Test (`node_connection_test.go`)
+Tests peer-to-peer connectivity in containerized environments:
+- Two isolated nodes connect via P2P
+- Uses testcontainers for realistic simulation
+- Tests bidirectional connection establishment
+- Verifies peer recognition and validation
 
 **What it tests:**
-- Basic P2P connectivity
+- Container-based P2P connectivity
 - Peer identification protocol
-- Name exchange mechanism
-- Database persistence
-- Connection validation
+- Bidirectional connection verification
+- Network isolation and discovery
 
-### 2. Hole Punching Test (`hole_punching_test.go`)
-Tests advanced hole punching functionality:
-- Three nodes (A, B, Relay) are created
-- A and B connect to Relay but not directly to each other
-- A discovers B as second-degree connection through Relay
-- A initiates hole punching to connect directly to B
-- Direct connection is established and data is exchanged
+### 2. Media CRUD Test (`media_crud_test.go`)
+Tests create, read, and delete operations for all media types:
+- Images: PNG files via `/api/media/image/upload` and `/api/delete/images/`
+- Audio: WAV files via `/api/media/audio/upload`
+- Video: MP4 files via `/api/media/video/upload`  
+- Docs: Markdown files via `/api/media/docs/upload` and `/api/delete/docs/`
 
 **What it tests:**
-- Second-degree peer discovery
-- Hole punching protocol
-- Relay-assisted connections
-- NAT traversal simulation
-- Multi-hop network topology
-
-### 3. Containerized Tests (`containerized_test.go`)
-Tests the application in containerized environments:
-- Uses testcontainers-go for realistic network simulation
-- Tests container-to-container communication
-- Simulates NAT and firewall conditions
-- Tests network partitioning and recovery
-
-**What it tests:**
-- Real network conditions
-- Container networking
-- Network isolation
-- Latency and packet loss handling
-
-## Test Infrastructure
-
-### Test Helpers (`test_helpers.go`)
-Provides utility functions and structures:
-- `TestNode`: Wrapper for application nodes in tests
-- `TestNetwork`: Manages collections of test nodes
-- Network topology creation (star, mesh)
-- Connection helpers and verification
+- File upload functionality for all media types
+- Gallery and file listing APIs
+- Individual file access and content verification
+- File deletion (where implemented)
+- Proper content-type handling
 
 ## Running Tests
 
 ### Prerequisites
-- Docker (for containerized tests)
+- Docker installed and running
 - Go 1.23+
-- Sufficient disk space for temporary test directories
+- Internet connection (for downloading base images)
+- Sufficient disk space for containers and test files
 
-### Run All Tests
+### Run All Integration Tests
 ```bash
-go test ./tests/integration/...
+go test ./tests/integration/... -v
 ```
 
-### Run Specific Tests
+### Run Specific Test Suites
 ```bash
-# Direct connection test only
-go test ./tests/integration/ -run TestDirectConnection
+# Test node P2P connections only
+go test ./tests/integration/ -run TestTwoIsolatedNodesConnection -v
 
-# Hole punching test only  
-go test ./tests/integration/ -run TestHolePunching
-
-# Skip containerized tests (faster)
-go test ./tests/integration/ -short
+# Test media CRUD operations only
+go test ./tests/integration/ -run TestMediaCRUDOperations -v
 ```
 
-### Verbose Output
+### Run Tests in Short Mode (Skip Integration Tests)
 ```bash
-go test ./tests/integration/ -v
+go test ./tests/integration/... -short
 ```
 
-## Test Scenarios Covered
+## Test Coverage
 
-### Basic Connectivity
-- ✅ Two nodes connect directly
-- ✅ Names are exchanged
-- ✅ Connection info is stored
-- ✅ Peer validation works
+### Node Connection Tests
+- ✅ Isolated container node startup
+- ✅ P2P connection establishment
+- ✅ Bidirectional peer recognition
+- ✅ Container networking integration
 
-### Advanced Networking
-- ✅ Second-degree peer discovery
-- ✅ Hole punching through relay
-- ✅ Multi-relay scenarios
-- ✅ Complex network topologies
+### Media CRUD Tests
+- ✅ **CREATE**: File uploads for all media types
+  - Images: PNG format with proper headers
+  - Audio: WAV format with proper headers  
+  - Video: MP4 format with proper headers
+  - Docs: Markdown text files
+- ✅ **READ**: Gallery and file access
+  - Gallery listing APIs (`/api/media/{type}/galleries`)
+  - File listing within galleries
+  - Individual file access with content verification
+  - Proper content-type response headers
+- ✅ **DELETE**: File removal (where implemented)
+  - Images: `/api/delete/images/{gallery}/{filename}`
+  - Docs: `/api/delete/docs/{filename}`
+  - Audio/Video: ⚠️ Deletion endpoints not yet implemented
 
-### Edge Cases
-- ✅ Empty peer lists (EOF handling)
-- ✅ Connection failures
-- ✅ Invalid peer IDs
-- ✅ Network timeouts
+## Test Environment
 
-### Real-World Conditions
-- 🔄 Containerized environments
-- 🔄 Network partitions
-- 🔄 High latency networks
-- 🔄 Packet loss scenarios
+The tests use **testcontainers-go** to create isolated Docker environments that closely mirror production deployment:
 
-## Test Architecture
+### Container Setup
+- Fresh application instance per test
+- Clean filesystem and database
+- Isolated network namespace
+- Proper port mappings for API access
+- Automatic container cleanup
 
-The tests are designed to:
+### Test Workflow
+1. **Setup**: Create containerized application instance
+2. **Execute**: Run test operations via HTTP API
+3. **Verify**: Assert expected responses and behavior
+4. **Cleanup**: Remove containers and temporary files
 
-1. **Isolate Components**: Each test creates independent node instances
-2. **Simulate Real Conditions**: Use temporary directories and realistic network setups
-3. **Verify End-to-End Behavior**: Test complete workflows from connection to data exchange
-4. **Handle Cleanup**: Automatic cleanup of resources and temporary files
-5. **Provide Clear Feedback**: Detailed logging and assertions
+## Test Implementation Details
 
-## Debugging Tests
+### Media Type Test Files
+- **Images**: 1x1 pixel PNG with proper PNG headers
+- **Audio**: Minimal WAV file with correct audio headers
+- **Video**: Basic MP4 container with proper structure
+- **Docs**: Markdown text content for testing
 
-### Common Issues
-1. **Port Conflicts**: Tests use dynamic port allocation to avoid conflicts
-2. **Timing Issues**: Tests include stabilization periods for network operations
-3. **Resource Cleanup**: Automatic cleanup prevents resource leaks
+### API Endpoint Coverage
+```
+POST /api/media/{type}/upload          # File uploads
+GET  /api/media/{type}/galleries       # List galleries  
+GET  /api/media/{type}/galleries/{gallery}  # List files in gallery
+GET  /api/media/{type}/galleries/{gallery}/{file}  # Access individual file
+DELETE /api/delete/images/{gallery}/{file}  # Delete image
+DELETE /api/delete/docs/{file}              # Delete document
+```
 
-### Debug Logging
-Tests include detailed logging to help diagnose issues:
-- Node startup and configuration
-- Connection attempts and results
-- Peer discovery progress
-- Database operations
+## Running the Tests
 
-### Manual Verification
-You can manually verify test results by:
-1. Checking temporary directories during test execution
-2. Examining database contents
-3. Monitoring network connections
-4. Reviewing log output
+### Example Test Execution
+```bash
+# Run with verbose output to see detailed progress
+go test ./tests/integration/ -run TestMediaCRUDOperations -v
 
-## Contributing
+# Expected output includes:
+# 🚀 Starting media CRUD operations test...
+# 🎯 Testing CRUD operations for image
+# 📤 Testing file upload for image  
+# ✅ Successfully uploaded 1 image files
+# 📋 Testing gallery listing for image
+# ✅ Successfully listed 1 files in image gallery
+# ... and so on for each media type
+```
 
-When adding new tests:
-1. Use the existing test helpers where possible
-2. Include proper cleanup in defer statements
-3. Add descriptive test names and comments
-4. Verify tests work in isolation and in parallel
-5. Update this README with new test scenarios
+### Performance Considerations
+- Container startup: ~30-60 seconds
+- Total test time: ~5-10 minutes for full suite
+- Disk usage: ~500MB for containers and test files
+- Network: Downloads base images on first run
+
+## Notes
+- Tests automatically skip deletion verification for audio/video (endpoints not implemented)
+- Large log output is normal due to application initialization
+- Tests are designed to be run in isolation and handle cleanup automatically
+- Docker must be running and accessible to current user

@@ -243,50 +243,6 @@ func (h *Handler) HandlePeerAvatar(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Invalid request path", http.StatusBadRequest)
 }
 
-// HandleDocs handles GET /api/docs requests
-func (h *Handler) HandleDocs(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	docs, err := h.appService.GetDirectoryService().GetDocs()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"docs":  docs,
-		"count": len(docs),
-	})
-}
-
-// HandleDoc handles GET /api/docs/{filename} requests
-func (h *Handler) HandleDoc(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Extract filename from URL path
-	filename := r.URL.Path[len("/api/docs/"):]
-	if filename == "" {
-		http.Error(w, "Filename required", http.StatusBadRequest)
-		return
-	}
-
-	doc, err := h.appService.GetDirectoryService().GetDoc(filename)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(doc)
-}
-
 // HandleFriends handles GET /api/friends requests
 func (h *Handler) HandleFriends(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
@@ -606,107 +562,6 @@ func (h *Handler) HandleFriendProfilePage(w http.ResponseWriter, r *http.Request
 		CurrentPage: "friends", // Keep friends nav active
 	}
 	h.templateService.RenderPage(w, "profile", data)
-}
-
-// HandleUploadDocs handles POST /api/upload/docs requests
-func (h *Handler) HandleUploadDocs(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Parse multipart form with 32MB max memory
-	err := r.ParseMultipartForm(32 << 20)
-	if err != nil {
-		http.Error(w, "Failed to parse form: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// Get uploaded files
-	files := r.MultipartForm.File["files"]
-	if len(files) == 0 {
-		http.Error(w, "No files uploaded", http.StatusBadRequest)
-		return
-	}
-
-	// Get subdirectory (optional)
-	subdirectory := r.FormValue("subdirectory")
-	subdirectory = strings.TrimSpace(subdirectory)
-
-	// Validate and sanitize subdirectory path
-	if subdirectory != "" {
-		subdirectory = filepath.Clean(subdirectory)
-		if strings.Contains(subdirectory, "..") || strings.HasPrefix(subdirectory, "/") {
-			http.Error(w, "Invalid subdirectory path", http.StatusBadRequest)
-			return
-		}
-	}
-
-	// Get base docs directory
-	baseDocsDir := filepath.Join(h.appService.GetDirectoryService().GetDirectoryPath(), "docs")
-
-	// Create target directory
-	targetDir := baseDocsDir
-	if subdirectory != "" {
-		targetDir = filepath.Join(baseDocsDir, subdirectory)
-	}
-
-	// Ensure target directory exists
-	if err := os.MkdirAll(targetDir, 0755); err != nil {
-		http.Error(w, "Failed to create directory: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Process each uploaded file
-	var uploadedFiles []string
-	var errors []string
-
-	for _, fileHeader := range files {
-		// Validate file extension
-		if !h.isValidDocumentFile(fileHeader.Filename) {
-			errors = append(errors, fmt.Sprintf("Invalid file type: %s", fileHeader.Filename))
-			continue
-		}
-
-		// Open uploaded file
-		file, err := fileHeader.Open()
-		if err != nil {
-			errors = append(errors, fmt.Sprintf("Failed to open %s: %v", fileHeader.Filename, err))
-			continue
-		}
-		defer file.Close()
-
-		// Create destination file
-		destPath := filepath.Join(targetDir, fileHeader.Filename)
-		destFile, err := os.Create(destPath)
-		if err != nil {
-			errors = append(errors, fmt.Sprintf("Failed to create %s: %v", fileHeader.Filename, err))
-			continue
-		}
-		defer destFile.Close()
-
-		// Copy file content
-		_, err = io.Copy(destFile, file)
-		if err != nil {
-			errors = append(errors, fmt.Sprintf("Failed to save %s: %v", fileHeader.Filename, err))
-			os.Remove(destPath) // Clean up partial file
-			continue
-		}
-
-		uploadedFiles = append(uploadedFiles, fileHeader.Filename)
-	}
-
-	// Return response
-	response := map[string]interface{}{
-		"success":        len(uploadedFiles) > 0,
-		"uploaded_files": uploadedFiles,
-		"uploaded_count": len(uploadedFiles),
-		"errors":         errors,
-		"target_dir":     targetDir,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
 }
 
 // isValidDocumentFile checks if a file is a valid document type
@@ -1097,29 +952,36 @@ func (h *Handler) handleDownloadedDocs(w http.ResponseWriter, r *http.Request, p
 	http.Error(w, "Downloaded docs serving not implemented yet", http.StatusNotImplemented)
 }
 
-// HandleDeleteDoc handles DELETE /api/delete/docs/{filename} requests
+// HandleDeleteDoc handles DELETE /api/delete/docs/{subdirectory}/{filename} requests
 func (h *Handler) HandleDeleteDoc(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "DELETE" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Extract filename from URL path
-	filename := r.URL.Path[len("/api/delete/docs/"):]
-	if filename == "" {
-		http.Error(w, "Filename required", http.StatusBadRequest)
+	// Extract path parts from URL
+	pathParts := strings.Split(r.URL.Path[len("/api/delete/docs/"):], "/")
+	if len(pathParts) < 2 || pathParts[0] == "" || pathParts[1] == "" {
+		http.Error(w, "Subdirectory and filename required", http.StatusBadRequest)
 		return
 	}
 
-	// Validate filename to prevent directory traversal
-	if strings.Contains(filename, "..") || strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
+	subdirectory := pathParts[0]
+	filename := strings.Join(pathParts[1:], "/") // Join in case filename has slashes
+
+	// Validate subdirectory and filename to prevent directory traversal
+	if strings.Contains(subdirectory, "..") || strings.Contains(subdirectory, "/") || strings.Contains(subdirectory, "\\") {
+		http.Error(w, "Invalid subdirectory name", http.StatusBadRequest)
+		return
+	}
+	if strings.Contains(filename, "..") || strings.Contains(filename, "\\") {
 		http.Error(w, "Invalid filename", http.StatusBadRequest)
 		return
 	}
 
 	// Get docs directory and construct file path
-	docsDir := h.appService.GetDirectoryService().GetDocsDirectory()
-	filePath := filepath.Join(docsDir, filename)
+	docsDir := filepath.Join(h.appService.GetDirectoryService().GetDirectoryPath(), "docs")
+	filePath := filepath.Join(docsDir, subdirectory, filename)
 
 	// Check if file exists
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
@@ -1134,18 +996,19 @@ func (h *Handler) HandleDeleteDoc(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Delete record from database
-	relativePath := filepath.Join("docs", filename)
+	relativePath := filepath.Join("docs", subdirectory, filename)
 	if err := h.appService.GetDatabaseService().DeleteFileRecordByPath(relativePath); err != nil {
 		log.Printf("Warning: Failed to delete file record from database: %v", err)
 	}
 
-	log.Printf("🗑️ Deleted document: %s", filename)
+	log.Printf("🗑️ Deleted document: %s from %s", filename, subdirectory)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":  true,
-		"message":  "Document deleted successfully",
-		"filename": filename,
+		"success":      true,
+		"message":      "Document deleted successfully",
+		"filename":     filename,
+		"subdirectory": subdirectory,
 	})
 }
 
@@ -1338,6 +1201,8 @@ func (h *Handler) HandleMediaGalleryContent(w http.ResponseWriter, r *http.Reque
 		isValidFileFunc = utils.IsAudioFile
 	case models.MediaTypeVideo:
 		isValidFileFunc = utils.IsVideoFile
+	case models.MediaTypeDocs:
+		isValidFileFunc = h.isValidDocumentFile
 	default:
 		http.Error(w, "Unsupported media type", http.StatusBadRequest)
 		return
@@ -1416,19 +1281,19 @@ func (h *Handler) HandleMediaGalleryContent(w http.ResponseWriter, r *http.Reque
 // findFileInMediaDirectory searches for a file in the main directory and all subdirectories
 func (h *Handler) findFileInMediaDirectory(baseDir, mediaType, fileName string) string {
 	mediaDir := filepath.Join(baseDir, mediaType)
-	
+
 	// First check in the main directory
 	mainFilePath := filepath.Join(mediaDir, fileName)
 	if _, err := os.Stat(mainFilePath); err == nil {
 		return mainFilePath
 	}
-	
+
 	// Then check in all subdirectories
 	files, err := os.ReadDir(mediaDir)
 	if err != nil {
 		return ""
 	}
-	
+
 	for _, file := range files {
 		if file.IsDir() {
 			subDirPath := filepath.Join(mediaDir, file.Name(), fileName)
@@ -1437,7 +1302,7 @@ func (h *Handler) findFileInMediaDirectory(baseDir, mediaType, fileName string) 
 			}
 		}
 	}
-	
+
 	return ""
 }
 
@@ -1690,9 +1555,121 @@ func (h *Handler) HandleMediaRoutes(w http.ResponseWriter, r *http.Request) {
 	case "upload":
 		// POST /api/media/{type}/upload
 		h.HandleUploadMedia(w, r)
+	case "content":
+		// GET /api/media/{type}/content/{gallery}/{filename} - for structured content (docs)
+		h.HandleMediaContent(w, r)
 	default:
-		http.Error(w, "Invalid media action. Use 'galleries' or 'upload'", http.StatusBadRequest)
+		http.Error(w, "Invalid media action. Use 'galleries', 'upload', or 'content'", http.StatusBadRequest)
 	}
+}
+
+// HandleMediaContent handles GET /api/media/{type}/content/{gallery}/{filename} requests for structured content
+func (h *Handler) HandleMediaContent(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse URL path: /api/media/{type}/content/{gallery}/{filename}
+	pathParts := strings.Split(r.URL.Path[len("/api/media/"):], "/")
+	if len(pathParts) < 4 || pathParts[0] == "" || pathParts[1] != "content" || pathParts[2] == "" || pathParts[3] == "" {
+		http.Error(w, "Invalid path format. Use /api/media/{type}/content/{gallery}/{filename}", http.StatusBadRequest)
+		return
+	}
+
+	mediaTypeStr := pathParts[0]
+	galleryName := pathParts[2]
+	fileName := strings.Join(pathParts[3:], "/")
+
+	// Currently only support docs for structured content
+	if mediaTypeStr != "docs" {
+		http.Error(w, "Structured content only supported for docs", http.StatusBadRequest)
+		return
+	}
+
+	// Validate document file type
+	if !h.isValidDocumentFile(fileName) {
+		http.Error(w, "Invalid document file", http.StatusBadRequest)
+		return
+	}
+
+	// Get the file path
+	baseDir := h.appService.GetDirectoryService().GetDirectoryPath()
+	var filePath string
+	if galleryName == "root_docs" {
+		filePath = h.findFileInMediaDirectory(baseDir, "docs", fileName)
+	} else {
+		filePath = filepath.Join(baseDir, "docs", galleryName, fileName)
+	}
+
+	if filePath == "" {
+		http.Error(w, "Document file not found", http.StatusNotFound)
+		return
+	}
+
+	// Check if file exists
+	fileInfo, err := os.Stat(filePath)
+	if err != nil {
+		http.Error(w, "Document file not found", http.StatusNotFound)
+		return
+	}
+
+	// Load document with metadata using the existing directory service function
+	doc, err := h.loadDocFromPath(fileName, filePath, fileInfo)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to load document: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(doc)
+}
+
+// loadDocFromPath creates a Doc model from file path and info
+func (h *Handler) loadDocFromPath(filename, filePath string, fileInfo os.FileInfo) (*models.Doc, error) {
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read doc file: %w", err)
+	}
+
+	contentStr := string(content)
+	ext := strings.ToLower(filepath.Ext(filename))
+
+	// Create title from filename (remove extension)
+	title := filename
+	if strings.HasSuffix(title, ext) {
+		title = title[:len(title)-len(ext)]
+	}
+
+	// Generate preview (first 200 characters)
+	preview := contentStr
+	if len(preview) > 200 {
+		preview = preview[:200] + "..."
+	}
+
+	// Determine content type and process content
+	var processedContent string
+	var contentType string
+
+	if ext == ".md" {
+		// For markdown files, we could convert to HTML here
+		// For now, keep it simple and return raw markdown
+		processedContent = contentStr
+		contentType = "html" // Frontend expects "html" for markdown
+	} else {
+		processedContent = contentStr
+		contentType = "text"
+	}
+
+	return &models.Doc{
+		Filename:    filename,
+		Title:       title,
+		Content:     processedContent,
+		Preview:     preview,
+		ModifiedAt:  fileInfo.ModTime(),
+		Size:        fileInfo.Size(),
+		ContentType: contentType,
+	}, nil
 }
 
 // RegisterRoutes registers all HTTP routes
@@ -1711,13 +1688,9 @@ func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/api/monitor", h.HandleMonitorStatus)
 	http.HandleFunc("/api/connect-ip", h.HandleConnectByIP)
 	http.HandleFunc("/api/peer-avatar/", h.HandlePeerAvatar)
-	http.HandleFunc("/api/docs", h.HandleDocs)
-	http.HandleFunc("/api/docs/", h.HandleDoc)
 	http.HandleFunc("/api/friends", h.HandleFriends)
 	http.HandleFunc("/api/friends/", h.HandleFriend)
 	http.HandleFunc("/api/peer-docs/", h.HandlePeerDocs)
-	// Upload routes
-	http.HandleFunc("/api/upload/docs", h.HandleUploadDocs)
 
 	// Files sync routes
 	http.HandleFunc("/api/sync-friend-files", h.HandleSyncFriendFiles)

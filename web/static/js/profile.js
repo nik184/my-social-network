@@ -370,11 +370,30 @@ function closeDocsGalleryModal() {
 // Open document from gallery
 async function openDocFromGallery(galleryName, fileName) {
     try {
-        const fileUrl = `/api/media/docs/galleries/${encodeURIComponent(galleryName)}/${encodeURIComponent(fileName)}`;
+        const doc = await sharedApp.fetchAPI(`/api/media/docs/content/${encodeURIComponent(galleryName)}/${encodeURIComponent(fileName)}`);
         
-        // For now, just open in new window/tab
-        window.open(fileUrl, '_blank');
+        document.getElementById('docModalTitle').textContent = doc.title;
+        document.getElementById('docModalMeta').innerHTML = `
+            <strong>Filename:</strong> ${sharedApp.escapeHtml(doc.filename)}<br>
+            <strong>Modified:</strong> ${new Date(doc.modified_at).toLocaleString()}<br>
+            <strong>Size:</strong> ${Math.round(doc.size / 1024 * 100) / 100} KB<br>
+            <strong>Type:</strong> ${doc.content_type === 'html' ? 'Markdown' : 'Text'}
+        `;
         
+        // Render content based on type
+        const contentElement = document.getElementById('docModalContent');
+        if (doc.content_type === 'html') {
+            contentElement.innerHTML = doc.content;
+            contentElement.className = 'doc-content html-content';
+        } else {
+            contentElement.textContent = doc.content;
+            contentElement.className = 'doc-content text-content';
+        }
+        
+        // Set current doc filename and show kebab menu for own docs
+        sharedApp.setCurrentDocFilename(doc.filename);
+        
+        document.getElementById('docModal').style.display = 'block';
     } catch (error) {
         console.error('Error opening document:', error);
         alert('Error opening document: ' + error.message);
@@ -439,38 +458,6 @@ function displayFriendDocsEmptyState(message) {
     `;
 }
 
-// Open a specific doc
-async function openDoc(filename) {
-    try {
-        const doc = await sharedApp.fetchAPI(`/api/docs/${encodeURIComponent(filename)}`);
-        
-        document.getElementById('docModalTitle').textContent = doc.title;
-        document.getElementById('docModalMeta').innerHTML = `
-            <strong>Filename:</strong> ${sharedApp.escapeHtml(doc.filename)}<br>
-            <strong>Modified:</strong> ${new Date(doc.modified_at).toLocaleString()}<br>
-            <strong>Size:</strong> ${Math.round(doc.size / 1024 * 100) / 100} KB<br>
-            <strong>Type:</strong> ${doc.content_type === 'html' ? 'Markdown' : 'Text'}
-        `;
-        
-        // Render content based on type
-        const contentElement = document.getElementById('docModalContent');
-        if (doc.content_type === 'html') {
-            contentElement.innerHTML = doc.content;
-            contentElement.className = 'doc-content html-content';
-        } else {
-            contentElement.textContent = doc.content;
-            contentElement.className = 'doc-content text-content';
-        }
-        
-        // Set current doc filename and show kebab menu for own docs
-        sharedApp.setCurrentDocFilename(filename);
-        
-        document.getElementById('docModal').style.display = 'block';
-    } catch (error) {
-        console.error('Error loading doc:', error);
-        alert('Error loading doc: ' + error.message);
-    }
-}
 
 // Open a specific friend doc
 async function openFriendDoc(peerID, filename) {
