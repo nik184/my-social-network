@@ -177,7 +177,6 @@ async function loadDocs() {
         sharedApp.showStatus('docsStatus', 'Loading docs...', false);
         
         const data = await sharedApp.fetchAPI('/api/media/docs/galleries');
-        
         displayDocsWithFilters(data.galleries || []);
         sharedApp.hideStatus('docsStatus');
     } catch (error) {
@@ -261,6 +260,8 @@ function displayDocsWithFilters(galleries) {
             ${filesHtml}
         </div>
     `;
+
+    filterDocs('root_docs');
 }
 
 // Filter docs by gallery
@@ -275,7 +276,7 @@ function filterDocs(galleryName) {
 
     // Show/hide files based on gallery
     document.querySelectorAll('.doc-item').forEach(item => {
-        if (galleryName === 'root_docs' || item.dataset.gallery === galleryName) {
+        if (item.dataset.gallery === galleryName) {
             item.style.display = 'flex';
         } else {
             item.style.display = 'none';
@@ -631,6 +632,8 @@ function displayPhotosWithFilters(galleries) {
     // Create filter buttons
     const filtersHtml = galleryNames.map(gallery => {
         const isRoot = gallery.name === 'root_images';
+        console.log(gallery.name, isRoot);
+
         return `<button class="gallery-filter-btn ${isRoot ? 'active' : ''}" 
                         data-gallery="${gallery.name}" 
                         onclick="filterPhotos('${gallery.name}')">
@@ -656,6 +659,8 @@ function displayPhotosWithFilters(galleries) {
             ${imagesHtml}
         </div>
     `;
+
+    filterPhotos('root_images');
 }
 
 // Filter photos by gallery
@@ -670,7 +675,7 @@ function filterPhotos(galleryName) {
 
     // Show/hide images based on gallery
     document.querySelectorAll('.image-item').forEach(item => {
-        if (galleryName === 'root_images' || item.dataset.gallery === galleryName) {
+        if (item.dataset.gallery === galleryName) {
             item.style.display = 'block';
         } else {
             item.style.display = 'none';
@@ -953,6 +958,8 @@ function displayAudioWithFilters(galleries) {
             ${audioHtml}
         </div>
     `;
+
+    filterAudio('root_audio');
 }
 
 // Filter audio by gallery
@@ -967,7 +974,7 @@ function filterAudio(galleryName) {
 
     // Show/hide audio files based on gallery
     document.querySelectorAll('.audio-item').forEach(item => {
-        if (galleryName === 'root_audio' || item.dataset.gallery === galleryName) {
+        if (item.dataset.gallery === galleryName) {
             item.style.display = 'flex';
         } else {
             item.style.display = 'none';
