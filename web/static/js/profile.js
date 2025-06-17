@@ -1606,14 +1606,16 @@ async function populateDocsSubdirectories() {
     try {
         const response = await sharedApp.fetchAPI('/api/media/docs/galleries');
         const galleries = response.galleries || [];
-        const galleryNames = galleries.map(gallery => gallery.name);
+        const galleryNames = galleries
+            .map(gallery => gallery.name)
+            .filter(name => name !== 'root_docs');
         
         const datalist = document.getElementById('docsSubdirectoryList');
         if (datalist) {
             // Clear existing options
             datalist.innerHTML = '';
             
-            // Add options for each existing gallery
+            // Add options for each existing gallery (excluding root)
             galleryNames.forEach(galleryName => {
                 const option = document.createElement('option');
                 option.value = galleryName;
@@ -1631,14 +1633,16 @@ async function populateImageGalleries() {
     try {
         const response = await sharedApp.fetchAPI('/api/media/image/galleries');
         const galleries = response.galleries || [];
-        const galleryNames = galleries.map(gallery => gallery.name);
+        const galleryNames = galleries
+            .map(gallery => gallery.name)
+            .filter(name => name !== 'root_images');
         
         const datalist = document.getElementById('photosSubdirectoryList');
         if (datalist) {
             // Clear existing options
             datalist.innerHTML = '';
             
-            // Add options for each existing gallery
+            // Add options for each existing gallery (excluding root)
             galleryNames.forEach(galleryName => {
                 const option = document.createElement('option');
                 option.value = galleryName;
@@ -1656,14 +1660,16 @@ async function populateAudioGalleries() {
     try {
         const response = await sharedApp.fetchAPI('/api/media/audio/galleries');
         const galleries = response.galleries || [];
-        const galleryNames = galleries.map(gallery => gallery.name);
+        const galleryNames = galleries
+            .map(gallery => gallery.name)
+            .filter(name => name !== 'root_audio');
         
         const datalist = document.getElementById('audioSubdirectoryList');
         if (datalist) {
             // Clear existing options
             datalist.innerHTML = '';
             
-            // Add options for each existing gallery
+            // Add options for each existing gallery (excluding root)
             galleryNames.forEach(galleryName => {
                 const option = document.createElement('option');
                 option.value = galleryName;
@@ -1681,14 +1687,16 @@ async function populateVideoGalleries() {
     try {
         const response = await sharedApp.fetchAPI('/api/media/video/galleries');
         const galleries = response.galleries || [];
-        const galleryNames = galleries.map(gallery => gallery.name);
+        const galleryNames = galleries
+            .map(gallery => gallery.name)
+            .filter(name => name !== 'root_video');
         
         const datalist = document.getElementById('videoSubdirectoryList');
         if (datalist) {
             // Clear existing options
             datalist.innerHTML = '';
             
-            // Add options for each existing gallery
+            // Add options for each existing gallery (excluding root)
             galleryNames.forEach(galleryName => {
                 const option = document.createElement('option');
                 option.value = galleryName;
