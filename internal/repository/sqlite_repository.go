@@ -56,7 +56,6 @@ func (r *SQLiteRepository) initializeTables() error {
 	}{
 		{"settings", r.getSettingsTableSQL()},
 		{"connections", r.getConnectionsTableSQL()},
-		{"friends", r.getFriendsTableSQL()},
 		{"files", r.getFilesTableSQL()},
 	}
 
@@ -86,18 +85,8 @@ func (r *SQLiteRepository) getConnectionsTableSQL() string {
 		last_connected DATETIME NOT NULL,
 		connection_type VARCHAR(255) NOT NULL,
 		is_validated BOOLEAN NOT NULL DEFAULT 0,
-		peer_name VARCHAR(255) DEFAULT ''
-	);`
-}
-
-func (r *SQLiteRepository) getFriendsTableSQL() string {
-	return `CREATE TABLE IF NOT EXISTS friends (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		peer_id VARCHAR(255) NOT NULL UNIQUE,
-		peer_name VARCHAR(255) NOT NULL,
-		added_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		last_seen DATETIME,
-		is_online BOOLEAN NOT NULL DEFAULT 0
+		peer_name VARCHAR(255) DEFAULT '',
+		friend BOOLEAN NOT NULL DEFAULT 0
 	);`
 }
 
@@ -312,12 +301,13 @@ func (r *SQLiteRepository) GetRecentConnections(days int) ([]models.ConnectionRe
 	return connections, nil
 }
 
-// Friends Repository Implementation
+// Connection-based Friends Implementation
 func (r *SQLiteRepository) AddFriend(peerID, peerName string) error {
 	_, err := r.db.Exec(`
-		INSERT OR REPLACE INTO friends (peer_id, peer_name, added_at)
-		VALUES (?, ?, CURRENT_TIMESTAMP)
-	`, peerID, peerName)
+		UPDATE connections 
+		SET friend = 1, peer_name = ?
+		WHERE peer_id = ?
+	`, peerName, peerID)
 	if err != nil {
 		return utils.WrapDatabaseError("add_friend", err)
 	}
@@ -327,7 +317,7 @@ func (r *SQLiteRepository) AddFriend(peerID, peerName string) error {
 }
 
 func (r *SQLiteRepository) RemoveFriend(peerID string) error {
-	result, err := r.db.Exec("DELETE FROM friends WHERE peer_id = ?", peerID)
+	result, err := r.db.Exec("UPDATE connections SET friend = 0 WHERE peer_id = ?", peerID)
 	if err != nil {
 		return utils.WrapDatabaseError("remove_friend", err)
 	}
@@ -347,8 +337,9 @@ func (r *SQLiteRepository) RemoveFriend(peerID string) error {
 
 func (r *SQLiteRepository) GetFriends() ([]models.Friend, error) {
 	rows, err := r.db.Query(`
-		SELECT id, peer_id, peer_name, added_at, last_seen, is_online
-		FROM friends
+		SELECT id, peer_id, peer_name, first_connected, last_connected, 1 as is_online
+		FROM connections
+		WHERE friend = 1
 		ORDER BY peer_name ASC
 	`)
 	if err != nil {
@@ -359,18 +350,13 @@ func (r *SQLiteRepository) GetFriends() ([]models.Friend, error) {
 	var friends []models.Friend
 	for rows.Next() {
 		var friend models.Friend
-		var lastSeen sql.NullTime
 
 		err := rows.Scan(
 			&friend.ID, &friend.PeerID, &friend.PeerName,
-			&friend.AddedAt, &lastSeen, &friend.IsOnline,
+			&friend.AddedAt, &friend.LastSeen, &friend.IsOnline,
 		)
 		if err != nil {
 			return nil, utils.WrapDatabaseError("scan_friend", err)
-		}
-
-		if lastSeen.Valid {
-			friend.LastSeen = &lastSeen.Time
 		}
 
 		friends = append(friends, friend)
@@ -381,7 +367,7 @@ func (r *SQLiteRepository) GetFriends() ([]models.Friend, error) {
 
 func (r *SQLiteRepository) IsFriend(peerID string) (bool, error) {
 	var count int
-	err := r.db.QueryRow("SELECT COUNT(*) FROM friends WHERE peer_id = ?", peerID).Scan(&count)
+	err := r.db.QueryRow("SELECT COUNT(*) FROM connections WHERE peer_id = ? AND friend = 1", peerID).Scan(&count)
 	if err != nil {
 		return false, utils.WrapDatabaseError("check_friend", err)
 	}
@@ -390,10 +376,10 @@ func (r *SQLiteRepository) IsFriend(peerID string) (bool, error) {
 
 func (r *SQLiteRepository) UpdateFriendStatus(peerID string, isOnline bool) error {
 	_, err := r.db.Exec(`
-		UPDATE friends 
-		SET is_online = ?, last_seen = CURRENT_TIMESTAMP
-		WHERE peer_id = ?
-	`, isOnline, peerID)
+		UPDATE connections 
+		SET last_connected = CURRENT_TIMESTAMP
+		WHERE peer_id = ? AND friend = 1
+	`, peerID)
 	if err != nil {
 		return utils.WrapDatabaseError("update_friend_status", err)
 	}
