@@ -337,6 +337,36 @@ func (h *Handler) HandleFriend(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// HandlePeerFriends handles GET /api/peer-friends/{peerID} requests
+func (h *Handler) HandlePeerFriends(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract peer ID from URL path
+	peerID := r.URL.Path[len("/api/peer-friends/"):]
+	if peerID == "" {
+		http.Error(w, "Peer ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Get friends of the specified peer
+	friends, err := h.appService.GetDatabaseService().GetPeerFriends(peerID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := models.FriendsResponse{
+		Friends: friends,
+		Count:   len(friends),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
 // HandlePeerDocs handles GET/POST /api/peer-docs/{peerID} and /api/peer-docs/{peerID}/{filename} requests
 func (h *Handler) HandlePeerDocs(w http.ResponseWriter, r *http.Request) {
 	// Handle POST requests for downloads
@@ -1770,6 +1800,7 @@ func (h *Handler) RegisterRoutes() {
 	http.HandleFunc("/api/peer-avatar/", h.HandlePeerAvatar)
 	http.HandleFunc("/api/friends", h.HandleFriends)
 	http.HandleFunc("/api/friends/", h.HandleFriend)
+	http.HandleFunc("/api/peer-friends/", h.HandlePeerFriends)
 	http.HandleFunc("/api/peer-docs/", h.HandlePeerDocs)
 
 	// Files sync routes

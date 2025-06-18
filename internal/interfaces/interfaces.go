@@ -26,6 +26,8 @@ type FriendsRepository interface {
 	AddFriend(peerID, peerName string) error
 	RemoveFriend(peerID string) error
 	GetFriends() ([]models.Friend, error)
+	GetPeerFriends(peerID string) ([]models.Friend, error)
+	SavePeerFriends(peerID string, friends []models.Friend) error
 	IsFriend(peerID string) (bool, error)
 	UpdateFriendStatus(peerID string, isOnline bool) error
 }

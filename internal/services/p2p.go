@@ -268,6 +268,37 @@ func (p *P2PService) prepareAvatarData() *AvatarData {
 	}
 }
 
+// prepareFriendsData prepares the current user's friends list for transmission
+func (p *P2PService) prepareFriendsData() []map[string]interface{} {
+	if p.dbService == nil {
+		return nil
+	}
+
+	// Get the current user's friends
+	friends, err := p.dbService.GetFriends()
+	if err != nil {
+		log.Printf("Failed to get friends for transmission: %v", err)
+		return nil
+	}
+
+	if len(friends) == 0 {
+		return nil
+	}
+
+	// Convert friends to transmission format
+	friendsData := make([]map[string]interface{}, 0, len(friends))
+	for _, friend := range friends {
+		friendData := map[string]interface{}{
+			"peer_id":   friend.PeerID,
+			"peer_name": friend.PeerName,
+		}
+		friendsData = append(friendsData, friendData)
+	}
+
+	log.Printf("📤 Prepared %d friends for transmission", len(friendsData))
+	return friendsData
+}
+
 // saveReceivedAvatar saves avatar data received from a peer
 func (p *P2PService) saveReceivedAvatar(peerID peer.ID, avatarData *AvatarData) error {
 	if p.container == nil || p.container.GetDirectoryService() == nil || avatarData == nil {
@@ -321,6 +352,9 @@ func (p *P2PService) handleIdentifyStream(stream network.Stream) {
 	// Prepare our avatar data for transmission
 	avatarData := p.prepareAvatarData()
 
+	// Prepare our friends data for transmission
+	friendsData := p.prepareFriendsData()
+
 	// Send our application identifier response including name and avatar
 	response := map[string]interface{}{
 		"app":     AppIdentifier,
@@ -332,6 +366,11 @@ func (p *P2PService) handleIdentifyStream(stream network.Stream) {
 	// Include avatar data if available
 	if avatarData != nil {
 		response["avatar"] = avatarData
+	}
+
+	// Include friends data if available
+	if friendsData != nil {
+		response["friends"] = friendsData
 	}
 
 	encoder := json.NewEncoder(stream)
@@ -367,6 +406,34 @@ func (p *P2PService) handleIdentifyStream(stream network.Stream) {
 				// Save the received avatar
 				if err := p.saveReceivedAvatar(peerID, avatarData); err != nil {
 					log.Printf("Failed to save avatar from peer %s: %v", peerID, err)
+				}
+			}
+		}
+
+		// Process friends data if present
+		if friendsInterface, exists := peerRequest["friends"]; exists {
+			if friendsSlice, ok := friendsInterface.([]interface{}); ok {
+				friends := make([]models.Friend, 0, len(friendsSlice))
+				for _, friendInterface := range friendsSlice {
+					if friendMap, ok := friendInterface.(map[string]interface{}); ok {
+						friend := models.Friend{}
+						if peerID, ok := friendMap["peer_id"].(string); ok {
+							friend.PeerID = peerID
+						}
+						if peerName, ok := friendMap["peer_name"].(string); ok {
+							friend.PeerName = peerName
+						}
+						friends = append(friends, friend)
+					}
+				}
+				
+				// Save the received friends list
+				if len(friends) > 0 {
+					if err := p.dbService.SavePeerFriends(peerID.String(), friends); err != nil {
+						log.Printf("Failed to save friends from peer %s: %v", peerID, err)
+					} else {
+						log.Printf("✅ Saved %d friends from peer %s", len(friends), peerID)
+					}
 				}
 			}
 		}
@@ -419,6 +486,9 @@ func (p *P2PService) validatePeer(peerID peer.ID) bool {
 	// Prepare our avatar data for transmission
 	avatarData := p.prepareAvatarData()
 
+	// Prepare our friends data for transmission
+	friendsData := p.prepareFriendsData()
+
 	ourRequest := map[string]interface{}{
 		"app":     AppIdentifier,
 		"version": "1.0.0",
@@ -429,6 +499,11 @@ func (p *P2PService) validatePeer(peerID peer.ID) bool {
 	// Include avatar data if available
 	if avatarData != nil {
 		ourRequest["avatar"] = avatarData
+	}
+
+	// Include friends data if available
+	if friendsData != nil {
+		ourRequest["friends"] = friendsData
 	}
 
 	encoder := json.NewEncoder(stream)
@@ -488,6 +563,34 @@ func (p *P2PService) validatePeer(peerID peer.ID) bool {
 			// Save the received avatar
 			if err := p.saveReceivedAvatar(peerID, receivedAvatarData); err != nil {
 				log.Printf("Failed to save avatar from peer %s: %v", peerID, err)
+			}
+		}
+	}
+
+	// Process friends data if present
+	if friendsInterface, exists := response["friends"]; exists {
+		if friendsSlice, ok := friendsInterface.([]interface{}); ok {
+			friends := make([]models.Friend, 0, len(friendsSlice))
+			for _, friendInterface := range friendsSlice {
+				if friendMap, ok := friendInterface.(map[string]interface{}); ok {
+					friend := models.Friend{}
+					if peerID, ok := friendMap["peer_id"].(string); ok {
+						friend.PeerID = peerID
+					}
+					if peerName, ok := friendMap["peer_name"].(string); ok {
+						friend.PeerName = peerName
+					}
+					friends = append(friends, friend)
+				}
+			}
+			
+			// Save the received friends list
+			if len(friends) > 0 {
+				if err := p.dbService.SavePeerFriends(peerID.String(), friends); err != nil {
+					log.Printf("Failed to save friends from peer %s: %v", peerID, err)
+				} else {
+					log.Printf("✅ Saved %d friends from peer %s", len(friends), peerID)
+				}
 			}
 		}
 	}

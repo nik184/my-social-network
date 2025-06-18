@@ -56,6 +56,7 @@ func (r *SQLiteRepository) initializeTables() error {
 	}{
 		{"settings", r.getSettingsTableSQL()},
 		{"connections", r.getConnectionsTableSQL()},
+		{"peer_friends", r.getPeerFriendsTableSQL()},
 		{"files", r.getFilesTableSQL()},
 	}
 
@@ -87,6 +88,17 @@ func (r *SQLiteRepository) getConnectionsTableSQL() string {
 		is_validated BOOLEAN NOT NULL DEFAULT 0,
 		peer_name VARCHAR(255) DEFAULT '',
 		friend BOOLEAN NOT NULL DEFAULT 0
+	);`
+}
+
+func (r *SQLiteRepository) getPeerFriendsTableSQL() string {
+	return `CREATE TABLE IF NOT EXISTS peer_friends (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		peer_id VARCHAR(255) NOT NULL,
+		friend_peer_id VARCHAR(255) NOT NULL,
+		friend_peer_name VARCHAR(255) NOT NULL,
+		added_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(peer_id, friend_peer_id)
 	);`
 }
 
@@ -363,6 +375,70 @@ func (r *SQLiteRepository) GetFriends() ([]models.Friend, error) {
 	}
 
 	return friends, nil
+}
+
+func (r *SQLiteRepository) GetPeerFriends(peerID string) ([]models.Friend, error) {
+	rows, err := r.db.Query(`
+		SELECT 0 as id, friend_peer_id, friend_peer_name, added_at, added_at as last_seen, 0 as is_online
+		FROM peer_friends
+		WHERE peer_id = ?
+		ORDER BY friend_peer_name ASC
+	`, peerID)
+	if err != nil {
+		return nil, utils.WrapDatabaseError("get_peer_friends", err)
+	}
+	defer rows.Close()
+
+	var friends []models.Friend
+	for rows.Next() {
+		var friend models.Friend
+
+		err := rows.Scan(
+			&friend.ID, &friend.PeerID, &friend.PeerName,
+			&friend.AddedAt, &friend.LastSeen, &friend.IsOnline,
+		)
+		if err != nil {
+			return nil, utils.WrapDatabaseError("scan_peer_friend", err)
+		}
+
+		friends = append(friends, friend)
+	}
+
+	return friends, nil
+}
+
+func (r *SQLiteRepository) SavePeerFriends(peerID string, friends []models.Friend) error {
+	// Start a transaction
+	tx, err := r.db.Begin()
+	if err != nil {
+		return utils.WrapDatabaseError("begin_transaction", err)
+	}
+	defer tx.Rollback()
+
+	// Clear existing peer friends for this peer
+	_, err = tx.Exec("DELETE FROM peer_friends WHERE peer_id = ?", peerID)
+	if err != nil {
+		return utils.WrapDatabaseError("clear_peer_friends", err)
+	}
+
+	// Insert new peer friends
+	for _, friend := range friends {
+		_, err = tx.Exec(`
+			INSERT INTO peer_friends (peer_id, friend_peer_id, friend_peer_name)
+			VALUES (?, ?, ?)
+		`, peerID, friend.PeerID, friend.PeerName)
+		if err != nil {
+			return utils.WrapDatabaseError("insert_peer_friend", err)
+		}
+	}
+
+	// Commit the transaction
+	if err = tx.Commit(); err != nil {
+		return utils.WrapDatabaseError("commit_transaction", err)
+	}
+
+	log.Printf("👥 Saved %d friends for peer %s", len(friends), peerID)
+	return nil
 }
 
 func (r *SQLiteRepository) IsFriend(peerID string) (bool, error) {

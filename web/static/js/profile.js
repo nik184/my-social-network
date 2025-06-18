@@ -8,6 +8,7 @@ function initializeProfilePage() {
     photosLoaded = false;
     audioLoaded = false;
     videoLoaded = false;
+    friendsLoaded = false;
     
     // Check if we're viewing a friend's profile or our own
     // Use the navigated URL if available (from SPA navigation), otherwise current location
@@ -541,6 +542,12 @@ function switchTab(tabName) {
         } else {
             loadVideo();
         }
+    } else if (tabName === 'friends' && !friendsLoaded) {
+        if (isViewingFriend && currentFriend) {
+            loadFriendFriends(currentFriend.peer_id);
+        } else {
+            loadProfileFriends();
+        }
     }
 }
 
@@ -548,6 +555,7 @@ function switchTab(tabName) {
 let photosLoaded = false;
 let audioLoaded = false;
 let videoLoaded = false;
+let friendsLoaded = false;
 
 // Load photos and galleries
 async function loadPhotos() {
@@ -1814,6 +1822,156 @@ window.onclick = function(event) {
     if (event.target === docsModal || event.target === photosModal || 
         event.target === audioModal || event.target === videoModal) {
         closeUploadModal();
+    }
+}
+
+// Load friends for profile page
+async function loadProfileFriends() {
+    try {
+        sharedApp.showStatus('friendsTabStatus', 'Loading friends...', false);
+        
+        const data = await sharedApp.fetchAPI('/api/friends');
+        
+        displayProfileFriends(data.friends || []);
+        friendsLoaded = true;
+        sharedApp.hideStatus('friendsTabStatus');
+    } catch (error) {
+        console.error('Error loading friends:', error);
+        sharedApp.showStatus('friendsTabStatus', 'Error loading friends: ' + error.message, true);
+        displayProfileFriendsEmptyState('Failed to load friends');
+    }
+}
+
+// Load friends of another peer
+async function loadFriendFriends(peerID) {
+    try {
+        sharedApp.showStatus('friendsTabStatus', 'Loading friend\'s friends...', false);
+        
+        // Update tab title
+        const friendsTabTitle = document.getElementById('friendsTabTitle');
+        if (friendsTabTitle && currentFriend) {
+            friendsTabTitle.textContent = `👥 ${currentFriend.peer_name}'s Friends`;
+        }
+        
+        const data = await sharedApp.fetchAPI(`/api/peer-friends/${peerID}`);
+        
+        displayProfileFriends(data.friends || []);
+        friendsLoaded = true;
+        sharedApp.hideStatus('friendsTabStatus');
+    } catch (error) {
+        console.error('Error loading friend\'s friends:', error);
+        sharedApp.showStatus('friendsTabStatus', 'Error loading friend\'s friends: ' + error.message, true);
+        displayProfileFriendsEmptyState('Failed to load friend\'s friends');
+    }
+}
+
+// Display friends in profile tab
+function displayProfileFriends(friends) {
+    const friendsTabContent = document.getElementById('friendsTabContent');
+    
+    if (friends.length === 0) {
+        displayProfileFriendsEmptyState('No friends found');
+        return;
+    }
+
+    let friendsHtml = '<div style="display: grid; gap: 15px;">';
+
+    friends.forEach(async (friend, index) => {
+        const addedDate = new Date(friend.added_at).toLocaleDateString();
+        const lastSeenText = friend.last_seen 
+            ? new Date(friend.last_seen).toLocaleString()
+            : 'Never';
+        const onlineStatus = friend.is_online ? 'Online' : 'Offline';
+        const statusColor = friend.is_online ? '#155724' : '#721c24';
+
+        // Load friend's avatar
+        const avatarInfo = await sharedApp.getPeerAvatar(friend.peer_id);
+        const avatarHtml = sharedApp.createPeerAvatarElement(friend.peer_id, avatarInfo, '50px');
+
+        const friendCard = `
+            <div style="border: 1px solid #ddd; border-radius: 5px; padding: 15px; background: #f8f9fa; cursor: pointer;" onclick="viewFriendProfile('${friend.peer_id}')">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center;">
+                        ${avatarHtml}
+                        <div style="margin-left: 15px;">
+                            <strong style="font-size: 18px;">${sharedApp.escapeHtml(friend.peer_name)}</strong>
+                            <br>
+                            <small style="color: #666;">
+                                Added: ${addedDate} • Last seen: ${lastSeenText}
+                                <br>
+                                Status: <span style="color: ${statusColor}; font-weight: bold;">${onlineStatus}</span>
+                            </small>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="button" onclick="event.stopPropagation(); viewFriendProfile('${friend.peer_id}')">View Profile</button>
+                        ${!isViewingFriend ? `<button class="button" onclick="event.stopPropagation(); removeFriend('${friend.peer_id}', '${sharedApp.escapeHtml(friend.peer_name)}')" style="background-color: #dc3545;">Remove</button>` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Add the card to the container
+        if (index === 0) {
+            friendsHtml = friendCard;
+            friendsTabContent.innerHTML = friendsHtml;
+        } else {
+            friendsTabContent.innerHTML += friendCard;
+        }
+    });
+}
+
+// Display empty state for friends in profile
+function displayProfileFriendsEmptyState(message) {
+    const friendsTabContent = document.getElementById('friendsTabContent');
+    friendsTabContent.innerHTML = `
+        <div class="empty-state">
+            <div class="empty-state-icon">👥</div>
+            <div>${message}</div>
+            <div class="create-doc-hint">
+                ${isViewingFriend ? '📡 Friends list is requested directly from your friend via P2P connection' : '💡 Add friends from the Friends page'}
+            </div>
+        </div>
+    `;
+}
+
+// Navigate to friend profile page using SPA navigation
+function viewFriendProfile(peerID) {
+    if (typeof sharedApp !== 'undefined' && sharedApp.loadPage) {
+        sharedApp.loadPage(`/friend-profile?peer_id=${encodeURIComponent(peerID)}`);
+    } else {
+        window.location.href = `/friend-profile?peer_id=${encodeURIComponent(peerID)}`;
+    }
+}
+
+// Remove a friend (only for own profile)
+async function removeFriend(peerID, friendName) {
+    if (!confirm(`Are you sure you want to remove ${friendName} from your friends?`)) {
+        return;
+    }
+
+    try {
+        sharedApp.showStatus('friendsTabStatus', `Removing ${friendName}...`, false);
+        
+        const response = await fetch(`/api/friends/${encodeURIComponent(peerID)}`, {
+            method: 'DELETE'
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to remove friend');
+        }
+        
+        sharedApp.showStatus('friendsTabStatus', `✅ ${friendName} removed from friends`, false);
+        
+        // Reload friends list
+        setTimeout(() => {
+            friendsLoaded = false;
+            loadProfileFriends();
+        }, 1000);
+        
+    } catch (error) {
+        console.error('Error removing friend:', error);
+        sharedApp.showStatus('friendsTabStatus', `❌ Failed to remove ${friendName}: ${error.message}`, true);
     }
 }
 
