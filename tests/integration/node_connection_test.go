@@ -17,17 +17,30 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-// ConnectionInfoResponse represents the API response for connection info
-type ConnectionInfoResponse struct {
-	PeerID         string   `json:"peerId"`
-	PublicAddress  string   `json:"publicAddress,omitempty"`
-	Port           int      `json:"port,omitempty"`
-	LocalAddresses []string `json:"localAddresses"`
-	IsPublicNode   bool     `json:"isPublicNode"`
+// NodeInfoResponse represents the API response for /api/info
+type NodeInfoResponse struct {
+	FolderInfo         *FolderInfo              `json:"folderInfo,omitempty"`
+	Node               *NetworkNode             `json:"node"`
+	IsPublicNode       bool                     `json:"isPublicNode"`
+	ConnectedPeerInfo  map[string]*PeerInfoJSON `json:"connectedPeerInfo,omitempty"`
 }
 
-// PeerInfoResponse represents peer information in API responses
-type PeerInfoResponse struct {
+// NetworkNode represents node information
+type NetworkNode struct {
+	ID        string    `json:"id"`
+	Addresses []string  `json:"addresses"`
+	LastSeen  time.Time `json:"lastSeen"`
+}
+
+// FolderInfo represents folder scan information
+type FolderInfo struct {
+	Path     string    `json:"path"`
+	Files    []string  `json:"files"`
+	LastScan time.Time `json:"lastScan"`
+}
+
+// PeerInfoJSON represents detailed peer information
+type PeerInfoJSON struct {
 	ID             string    `json:"id"`
 	Name           string    `json:"name"`
 	Addresses      []string  `json:"addresses"`
@@ -36,6 +49,16 @@ type PeerInfoResponse struct {
 	IsValidated    bool      `json:"is_validated"`
 	ConnectionType string    `json:"connection_type"`
 	HasAvatar      bool      `json:"has_avatar"`
+}
+
+// PeersResponse represents the API response for /api/peers
+type PeersResponse struct {
+	ValidatedPeers      []string `json:"validatedPeers"`
+	ValidatedCount      int      `json:"validatedCount"`
+	TotalConnectedCount int      `json:"totalConnectedCount"`
+	ApplicationPeers    []string `json:"applicationPeers"`
+	Peers               []string `json:"peers"`
+	Count               int      `json:"count"`
 }
 
 // SecondDegreePeerResponse represents a second-degree peer in API responses
@@ -113,9 +136,9 @@ func TestTwoIsolatedNodesConnection(t *testing.T) {
 
 	// Get connection information from Node A
 	t.Log("🔍 Retrieving connection info from Node A...")
-	nodeAInfo, err := getNodeConnectionInfo(ctx, nodeA)
+	nodeAInfo, err := getNodeInfo(ctx, nodeA)
 	require.NoError(t, err, "Failed to get Node A connection info")
-	t.Logf("✅ Node A - PeerID: %s, Addresses: %d", nodeAInfo.PeerID, len(nodeAInfo.LocalAddresses))
+	t.Logf("✅ Node A - PeerID: %s, Addresses: %d", nodeAInfo.Node.ID, len(nodeAInfo.Node.Addresses))
 
 	// Get Node A's container IP for direct connection
 	nodeAIP, err := nodeA.ContainerIP(ctx)
@@ -124,7 +147,7 @@ func TestTwoIsolatedNodesConnection(t *testing.T) {
 
 	// Attempt to connect Node B to Node A
 	t.Log("🔗 Connecting Node B to Node A...")
-	err = connectNodeToTarget(ctx, nodeB, nodeAIP, 9000, nodeAInfo.PeerID)
+	err = connectNodeToTarget(ctx, nodeB, nodeAIP, 9000, nodeAInfo.Node.ID)
 	require.NoError(t, err, "Node B should be able to connect to Node A")
 	t.Log("✅ Connection request sent from Node B to Node A")
 
@@ -134,46 +157,46 @@ func TestTwoIsolatedNodesConnection(t *testing.T) {
 
 	// Verify Node B has connected to Node A
 	t.Log("🔍 Verifying Node B's connections...")
-	nodeBPeers, err := getNodePeerInfo(ctx, nodeB)
+	nodeBPeers, err := getNodePeers(ctx, nodeB)
 	require.NoError(t, err, "Failed to get Node B peer info")
-	assert.GreaterOrEqual(t, len(nodeBPeers), 1, "Node B should have at least 1 connected peer")
+	assert.GreaterOrEqual(t, nodeBPeers.ValidatedCount, 1, "Node B should have at least 1 connected peer")
 
 	// Check if Node A is in Node B's peer list
 	var nodeAFoundInB bool
-	for _, peer := range nodeBPeers {
-		if peer.ID == nodeAInfo.PeerID && peer.Name == "node-a" {
+	for _, peerID := range nodeBPeers.ValidatedPeers {
+		if peerID == nodeAInfo.Node.ID {
 			nodeAFoundInB = true
-			t.Logf("✅ Node B recognizes Node A: %s (%s)", peer.Name, peer.ID)
+			t.Logf("✅ Node B recognizes Node A: %s", peerID)
 			break
 		}
 	}
-	assert.True(t, nodeAFoundInB, "Node B should recognize Node A by name and ID")
+	assert.True(t, nodeAFoundInB, "Node B should recognize Node A by ID")
 
 	// Verify Node A has connected to Node B (bidirectional connection)
 	t.Log("🔍 Verifying Node A's connections...")
-	nodeAPeers, err := getNodePeerInfo(ctx, nodeA)
+	nodeAPeers, err := getNodePeers(ctx, nodeA)
 	require.NoError(t, err, "Failed to get Node A peer info")
-	assert.GreaterOrEqual(t, len(nodeAPeers), 1, "Node A should have at least 1 connected peer")
+	assert.GreaterOrEqual(t, nodeAPeers.ValidatedCount, 1, "Node A should have at least 1 connected peer")
 
 	// Get Node B's info to verify the bidirectional connection
-	nodeBInfo, err := getNodeConnectionInfo(ctx, nodeB)
+	nodeBInfo, err := getNodeInfo(ctx, nodeB)
 	require.NoError(t, err, "Failed to get Node B connection info")
 
 	var nodeBFoundInA bool
-	for _, peer := range nodeAPeers {
-		if peer.ID == nodeBInfo.PeerID && peer.Name == "node-b" {
+	for _, peerID := range nodeAPeers.ValidatedPeers {
+		if peerID == nodeBInfo.Node.ID {
 			nodeBFoundInA = true
-			t.Logf("✅ Node A recognizes Node B: %s (%s)", peer.Name, peer.ID)
+			t.Logf("✅ Node A recognizes Node B: %s", peerID)
 			break
 		}
 	}
-	assert.True(t, nodeBFoundInA, "Node A should recognize Node B by name and ID")
+	assert.True(t, nodeBFoundInA, "Node A should recognize Node B by ID")
 
 	// Final verification: Both nodes should have exactly 1 peer (each other)
 	t.Log("🎯 Final verification...")
 	if nodeAFoundInB && nodeBFoundInA {
 		t.Log("🎉 SUCCESS: Bidirectional connection established between isolated nodes!")
-		t.Logf("   Node A (%s) ↔ Node B (%s)", nodeAInfo.PeerID[:12]+"...", nodeBInfo.PeerID[:12]+"...")
+		t.Logf("   Node A (%s) ↔ Node B (%s)", nodeAInfo.Node.ID[:12]+"...", nodeBInfo.Node.ID[:12]+"...")
 	}
 
 	t.Log("✅ Two isolated nodes connection test completed successfully")
@@ -241,16 +264,16 @@ func startIsolatedNode(ctx context.Context, nodeName, dockerfile string) (testco
 	})
 }
 
-// getNodeConnectionInfo retrieves connection information from a node's API
-func getNodeConnectionInfo(ctx context.Context, container testcontainers.Container) (*ConnectionInfoResponse, error) {
-	url, err := buildAPIURL(ctx, container, "/api/connection-info")
+// getNodeInfo retrieves node information from a node's API
+func getNodeInfo(ctx context.Context, container testcontainers.Container) (*NodeInfoResponse, error) {
+	url, err := buildAPIURL(ctx, container, "/api/info")
 	if err != nil {
 		return nil, err
 	}
 
 	resp, err := http.Get(url)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get connection info: %w", err)
+		return nil, fmt.Errorf("failed to get node info: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -258,7 +281,7 @@ func getNodeConnectionInfo(ctx context.Context, container testcontainers.Contain
 		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
 	}
 
-	var info ConnectionInfoResponse
+	var info NodeInfoResponse
 	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
@@ -266,9 +289,9 @@ func getNodeConnectionInfo(ctx context.Context, container testcontainers.Contain
 	return &info, nil
 }
 
-// getNodePeerInfo retrieves connected peer information from a node's API
-func getNodePeerInfo(ctx context.Context, container testcontainers.Container) ([]PeerInfoResponse, error) {
-	url, err := buildAPIURL(ctx, container, "/api/peer-info")
+// getNodePeers retrieves connected peer information from a node's API
+func getNodePeers(ctx context.Context, container testcontainers.Container) (*PeersResponse, error) {
+	url, err := buildAPIURL(ctx, container, "/api/peers")
 	if err != nil {
 		return nil, err
 	}
@@ -283,12 +306,12 @@ func getNodePeerInfo(ctx context.Context, container testcontainers.Container) ([
 		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
 	}
 
-	var peers []PeerInfoResponse
+	var peers PeersResponse
 	if err := json.NewDecoder(resp.Body).Decode(&peers); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	return peers, nil
+	return &peers, nil
 }
 
 // connectNodeToTarget connects a node to another node via API
