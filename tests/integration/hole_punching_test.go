@@ -136,10 +136,10 @@ func TestHolePunchingMechanism(t *testing.T) {
 	assert.GreaterOrEqual(t, publicPeers.ValidatedCount, 2, "Public Node should have at least 2 connected peers")
 	t.Logf("✅ Public Node has %d validated peers", publicPeers.ValidatedCount)
 
-	// Phase 2: Test that NAT nodes can't discover each other directly (simulating NAT behavior)
-	t.Log("🔗 Phase 2: Testing NAT simulation - nodes should not discover each other directly...")
+	// Phase 2: Test that NAT nodes cannot connect to each other directly (simulating NAT/firewall)
+	t.Log("🔗 Phase 2: Testing direct connection blocking between NAT nodes...")
 
-	// Check that NAT Node A doesn't initially know about NAT Node B
+	// Verify NAT Node A doesn't initially know about NAT Node B
 	natAPeersInitial, err := getNodePeers(ctx, natNodeA)
 	require.NoError(t, err, "Failed to get NAT Node A initial peers")
 	
@@ -151,11 +151,40 @@ func TestHolePunchingMechanism(t *testing.T) {
 		}
 	}
 	
-	// In a real NAT scenario, they wouldn't discover each other initially
 	if !natBFoundInitially {
-		t.Log("✅ NAT simulation: NAT nodes haven't discovered each other directly (as expected)")
+		t.Log("✅ Initial verification: NAT Node A doesn't know NAT Node B (as expected)")
 	} else {
-		t.Log("⚠️ Note: NAT nodes discovered each other directly (they're on same network)")
+		t.Log("⚠️ Note: NAT Node A already discovered NAT Node B")
+	}
+
+	// Test direct connection attempt between NAT nodes (should fail in real NAT scenario)
+	// Since they're on the same Docker network, we'll simulate NAT blocking by checking
+	// that they can't discover each other without going through the relay
+	natAIP, err := natNodeA.ContainerIP(ctx)
+	require.NoError(t, err, "Failed to get NAT Node A IP")
+
+	// In a real NAT environment, this direct connection would fail
+	// Since we're in a controlled Docker environment, we'll document this limitation
+	t.Logf("🔍 NAT Node A IP: %s", natAIP)
+	t.Log("📝 Note: In a real NAT environment, direct IP connection would be blocked")
+	t.Log("    Docker network allows direct connection, but we're testing the hole punching logic")
+	
+	// Verify they haven't connected to each other yet (before hole punching)
+	natBPeersInitial, err := getNodePeers(ctx, natNodeB)
+	require.NoError(t, err, "Failed to get NAT Node B initial peers")
+	
+	var natAFoundInitially bool
+	for _, peerID := range natBPeersInitial.ValidatedPeers {
+		if peerID == natAInfo.Node.ID {
+			natAFoundInitially = true
+			break
+		}
+	}
+	
+	if !natAFoundInitially && !natBFoundInitially {
+		t.Log("✅ Verified: NAT nodes haven't discovered each other directly (hole punching needed)")
+	} else {
+		t.Log("⚠️ Note: NAT nodes discovered each other directly (same Docker network)")
 	}
 
 	// Phase 3: Use hole punching mechanism

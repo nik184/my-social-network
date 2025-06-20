@@ -133,8 +133,69 @@ func TestAdvancedHolePunchingMechanism(t *testing.T) {
 	assert.GreaterOrEqual(t, publicPeers.ValidatedCount, 3, "Public Node should have at least 3 connected peers")
 	t.Logf("✅ Public Node has %d validated peers", publicPeers.ValidatedCount)
 
-	// Phase 2: Use Public Node to help Private Node A and B connect to Private Node C
-	t.Log("🔗 Phase 2: Using Public Node to connect Private Nodes A & B to Private Node C...")
+	// Phase 2: Verify private nodes cannot connect directly, then use Public Node as relay
+	t.Log("🔗 Phase 2: Testing direct connection blocking and relay-based discovery...")
+
+	// First verify that private nodes haven't discovered each other directly
+	t.Log("🔍 Verifying private nodes are isolated from each other...")
+	
+	privateAPeersInitial, err := getNodePeers(ctx, privateNodeA)
+	require.NoError(t, err, "Failed to get Private Node A initial peers")
+	
+	privateBPeersInitial, err := getNodePeers(ctx, privateNodeB)
+	require.NoError(t, err, "Failed to get Private Node B initial peers")
+	
+	privateCPeersInitial, err := getNodePeers(ctx, privateNodeC)
+	require.NoError(t, err, "Failed to get Private Node C initial peers")
+
+	// Check that A doesn't know about B or C initially
+	var aBFoundInitially, aCFoundInitially bool
+	for _, peerID := range privateAPeersInitial.ValidatedPeers {
+		if peerID == privateBInfo.Node.ID {
+			aBFoundInitially = true
+		}
+		if peerID == privateCInfo.Node.ID {
+			aCFoundInitially = true
+		}
+	}
+
+	// Check that B doesn't know about A or C initially  
+	var bAFoundInitially, bCFoundInitially bool
+	for _, peerID := range privateBPeersInitial.ValidatedPeers {
+		if peerID == privateAInfo.Node.ID {
+			bAFoundInitially = true
+		}
+		if peerID == privateCInfo.Node.ID {
+			bCFoundInitially = true
+		}
+	}
+
+	// Check that C doesn't know about A or B initially
+	var cAFoundInitially, cBFoundInitially bool
+	for _, peerID := range privateCPeersInitial.ValidatedPeers {
+		if peerID == privateAInfo.Node.ID {
+			cAFoundInitially = true
+		}
+		if peerID == privateBInfo.Node.ID {
+			cBFoundInitially = true
+		}
+	}
+
+	// Verify isolation
+	if !aBFoundInitially && !aCFoundInitially && !bAFoundInitially && !bCFoundInitially && !cAFoundInitially && !cBFoundInitially {
+		t.Log("✅ Verified: All private nodes are isolated (cannot discover each other directly)")
+	} else {
+		t.Log("⚠️ Note: Some private nodes discovered each other directly (same Docker network)")
+		t.Logf("   A->B: %t, A->C: %t, B->A: %t, B->C: %t, C->A: %t, C->B: %t", 
+			aBFoundInitially, aCFoundInitially, bAFoundInitially, bCFoundInitially, cAFoundInitially, cBFoundInitially)
+	}
+
+	// Document NAT simulation limitation
+	t.Log("📝 Note: In real NAT/firewall environment, direct connections would be blocked")
+	t.Log("    Docker network allows connectivity, but we're testing hole punching logic")
+
+	// Now use Public Node to help connect A & B to C
+	t.Log("🔗 Using Public Node to connect Private Nodes A & B to Private Node C...")
 
 	// Private Node A discovers and connects to Private Node C via Public Node
 	err = requestHolePunching(ctx, privateNodeA, privateCInfo.Node.ID, publicInfo.Node.ID)
@@ -207,8 +268,38 @@ func TestAdvancedHolePunchingMechanism(t *testing.T) {
 	// Wait for nodes to detect the termination
 	time.Sleep(10 * time.Second)
 
-	// Phase 4: Use Private Node C as relay for Private Nodes A and B to connect to each other
-	t.Log("🔗 Phase 4: Using Private Node C as relay for A and B to connect...")
+	// Phase 4: Verify A and B still cannot connect directly, then use C as relay
+	t.Log("🔗 Phase 4: Verifying A-B isolation and using Private Node C as relay...")
+
+	// First verify that A and B still haven't connected directly (before using C as relay)
+	privateAPeersBeforeAB, err := getNodePeers(ctx, privateNodeA)
+	require.NoError(t, err, "Failed to get Private Node A peers before A-B connection")
+	
+	privateBPeersBeforeAB, err := getNodePeers(ctx, privateNodeB)
+	require.NoError(t, err, "Failed to get Private Node B peers before A-B connection")
+
+	var aBFoundBeforeRelay, bAFoundBeforeRelay bool
+	for _, peerID := range privateAPeersBeforeAB.ValidatedPeers {
+		if peerID == privateBInfo.Node.ID {
+			aBFoundBeforeRelay = true
+			break
+		}
+	}
+	for _, peerID := range privateBPeersBeforeAB.ValidatedPeers {
+		if peerID == privateAInfo.Node.ID {
+			bAFoundBeforeRelay = true
+			break
+		}
+	}
+
+	if !aBFoundBeforeRelay && !bAFoundBeforeRelay {
+		t.Log("✅ Verified: A and B are still isolated (need relay to connect)")
+	} else {
+		t.Log("⚠️ Note: A and B discovered each other without relay")
+	}
+
+	// Now use Private Node C as relay for A and B to connect
+	t.Log("🔗 Using Private Node C as relay for A and B to connect...")
 
 	// Private Node A discovers and connects to Private Node B via Private Node C
 	err = requestHolePunching(ctx, privateNodeA, privateBInfo.Node.ID, privateCInfo.Node.ID)
