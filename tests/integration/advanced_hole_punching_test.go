@@ -266,7 +266,7 @@ func TestAdvancedHolePunchingMechanism(t *testing.T) {
 
 	// Test P2P communication across the network
 	t.Log("🔍 Testing P2P communication across the network...")
-	
+
 	// Test A -> C communication
 	err = testP2PCommunication(ctx, privateNodeA, privateCInfo.Node.ID)
 	if err == nil {
@@ -341,8 +341,8 @@ func startAdvancedNode(ctx context.Context, nodeName, dockerfile, networkName st
 		Networks:     []string{networkName},
 		WaitingFor:   wait.ForLog("P2P Host created successfully").WithStartupTimeout(120 * time.Second),
 		Env: map[string]string{
-			"NODE_NAME":               nodeName,
-			"IS_PUBLIC_NODE":          fmt.Sprintf("%t", isPublic),
+			"NODE_NAME":                nodeName,
+			"IS_PUBLIC_NODE":           fmt.Sprintf("%t", isPublic),
 			"ADVANCED_HOLE_PUNCH_MODE": nodeType,
 		},
 	}
