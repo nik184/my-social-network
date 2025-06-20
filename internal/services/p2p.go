@@ -822,6 +822,15 @@ func (p *P2PService) handleStream(stream network.Stream) {
 			Payload: imageResponse,
 		}
 
+	case models.MessageTypeGetFriends:
+		// Handle friends list request
+		log.Printf("👥 Processing friends request from %s", peerID)
+		friendsResponse := p.handleGetFriendsRequest()
+		response = models.P2PMessage{
+			Type:    models.MessageTypeGetFriendsResp,
+			Payload: friendsResponse,
+		}
+
 	default:
 		log.Printf("Unknown message type: %s", msg.Type)
 		return
@@ -1733,6 +1742,30 @@ func (p *P2PService) handleGetDocsRequest() *models.DocsResponse {
 	}
 }
 
+// handleGetFriendsRequest handles P2P request for friends list
+func (p *P2PService) handleGetFriendsRequest() *models.FriendsResponse {
+	if p.dbService == nil {
+		return &models.FriendsResponse{
+			Friends: []models.Friend{},
+			Count:   0,
+		}
+	}
+
+	friends, err := p.dbService.GetFriends()
+	if err != nil {
+		log.Printf("Failed to get friends for P2P request: %v", err)
+		return &models.FriendsResponse{
+			Friends: []models.Friend{},
+			Count:   0,
+		}
+	}
+
+	return &models.FriendsResponse{
+		Friends: friends,
+		Count:   len(friends),
+	}
+}
+
 // handleGetDocRequest handles P2P request for specific doc
 func (p *P2PService) handleGetDocRequest(payload interface{}) *models.DocResponse {
 	if p.container == nil || p.container.GetDirectoryService() == nil {
@@ -2276,6 +2309,125 @@ func (p *P2PService) getNodeInfo() *models.NodeInfoResponse {
 	}
 
 	return response
+}
+
+// FetchPeerFriends requests friends list from a remote peer
+func (p *P2PService) FetchPeerFriends(peerID peer.ID) ([]models.Friend, error) {
+	ctx, cancel := context.WithTimeout(p.ctx, 10*time.Second)
+	defer cancel()
+
+	stream, err := p.host.NewStream(ctx, peerID, protocol.ID(AppProtocol))
+	if err != nil {
+		return nil, fmt.Errorf("failed to open stream: %w", err)
+	}
+	defer stream.Close()
+
+	// Send friends request
+	msg := models.P2PMessage{
+		Type:    models.MessageTypeGetFriends,
+		Payload: models.FriendsRequest{},
+	}
+
+	encoder := json.NewEncoder(stream)
+	if err := encoder.Encode(msg); err != nil {
+		return nil, fmt.Errorf("failed to send friends request: %w", err)
+	}
+
+	// Read response
+	decoder := json.NewDecoder(stream)
+	var response models.P2PMessage
+	if err := decoder.Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if response.Type != models.MessageTypeGetFriendsResp {
+		return nil, fmt.Errorf("unexpected response type: %s", response.Type)
+	}
+
+	// Parse response payload
+	responseData, err := json.Marshal(response.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal response payload: %w", err)
+	}
+
+	var friendsResponse models.FriendsResponse
+	if err := json.Unmarshal(responseData, &friendsResponse); err != nil {
+		return nil, fmt.Errorf("failed to parse friends response: %w", err)
+	}
+
+	log.Printf("✅ Successfully fetched %d friends from peer %s", len(friendsResponse.Friends), peerID)
+	return friendsResponse.Friends, nil
+}
+
+// FetchAndSavePeerFriends fetches friends from a remote peer and saves them to the database
+func (p *P2PService) FetchAndSavePeerFriends(peerIDStr string) ([]models.Friend, error) {
+	// First, check if we have connection info for this peer
+	connectionHistory, err := p.dbService.GetConnectionHistory()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get connection history: %w", err)
+	}
+
+	var targetConnection *models.ConnectionRecord
+	for _, conn := range connectionHistory {
+		if conn.PeerID == peerIDStr {
+			targetConnection = &conn
+			break
+		}
+	}
+
+	if targetConnection == nil {
+		return nil, fmt.Errorf("no connection information found for peer %s", peerIDStr)
+	}
+
+	// Parse the peer ID
+	peerID, err := peer.Decode(peerIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid peer ID: %w", err)
+	}
+
+	// Fetch friends from the remote peer
+	friends, err := p.FetchPeerFriends(peerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch friends from peer: %w", err)
+	}
+
+	// Save the fetched friends to the peer_friends table
+	if len(friends) > 0 {
+		if err := p.dbService.SavePeerFriends(peerIDStr, friends); err != nil {
+			return nil, fmt.Errorf("failed to save peer friends: %w", err)
+		}
+
+		// Save fetched friends as connection records for potential future connections
+		for _, friend := range friends {
+			// Check if we already have a connection record for this friend
+			connectionExists := false
+			for _, conn := range connectionHistory {
+				if conn.PeerID == friend.PeerID {
+					connectionExists = true
+					break
+				}
+			}
+
+			// If no connection record exists, create a placeholder connection record
+			if !connectionExists {
+				// Use a placeholder address since we don't know the actual address
+				err := p.dbService.RecordConnectionWithName(
+					friend.PeerID,
+					"unknown:0",   // placeholder address
+					"peer_friend", // connection type to indicate this was discovered through friends
+					false,         // not validated yet
+					friend.PeerName,
+				)
+				if err != nil {
+					log.Printf("⚠️ Failed to record connection for friend %s: %v", friend.PeerID, err)
+				} else {
+					log.Printf("📝 Recorded placeholder connection for friend %s (%s)", friend.PeerName, friend.PeerID)
+				}
+			}
+		}
+	}
+
+	return friends, nil
 }
 
 // Close shuts down the P2P service

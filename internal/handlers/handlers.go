@@ -351,11 +351,28 @@ func (h *Handler) HandlePeerFriends(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get friends of the specified peer
+	// First, try to get friends from local database
 	friends, err := h.appService.GetDatabaseService().GetPeerFriends(peerID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	// If no friends found locally, try to fetch from remote peer
+	if len(friends) == 0 {
+		log.Printf("🔍 No local friends data for peer %s, attempting remote fetch...", peerID)
+		
+		p2pService := h.appService.GetP2PService()
+		if p2pService != nil {
+			remoteFriends, err := p2pService.FetchAndSavePeerFriends(peerID)
+			if err != nil {
+				log.Printf("⚠️ Failed to fetch friends from remote peer %s: %v", peerID, err)
+				// Continue with empty friends list - don't fail the request
+			} else if len(remoteFriends) > 0 {
+				log.Printf("✅ Successfully fetched and saved %d friends from remote peer %s", len(remoteFriends), peerID)
+				friends = remoteFriends
+			}
+		}
 	}
 
 	response := models.FriendsResponse{

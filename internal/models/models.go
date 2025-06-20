@@ -162,6 +162,11 @@ type AddFriendRequest struct {
 	PeerName string `json:"peer_name"`
 }
 
+// FriendsRequest represents a request for friends list
+type FriendsRequest struct {
+	// No additional fields needed for basic friends list request
+}
+
 // FilesRequest represents a request for files table
 type FilesRequest struct {
 	RequestID string `json:"request_id"`
@@ -291,4 +296,6 @@ const (
 	MessageTypeGetMediaGalleryResp   = "getMediaGalleryResp"
 	MessageTypeGetMediaFile          = "getMediaFile"
 	MessageTypeGetMediaFileResp      = "getMediaFileResp"
+	MessageTypeGetFriends            = "getFriends"
+	MessageTypeGetFriendsResp        = "getFriendsResp"
 )
