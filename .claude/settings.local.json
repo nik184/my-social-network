@@ -28,7 +28,10 @@
       "Bash(/home/nik2023/go/old-school/remove_legacy_handlers.sh:*)",
       "Bash(cp:*)",
       "Bash(diff:*)",
-      "Bash(./run-e2e-tests.sh:*)"
+      "Bash(./run-e2e-tests.sh:*)",
+      "Bash(docker container prune:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": []
   },
